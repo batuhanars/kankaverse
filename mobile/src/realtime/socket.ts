@@ -2,7 +2,7 @@ import { Alert, AppState } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 import { getAccessToken, refreshAccessToken } from '@/api/http';
 import { useMessagesStore } from '@/stores/messages';
-import { hydrateOne } from '@/stores/e2ee';
+import { decryptDmLastMessage, hydrateOne } from '@/stores/e2ee';
 import { bindE2eeSocket } from './e2eeSocket';
 import { useTypingStore } from '@/stores/typing';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -289,8 +289,10 @@ function ensureSocket(): Socket {
   // kimse dinlemiyordu → DM listesi, istek rozeti ve bildirim rozeti bayat kalıyordu. Web
   // `composables/useSocket.ts` ile aynı olay kümesi (bu sprintte kullanılan alt küme).
 
-  socket.on('dm.message', (data: { channelId: string; lastMessage: { id?: string; content: string; createdAt: string; encrypted?: boolean }; senderId: string }) => {
+  socket.on('dm.message', (data: { channelId: string; lastMessage: { id?: string; content: string; createdAt: string; encrypted?: boolean; e2ee?: { ciphertext: string; senderDeviceId: string; createdAt: string } }; senderId: string }) => {
     useDmStore.getState().applyActivity(data);
+    // E3 Rev.5: şifreli yük varsa ön planda çöz; liste önizlemesi `plainTick` ile depodan okunur.
+    void decryptDmLastMessage(data.channelId, data.lastMessage, data.senderId).catch(() => undefined);
   });
 
   // C46 §4b — DM/grup satırında tepki göstergesi (süzgeç sunucuda)

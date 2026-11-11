@@ -15,9 +15,11 @@ interface E2eeState {
   engine: E2eeEngine | null;
   warnings: Record<string, WarningKind>;
   channels: Record<string, ChannelInfo>;
+  /** Yeni düz metin depoya yazılınca artar; DM listesi önizlemesi buna bağlıdır (E3 Rev.5). */
+  plainTick: number;
 }
 
-export const useE2eeStore = create<E2eeState>(() => ({ engine: null, warnings: {}, channels: {} }));
+export const useE2eeStore = create<E2eeState>(() => ({ engine: null, warnings: {}, channels: {}, plainTick: 0 }));
 
 const set = useE2eeStore.setState;
 const get = useE2eeStore.getState;
@@ -25,6 +27,12 @@ let ready: Promise<void> = Promise.resolve();
 
 const setWarning = (channelId: string, kind: WarningKind) =>
   set((s) => ({ warnings: { ...s.warnings, [channelId]: kind } }));
+
+/**
+ * E3 Rev.5: bir mesajın düz metni depoya yazıldı (soket çözmesi VEYA push yolundaki çevrimdışı çözme); liste
+ * önizlemesi depodan yeniden okusun. Yalnız bir `setState`: zamanlayıcı yok, arka plan yolunda da güvenli.
+ */
+export const markDecrypted = () => set((s) => ({ plainTick: s.plainTick + 1 }));
 
 /** Girişten sonra bir kez: durum → cihaz kaydı → KeyPackage → bekleyen Welcome'lar. */
 export function initE2ee(userId: string): Promise<void> {
@@ -126,6 +134,33 @@ export async function fillPinsFromStore(pins: MessageDto[]): Promise<MessageDto[
 /** Tek mesaj (soket/HTTP yankısı). İptal cihazdan gelen mesaj elenir (null). */
 export async function hydrateOne(m: MessageDto): Promise<MessageDto | null> {
   return (await hydrateMessages(m.channelId, [m]))[0] ?? null;
+}
+
+/**
+ * E3 Rev.5 (ön plan): `dm.message` soketindeki şifreli yükü UI motoruyla çözer (tek çözme kuralı motorda:
+ * depoda varsa okunur; push yolu aynı kuyruktan geçer, iki kez çözülmez). Motor yoksa hiçbir şey yapılmaz.
+ */
+export async function decryptDmLastMessage(
+  channelId: string,
+  last: { id?: string; createdAt: string; e2ee?: { ciphertext: string; senderDeviceId: string; createdAt: string } },
+  senderId: string,
+): Promise<void> {
+  const { id, e2ee } = last;
+  if (!id || !e2ee || !get().engine) return;
+  const m = await hydrateOne({
+    id,
+    channelId,
+    content: '',
+    encrypted: true,
+    ciphertext: e2ee.ciphertext,
+    senderDeviceId: e2ee.senderDeviceId,
+    replyToId: null,
+    author: { id: senderId, username: '', avatarUrl: null },
+    createdAt: e2ee.createdAt,
+    editedAt: null,
+    pinnedAt: null,
+  } as MessageDto);
+  if (m?.e2eeStatus === 'ok') markDecrypted();
 }
 
 /** Sayfa (yeniden eskiye) için çözme; sayfa eskiden yeniye çözülür (MLS sırası, bkz. motor). */

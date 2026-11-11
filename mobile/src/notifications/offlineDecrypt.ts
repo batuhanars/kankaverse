@@ -1,6 +1,6 @@
 import type { NotificationPreview } from '@kankaverse/e2ee-client';
 import { flushPushCryptoMetrics, openLocalMobileEngine } from '@/e2ee/startEngine';
-import { useE2eeStore } from '@/stores/e2ee';
+import { markDecrypted, useE2eeStore } from '@/stores/e2ee';
 import { loadCachedUserId } from './headlessEngine';
 import type { PushE2ee } from './e2eePayload';
 
@@ -49,6 +49,8 @@ export async function decryptOfflineForPush(
   } catch {
     // hata türü bile loglanmaz: sonuç unavailable, bildirim genel metinle kalır
   }
+  // Liste ön plandaysa önizleme bu çözmeyi de görsün (tek setState, zamanlayıcı yok).
+  if (result.kind === 'text') markDecrypted();
   metric(Date.now() - t0, result.kind, cold);
   flushPushCryptoMetrics();
   return result;
