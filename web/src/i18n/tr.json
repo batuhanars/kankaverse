@@ -479,7 +479,8 @@
     "noMutualFriends": "Ortak kanka yok.",
     "noMutualGuilds": "Ortak ortam yok.",
     "viewFull": "Profilin Tamamını Gör",
-    "message": "Mesaj"
+    "message": "Mesaj",
+    "mention": "Bahset"
   },
   "security": {
     "title": "Güvenlik Ayarları",

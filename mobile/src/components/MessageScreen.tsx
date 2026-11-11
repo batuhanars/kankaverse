@@ -149,6 +149,11 @@ export function MessageScreen({
   // olarak tutuluyor (id + ad + avatar zaten mesajda var) → panel açılırken ek istek yok, kartı
   // kendisi çekiyor.
   const [profileTarget, setProfileTarget] = useState<MessageAuthorDto | null>(null);
+  // D95 — profil panelinden "Bahset" isteği (ComposerHost yazma kutusuna ekler)
+  const [mentionRequest, setMentionRequest] = useState<{ candidate: MentionCandidate } | null>(null);
+  // Kısayol yalnız yazılabilen çok kişili sohbette: 1-1 DM (`showIdentity` false) ve yazma kutusu
+  // kapalıyken (`disabledNotice`: salt okunur/engelli) ya da öneri kaynağı yokken sunulmaz.
+  const canMentionShortcut = showIdentity && !disabledNotice && (mentionCandidates?.length ?? 0) > 0;
 
   // "Yazıyor" yayını + etiketi kendi kancasında (M1d-C §2.1).
   const typing = useTypingEmitter(channelId, typingMode);
@@ -504,6 +509,7 @@ export function MessageScreen({
         typingLabel={typing.label}
         bottomInset={bottomInset}
         channelId={channelId}
+        mentionRequest={mentionRequest}
       />
 
       <MessageActionHost
@@ -548,6 +554,11 @@ export function MessageScreen({
           username={profileTarget.username}
           avatarUrl={profileTarget.avatarUrl}
           guildId={guildId}
+          onMention={
+            canMentionShortcut
+              ? () => setMentionRequest({ candidate: { id: profileTarget.id, username: profileTarget.username } })
+              : undefined
+          }
           onClose={() => setProfileTarget(null)}
         />
       )}

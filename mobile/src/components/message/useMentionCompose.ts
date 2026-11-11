@@ -149,6 +149,26 @@ export function useMentionCompose(
     [],
   );
 
+  /**
+   * D95 — "Bahset" kısayolu (profil paneli): `@` yazmadan, metnin SONUNA `@ad ` ekler (metin varsa
+   * ve boşlukla bitmiyorsa önce bir boşluk). Kayıt `select` ile aynı (`pickedRef`) → gönderimde
+   * aynı `<@userId>` dönüşümü. Yeni metni ve imleç konumunu (sonu) döndürür.
+   */
+  const append = useCallback(
+    (candidate: MentionCandidate, text: string): { text: string; cursor: number } => {
+      const sep = text.length > 0 && !/\s$/.test(text) ? ' ' : '';
+      const newText = `${text}${sep}@${candidate.username} `;
+      pickedRef.current.set(candidate.username, candidate.id);
+      queryRef.current = null;
+      setVisible(false);
+      setSuggestions([]);
+      textRef.current = newText;
+      cursorRef.current = newText.length;
+      return { text: newText, cursor: newText.length };
+    },
+    [],
+  );
+
   const close = useCallback(() => {
     queryRef.current = null;
     setVisible(false);
@@ -211,11 +231,12 @@ export function useMentionCompose(
       onChangeText,
       onSelectionChange,
       select,
+      append,
       close,
       applyMentionTokens,
       clearPicked,
       seedPicked,
     }),
-    [suggestions, visible, onChangeText, onSelectionChange, select, close, applyMentionTokens, clearPicked, seedPicked],
+    [suggestions, visible, onChangeText, onSelectionChange, select, append, close, applyMentionTokens, clearPicked, seedPicked],
   );
 }
