@@ -1,6 +1,6 @@
 # SPRINT E4: Şikâyette kanıt (şifreli DM dahil) + mesaj parmak izi (franking)
 
-> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı; §7 açık sorular PM önerisiyle kabul). Rev.1 (aynı gün, api adımı PM incelemesi: erişim kapısı + ayrıntı ucu, §3.6).** PM compose (Opus). **e2ee-core + e2ee-client + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı; §7 açık sorular PM önerisiyle kabul). Rev.1 (aynı gün, api adımı PM incelemesi: erişim kapısı + ayrıntı ucu, §3.6). Rev.2 (aynı gün, sahip kararı: mobil şikâyet akışı, §4.1).** PM compose (Opus). **e2ee-core + e2ee-client + api + web + mobil.**
 > Yol haritası: E0 ✅ → E1 ✅ → E3 ✅ → **E4 bu sprint** → E5 yedek → E2 grup DM → **yayın** → E7 → E8 (E6 medya ertelendi).
 > 🔴 **R7 bölgesi, tamamı:** T&S karar fonksiyonları (şikâyet, kanıt, moderasyon görünümü) + E2EE yük biçimi.
 > Dayanak: `SPRINT_E1_DM_E2EE_CONTRACT.md` (§1 ilkeler, §3.2 yük biçimi), sahip kararı 2026-11-05 (şikâyet modeli), sahip kararları 2026-11-11 (aşağıda).
@@ -98,6 +98,24 @@ model ReportEvidence {
 - **Şikâyet (şifreli DM'de bir mesaj):** mevcut şikâyet akışı; gönderimden önce yerel depodan hedef + aynı kanalda önceki 5 **çözülmüş** (`status: 'ok'`) mesaj toplanır (`body`, `sentAt`, `fk`). Şikâyet ekranında açık uyarı: "Şikâyet ettiğinde bu mesaj ve sohbetteki önceki 5 mesaj moderasyon ekibine iletilir." Şifresiz sohbette aynı uyarı (sunucu kendisi okur).
 - **Moderasyon paneli (web):** kanıt bölümü: mesajlar, yazar, zaman, "doğrulandı / doğrulanmamış / sunucu kaydı" etiketi, ek referansı (önizleme YOK).
 - Tüm metinler i18n (web `{'@'}` kaçışı).
+
+### §4.1 Rev.2 (2026-11-11, sahip kararı): mobil şikâyet akışı
+**Bulgu:** mobilde şikâyet akışı hiç yok. §4 "mevcut şikâyet akışı" derken mobilde de var sanıldı. Kök neden: mobil T&S pariteti (M4t) yalnız sahibin fark ettiği iki yüzeyi (kamera uyarısı + acil buton) taşıdı; webdeki şikâyet yüzeyleri hiç envantere girmedi. Bu Rev ile E4 kapsamına alınır, R7-3'e dahildir.
+
+**Kapsam (yalnız `mobile/`; api ve web değişmez, `POST /reports` mevcut uç):**
+- `src/api/reports.ts` (yeni): web `web/src/api/reports.ts` ile aynı tipler (`ReportTargetType`, `ReportReason`, `ReportEvidenceItem`, `CreateReportPayload`).
+- `ReportSheet` (yeni bileşen): sebep seçimi (7 sebep) + isteğe bağlı açıklama + gönder; başarı/hata toast'ı. Web `ReportModal.vue` davranışı birebir. MESSAGE hedefinde §4 uyarı metni ("bu mesaj ve önceki 5 mesaj iletilir") şifreli ve şifresiz sohbette gösterilir.
+- **Giriş noktaları (webdekilerin karşılığı):**
+  1. Mesaj uzun basma menüsü (`MessageActionSheet`): "Şikâyet Et", yalnız başkasının mesajında. Şifreli DM'de gönderimden önce `collectEvidence` (e2ee-client, web'le aynı çağrı) ile hedef + önceki 5 `status: 'ok'` mesaj toplanır; şifresiz kanalda `evidence` gönderilmez (sunucu kendisi okur).
+  2. DM profil paneli ve kullanıcı kartı: "Kullanıcıyı Şikâyet Et" (USER).
+  3. DM listesi uzun basma menüsü: "Kullanıcıyı Şikâyet Et" (USER, karşı taraf).
+  4. Ortam menüsü: "Ortamı Şikâyet Et" (GUILD), web C8 §5 karşılığı.
+- Metinler: web `tr.json` `report.*` anahtarları yeniden kullanılır; mobilde eksik anahtar varsa mobil i18n'e aynı metinle eklenir, **yeni metin uydurulmaz**.
+- Kendi mesajını / kendini şikâyet etme seçeneği gösterilmez (web'deki kural).
+
+**Testler (mobil):** payload kurulumu (şifreli: `evidence` dolu, ≤6 öğe, hedef dahil; şifresiz: `evidence` yok); kendi mesajında menü öğesi yok; `collectEvidence` hata verirse şikâyet yine gider, `evidence` olmadan (web `ReportModal.vue` ile aynı; mağdurun şikâyeti yerel depo hatası yüzünden engellenmez), hata loglanır.
+
+**DoD ek:** cihaz turunda şikâyet mobilden de yapılır (şifreli DM mesajı + şifresiz ortam mesajı + kullanıcı); moderasyon panelinde (web) kanıt "doğrulandı" görünür. Native diff yok, yeni dev build gerekmez (vc68 derlemesine biner).
 
 ## §5 Gizlilik metni (E4 ile yayına girer)
 PM taslağı sahibe sunar, sahip onaylar. İçerik: (a) ortam dışı 1-1 DM metinleri uçtan uca şifreli; DM medyası şifreli değil (E6 ertelendi); (b) şikâyet edilen mesaj ve önceki 5 mesaj moderasyon için saklanır, kapanıştan 90 gün sonra silinir; (c) şifreli sohbette bu mesajları şikâyetçinin cihazı iletir, platform başka türlü okuyamaz; (d) web istemcisinin kodu sunucudan geldiği için web'de güvence mobilden zayıftır (E1 §4). Grup DM ifadesi E2 bitince güncellenir (yayın E2 sonrası).
