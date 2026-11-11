@@ -22,9 +22,11 @@ dependencies {
   // QuickReplyService HeadlessJsTaskService'ten turer (expo-modules-core react-android'i `implementation` aldigi icin burada acik).
   compileOnly 'com.facebook.react:react-android'
   // E3 Rev.4: KvFirebaseMessagingService, expo-notifications'in (open) ExpoFirebaseMessagingService'ini genisletir.
-  // `implementation project(...)` manifest birlestirmede bu modulu expo-notifications'tan USTUN yapar; boylece
-  // modul manifestindeki tools:node="remove" Expo'nun servis kaydini gercekten siler. Firebase surumu expo-notifications ile ayni.
-  implementation project(':expo-notifications')
+  // Bagimlilik manifest birlestirmede bu modulu expo-notifications'tan USTUN yapar; boylece modul manifestindeki
+  // tools:node="remove" Expo'nun servis kaydini gercekten siler (derlemede birlesik manifestle dogrulandi).
+  // SDK 54'te expo-notifications Gradle projesi degil, hazir AAR (node_modules/expo-notifications/local-maven-repo):
+  // koordinat + surum package-lock'taki expo-notifications ile AYNI olmali; SDK/paket yukseltilince birlikte guncelle.
+  implementation 'host.exp.exponent:expo.modules.notifications:0.32.17'
   implementation 'com.google.firebase:firebase-messaging:24.0.1'
 }
 
