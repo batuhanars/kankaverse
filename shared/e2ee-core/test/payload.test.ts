@@ -16,9 +16,10 @@ describe('yük biçimi (§3.2)', () => {
   })
 
   it('bilinmeyen sürüm hata değil, ayırt edilebilir sonuç', () => {
-    expect(decodePayload(enc({ v: 2, t: 'text', body: 'x', sentAt: 1, franking: 'abc' }))).toEqual({
+    // v2 artık tanınır (E4); bilinmeyen sürüm örneği v3.
+    expect(decodePayload(enc({ v: 3, t: 'text', body: 'x', sentAt: 1, fk: 'abc' }))).toEqual({
       kind: 'unsupported',
-      version: 2,
+      version: 3,
     })
   })
 
