@@ -37,3 +37,24 @@ export const E2EE_PLATFORMS = ['web', 'android'] as const;
 export const E2EE_EVENT_COMMIT = 'e2ee:commit';
 export const E2EE_EVENT_WELCOME = 'e2ee:welcome';
 export const E2EE_EVENT_DEVICES_CHANGED = 'e2ee:devices-changed';
+
+/** E5a — yedek (SPRINT_E5A §2.1/§3). Parametre tabanı: OWASP asgari Argon2id; üst sınır istemciyi kilitleyecek değeri engeller. */
+export const E2EE_BACKUP_SALT_BYTES = 16;
+/** nonce(12) + BMK(32) + GCM tag(16). */
+export const E2EE_BACKUP_WRAPPED_KEY_BYTES = 60;
+export const E2EE_BACKUP_M_MIN = 19456;
+/** Üst sınır (256 MiB): istemci e2ee-core `BACKUP_KDF_MAX` ile aynı; kötü niyetli/bozuk kayıt uygulamayı çökertmesin. */
+export const E2EE_BACKUP_M_MAX = 262_144;
+export const E2EE_BACKUP_T_MIN = 2;
+export const E2EE_BACKUP_T_MAX = 16;
+export const E2EE_BACKUP_MAX_SNAPSHOTS = 5;
+export const E2EE_BACKUP_MAX_BYTES = 25 * 1024 * 1024;
+/** Presigned PUT/GET ömrü (sn). */
+export const E2EE_BACKUP_PRESIGN_SECONDS = 300;
+/** 16 bayt = 22 karakter + '=='; 60 bayt = 80 karakter (dolgusuz). */
+export const E2EE_BACKUP_SALT_B64_RE = /^[A-Za-z0-9+/]{22}==$/;
+export const E2EE_BACKUP_WRAPPED_B64_RE = /^[A-Za-z0-9+/]{80}$/;
+/** E5a Rev.2 §4.7: varlık kontrolünde tek çağrıda en çok kimlik. */
+export const E2EE_EXISTS_MAX_IDS = 500;
+export const E2EE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+export const E2EE_BACKUP_SHA256_RE = /^[0-9a-f]{64}$/;

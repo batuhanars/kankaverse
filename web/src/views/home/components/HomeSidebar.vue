@@ -8,6 +8,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useDmStore } from '@/stores/dm'
 import DmList from './DmList.vue'
+import BackupRestoreBanner from '@/components/shared/BackupRestoreBanner.vue'
 import StartChatModal from './StartChatModal.vue'
 
 const { t } = useI18n()
@@ -108,6 +109,9 @@ function onChatCreated(channelId: string) {
         +
       </button>
     </div>
+
+    <!-- E5a §4.4-3: geri yükleme bandı (yedek kurulu, bu cihazda kilitli) -->
+    <BackupRestoreBanner />
 
     <!-- DM listesi -->
     <DmList

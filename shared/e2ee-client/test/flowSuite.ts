@@ -5,6 +5,7 @@ import type { CryptoProvider } from '@kankaverse/e2ee-core'
 import { E2eeEngine } from '../src/engine'
 import { serialLock } from '../src/lock'
 import type { WarningKind } from '../src/ports'
+import { backupDeps } from './fakeBackup'
 import { FakeServer } from './fakeServer'
 import { MemoryVault } from './memoryVault'
 
@@ -44,6 +45,7 @@ export const as = <T>(p: Profile, fn: (e: E2eeEngine) => Promise<T>): Promise<T>
 /** Aynı cihazı (aynı depo, aynı oturum zinciri) yeniden başlatır: uygulamayı kapatıp açmak. */
 export const restart = (userId: string, family: string, vault: MemoryVault, warn: WarnFn = () => {}) =>
   E2eeEngine.start(userId, {
+    ...backupDeps(server),
     api: server.apiFor(userId, family),
     openVault: async () => vault,
     withLock: serialLock(),
@@ -324,6 +326,7 @@ export function flowSuite(label: string, p: CryptoProvider) {
       const real = server.apiFor('B', B1.family)
       const down = () => Promise.reject(new Error('ağ yok'))
       const broken = (await E2eeEngine.start('B', {
+        ...backupDeps(server),
         api: new Proxy(real, { get: (t, k) => (k === 'channelState' ? down : t[k as keyof typeof t]) }),
         openVault: async () => B1.vault,
         withLock: serialLock(),

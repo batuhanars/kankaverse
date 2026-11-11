@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useRolesStore } from '@/stores/roles'
 import { useMessagesStore } from '@/stores/messages'
+import { useE2eeStore } from '@/stores/e2ee'
 import { messagesApi } from '@/api/messages'
 import MessageRow from './MessageRow.vue'
 import UserCardPopover from './UserCardPopover.vue'
@@ -40,6 +41,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const authStore = useAuthStore()
 const messagesStore = useMessagesStore()
+const e2eeStore = useE2eeStore()
 
 const isMine = computed(() => props.message.author.id === authStore.user?.id)
 
@@ -216,6 +218,7 @@ async function confirmDelete() {
   try {
     await messagesApi.deleteMessage(props.message.channelId, props.message.id)
     messagesStore.removeMessage(props.message.channelId, props.message.id)
+    void e2eeStore.forgetMessage(props.message.channelId, props.message.id) // E5a §4.1
   } catch {
     // Sunucu hatası — WS zaten kaldıracak
   } finally {

@@ -18,6 +18,11 @@ export class MemoryVault implements Vault {
     this.rows.delete(this.k(store, key))
   }
 
+  async keys(store: VaultStore) {
+    const prefix = `${store}/`
+    return [...this.rows.keys()].filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length))
+  }
+
   async resetDeviceState() {
     for (const k of [...this.rows.keys()]) if (!k.startsWith('messages/')) this.rows.delete(k)
   }

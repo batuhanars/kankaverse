@@ -8,6 +8,8 @@ import {
   type WithLock,
 } from '@kankaverse/e2ee-client'
 import { detectWebProvider } from '@kankaverse/e2ee-core'
+import { webArgon2id } from './argon2'
+import { webBlobTransport } from './blobTransport'
 import { destroyOtherVaults, Vault } from './vault'
 
 const sameTab = serialLock()
@@ -43,6 +45,8 @@ export async function startWebEngine(
     },
     withLock: webLock,
     provider,
+    argon2: webArgon2id,
+    blob: webBlobTransport,
     onWarn,
   })
 }

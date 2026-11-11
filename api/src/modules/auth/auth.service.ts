@@ -910,7 +910,8 @@ export class AuthService implements OnModuleInit {
     }
   }
 
-  private async verifyReauth(user: User, password: string, totpCode?: string): Promise<void> {
+  /** Hassas işlem reauth'u (şifre + 2FA varsa TOTP). E5a yedek sıfırla/sil de BUNU kullanır; ikinci kopya YOK. */
+  async verifyReauth(user: User, password: string, totpCode?: string): Promise<void> {
     const valid = await argon2.verify(user.passwordHash, password);
     if (!valid) {
       throw new UnauthorizedException({ message: 'Şifre hatalı.', error: 'INVALID_CREDENTIALS' });

@@ -7,6 +7,7 @@ import { restoreActiveAiVideo, useAiVideoViewerStore } from '@/stores/aiVideoVie
 import { useShareIntentStore } from '@/stores/shareIntent';
 import { useDmStore } from '@/stores/dm';
 import { initE2ee } from '@/stores/e2ee';
+import { backupOnBackground, startBackup, stopBackup } from '@/stores/e2eeBackup';
 import { useFriendsStore } from '@/stores/friends';
 import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
@@ -53,7 +54,8 @@ export default function AppLayout() {
     if (!userId) return;
     useDmStore.getState().setSessionUser(userId);
     // E1: bayrak açıksa cihaz kaydı + KeyPackage + bekleyen Welcome (arka planda; arayüzü bekletmez).
-    void initE2ee(userId);
+    // E5a §4.3: yedek zamanlayıcısı YALNIZ ön plan oturumunda başlar (bildirim görevinde değil, MIUI kuralı).
+    void initE2ee(userId).then(() => startBackup());
     // Kanka isteklerini oturum başında BİR KEZ çek — sidebar'daki "kanka isteği" satırı (sahip
     // bulgusu 2026-07-30) aksi halde "Kanka Ekle" ekranına girilmeden 0 kalırdı. Sonraki
     // güncellemeler `friend.*` WS olaylarından geliyor, tekrar çekim gerekmiyor.
@@ -84,13 +86,18 @@ export default function AppLayout() {
     // Play uygulama içi güncelleme: açılışta ve ön plana dönüşte (store kendi aralığını tutar).
     void useAppUpdateStore.getState().check();
     const sub = AppState.addEventListener('change', (state) => {
-      if (state !== 'active') return;
+      // E5a §4.3: arka plana geçiş ANINDA tek kısa deneme; arka planda uzun iş başlatılmaz.
+      if (state !== 'active') {
+        backupOnBackground();
+        return;
+      }
       if (!isPushTokenRegistered()) void syncPushToken();
       void restoreActiveAiVideo();
       void useAppUpdateStore.getState().check();
     });
     return () => {
       sub.remove();
+      stopBackup();
       useDmStore.getState().setSessionUser(null);
       useFriendsStore.getState().reset();
       useUnreadStore.getState().reset();

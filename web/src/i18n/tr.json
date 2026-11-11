@@ -1499,6 +1499,90 @@
     "errors": {
       "notReady": "Sohbet şifreleniyor, birkaç saniye sonra tekrar dene.",
       "deviceRemoved": "Bu cihaz bu sohbetten çıkarıldı."
+    },
+    "backup": {
+      "title": "Sohbet yedeği",
+      "intro": "Şifreli mesajlarının yedeği yalnız senin belirlediğin yedek şifresiyle açılır. Yeni bir cihazda eski mesajlarını geri yükleyebilirsin.",
+      "status": {
+        "none": "Kurulu değil",
+        "unlocked": "Bu cihazda açık",
+        "locked": "Bu cihazda kilitli"
+      },
+      "lastBackup": "Son yedek: {date}",
+      "noBackupYet": "Bu cihazdan henüz yedek alınmadı",
+      "staleWarning": "Son yedek 24 saatten eski. Yedek kendiliğinden tekrar denenecek.",
+      "actions": {
+        "setup": "Yedeği kur",
+        "unlock": "Bu cihazda aç",
+        "now": "Şimdi yedekle",
+        "change": "Yedek şifresini değiştir",
+        "reset": "Şifremi unuttum",
+        "disable": "Yedeği kapat"
+      },
+      "now": {
+        "uploaded": "Yedek alındı.",
+        "upToDate": "Yedeğin güncel.",
+        "failed": "Yedek şu an alınamadı, kendiliğinden tekrar denenecek.",
+        "locked": "Yedek bu cihazda kilitli. Önce yedeği bu cihazda aç."
+      },
+      "warning": "Yedeğin bu şifreyle kilitlenir. Şifre senin cihazından çıkmaz, biz de bilmeyiz. Unutursan yedeğini ne sen ne de biz açabiliriz. Kolay tahmin edilebilir bir şifre seçme.",
+      "fields": {
+        "password": "Yedek şifresi",
+        "repeat": "Yedek şifresi (tekrar)",
+        "oldPassword": "Eski yedek şifresi",
+        "newPassword": "Yeni yedek şifresi",
+        "newRepeat": "Yeni yedek şifresi (tekrar)"
+      },
+      "ack": "Bu şifreyi unutursam yedeğimi kimse açamaz, anladım",
+      "rules": {
+        "too-short": "Şifre en az 12 karakter olmalı.",
+        "too-few-distinct": "Şifrede en az 6 farklı karakter olmalı.",
+        "contains-identity": "Şifre kullanıcı adını ya da e-posta adresinin ilk kısmını içeremez.",
+        "mismatch": "Şifreler eşleşmiyor."
+      },
+      "setup": {
+        "title": "Sohbet yedeğini kur",
+        "submit": "Yedeği kur",
+        "later": "Şimdi değil",
+        "done": "Yedeğin kuruldu."
+      },
+      "unlock": {
+        "title": "Yedeği bu cihazda aç",
+        "body": "Yedek şifreni gir. Açılınca eski mesajların bu cihaza geri yüklenir.",
+        "submit": "Aç ve geri yükle"
+      },
+      "change": {
+        "title": "Yedek şifresini değiştir",
+        "submit": "Şifreyi değiştir",
+        "done": "Yedek şifren değişti."
+      },
+      "reset": {
+        "title": "Yedek şifremi unuttum",
+        "warning": "Eski yedeğin kalıcı olarak silinir. Yerine, bu cihazdaki mesajlarla yeni bir yedek başlar. Diğer cihazlarda yeni şifreyi girmen gerekir.",
+        "submit": "Sıfırla ve yeni yedek başlat",
+        "done": "Yedek sıfırlandı, yeni yedeğin başladı."
+      },
+      "disable": {
+        "title": "Yedeği kapat",
+        "warning": "Yedeğin ve sunucudaki tüm kopyaları kalıcı olarak silinir. Mesajların bu cihazda kalır ama yeni bir cihazda geri yüklenemez.",
+        "submit": "Yedeği kapat",
+        "done": "Yedek kapatıldı."
+      },
+      "banner": {
+        "text": "Eski mesajlarını geri yüklemek için yedek şifreni gir",
+        "action": "Geri yükle",
+        "dismiss": "Kapat"
+      },
+      "restore": {
+        "done": "{n} mesaj geri yüklendi.",
+        "none": "Geri yüklenecek mesaj bulunamadı.",
+        "partial": "{n} mesaj geri yüklendi. Bazı yedekler açılamadı."
+      },
+      "wrongPassword": "Şifre yanlış",
+      "deriving": "Şifre işleniyor...",
+      "errors": {
+        "generic": "Bir sorun oluştu, biraz sonra tekrar dene."
+      }
     }
   },
   "messageSearch": {

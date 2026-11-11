@@ -34,6 +34,7 @@ import E2eeLockIcon from '@/components/shared/E2eeLockIcon.vue'
 import E2eeWarningBanner from '@/components/shared/E2eeWarningBanner.vue'
 import { useE2eeChannelView } from '@/composables/useE2eeChannelView'
 import { useE2eeStore } from '@/stores/e2ee'
+import { useE2eeBackupStore } from '@/stores/e2eeBackup'
 import MessageEditModal from '@/components/shared/MessageEditModal.vue'
 import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
 import ReactionPill from '@/components/shared/ReactionPill.vue'
@@ -126,6 +127,7 @@ const optimistic = useOptimisticSend()
 const messagesStore = useMessagesStore()
 const dmStore = useDmStore()
 const e2eeStore = useE2eeStore()
+const backupStore = useE2eeBackupStore()
 const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
 const callStore = useCallStore()
@@ -344,6 +346,7 @@ async function confirmDelete() {
   try {
     await messagesApi.deleteMessage(props.channel.id, deleteTargetId.value)
     messagesStore.removeMessage(props.channel.id, deleteTargetId.value)
+    void e2eeStore.forgetMessage(props.channel.id, deleteTargetId.value) // E5a §4.1
   } catch {
     // WS zaten kaldıracak; sessizce yut
   } finally {
@@ -361,6 +364,13 @@ const messages = computed(() => messagesStore.messagesForChannel(props.channel.i
 useAudioQueue(() => props.channel.id, messages)
 const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channel.id] ?? false)
 const e2eeView = useE2eeChannelView(() => props.channel.id, messages, hasMore)
+
+// E5a §4.4-1: şifreli DM açıldığında (bu cihazda ilk kez) yedek kurulum sorusu; tek seferlik bayrak store'da.
+// Yedek durumu motor açılışında asenkron gelir; ikisi de izlenir ki hangisi geç gelirse soru yine çıksın.
+watch([() => e2eeView.encrypted.value, () => backupStore.state], ([enc]) => { if (enc) backupStore.maybePromptSetup() }, { immediate: true })
+
+// E5a §4.4-3: geri yükleme bitince açık sohbet mesajları yeniden yüklenir (yeniden hidrate, yeni kayıtlarla).
+watch(() => backupStore.restoreTick, () => { void messagesStore.fetchMessages(props.channel.id) })
 
 watch(
   () => props.channel.id,

@@ -174,6 +174,8 @@ export default () => {
     e2eeEnabled: process.env.E2EE_ENABLED === 'true',
     // E4 §2.2 — istemci v2 (parmak izli) yük göndersin mi. Okuma tarafı hazır olunca açılır (Play yayılınca).
     e2eeFranking: process.env.E2EE_FRANKING === 'true',
+    // E5a — şifreli DM yedeği (yedek şifresi, sunucuda yalnız şifreli görüntü). Varsayılan KAPALI; izin listesi E1 ile aynı.
+    e2eeBackup: process.env.E2EE_BACKUP === 'true',
     e2eeUserIds: (process.env.E2EE_USER_IDS ?? '')
       .split(',')
       .map((id) => id.trim())

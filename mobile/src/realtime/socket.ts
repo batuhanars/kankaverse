@@ -2,7 +2,7 @@ import { Alert, AppState } from 'react-native';
 import { io, type Socket } from 'socket.io-client';
 import { getAccessToken, refreshAccessToken } from '@/api/http';
 import { useMessagesStore } from '@/stores/messages';
-import { decryptDmLastMessage, hydrateOne } from '@/stores/e2ee';
+import { decryptDmLastMessage, forgetE2eeMessage, hydrateOne } from '@/stores/e2ee';
 import { bindE2eeSocket } from './e2eeSocket';
 import { useTypingStore } from '@/stores/typing';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -191,6 +191,7 @@ function ensureSocket(): Socket {
 
   socket.on('message.deleted', (data: { messageId: string; channelId: string }) => {
     useMessagesStore.getState().removeMessage(data.channelId, data.messageId);
+    void forgetE2eeMessage(data.channelId, data.messageId); // E5a §4.1: yerel düz kayıt da gider
   });
 
   // M1d-C — tepkiler. Sunucu mesajın tamamını değil DELTA yayar (`broadcastReaction`), toplamı

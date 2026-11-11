@@ -3,6 +3,7 @@ import { ref, shallowRef } from 'vue'
 import { e2eeApi } from '@/api/e2ee'
 import { messagesApi } from '@/api/messages'
 import { useDmStore } from '@/stores/dm'
+import { useE2eeBackupStore } from '@/stores/e2eeBackup'
 import type {
   ChannelInfo,
   E2eeEngine,
@@ -46,6 +47,8 @@ export const useE2eeStore = defineStore('e2ee', () => {
       try {
         engine.value = await startWebEngine(userId, e2eeApi, setWarning)
         await engine.value?.onWelcome()
+        // E5a §4.3: yedek bayrağı açıksa zamanlayıcı başlar (bayrak yoksa `start` hiçbir şey yapmaz).
+        if (engine.value) void useE2eeBackupStore().start(engine.value)
       } catch (e) {
         console.error('[e2ee] başlatılamadı', e)
       }
@@ -56,6 +59,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
   /** Çıkış / yeni giriş / hesap silme: bu tarayıcıdaki TÜM şifreli yerel depolar silinir. */
   async function wipe(): Promise<void> {
     const current = engine.value
+    useE2eeBackupStore().stop()
     engine.value = null
     channels.value = {}
     warnings.value = {}
@@ -217,6 +221,18 @@ export const useE2eeStore = defineStore('e2ee', () => {
   }
 
   /**
+   * E5a §4.1 silme boşluğu: şifreli DM mesajı silinince yerel düz kaydı da silinir (yedekte yaşamasın).
+   * Tek giriş: soket `message.deleted` ve yerel silme aynı yerden geçer. Şifreli DM değilse hiçbir şey yapmaz.
+   */
+  async function forgetMessage(channelId: string, messageId: string): Promise<void> {
+    await ready
+    if (!engine.value || !isOneToOneDm(channelId)) return
+    await engine.value
+      .forgetMessage(messageId)
+      .catch((e) => console.error('[e2ee] yerel kayıt silinemedi', e))
+  }
+
+  /**
    * E4 şikâyet kanıtı: hedef + önceki mesajlardan yerelde çözülmüş (`ok`) olanlar. `older` ekrandaki listedir
    * (hedeften öncekiler). Motor yok / şifreli değil: boş dizi, şikâyet yalnız referansla gider.
    */
@@ -247,5 +263,6 @@ export const useE2eeStore = defineStore('e2ee', () => {
     send,
     editEncrypted,
     collectEvidence,
+    forgetMessage,
   }
 })

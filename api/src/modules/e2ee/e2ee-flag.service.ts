@@ -18,6 +18,11 @@ export class E2eeFlagService {
     return this.config.get<boolean>('e2eeFranking') === true;
   }
 
+  /** E5a: şifreli DM yedeği uçları açık mı (uygunluk ayrıca isEligible ile). Varsayılan false. */
+  get backup(): boolean {
+    return this.config.get<boolean>('e2eeBackup') === true;
+  }
+
   isEligible(userId: string): boolean {
     if (!this.enabled) return false;
     const allow = this.config.get<string[]>('e2eeUserIds') ?? [];

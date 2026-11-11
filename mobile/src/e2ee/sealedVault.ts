@@ -21,6 +21,8 @@ export interface RowStore {
   get(userId: string, store: string, key: string): Promise<SealedRow | null>
   put(userId: string, store: string, key: string, row: SealedRow): Promise<void>
   delete(userId: string, store: string, key: string): Promise<void>
+  /** Bölümdeki tüm anahtarlar (yedek görüntüsü `messages` bölümünü bununla gezer). */
+  keys(userId: string, store: string): Promise<string[]>
   deleteStores(userId: string, stores: string[]): Promise<void>
   deleteUser(userId: string): Promise<void>
   /** Depoda satırı olan tüm kullanıcılar (çıkışta anahtarlarını da silebilmek için). */
@@ -42,7 +44,7 @@ export class SealedVault implements Vault {
   private constructor(
     readonly userId: string,
     private rows: RowStore,
-    private keys: KeyStore,
+    private keyStore: KeyStore,
     private key: Uint8Array,
     private random: RandomBytes,
   ) {}
@@ -86,6 +88,10 @@ export class SealedVault implements Vault {
     return this.rows.delete(this.userId, store, key)
   }
 
+  keys(store: VaultStore): Promise<string[]> {
+    return this.rows.keys(this.userId, store)
+  }
+
   /** Cihaz + grup durumunu siler, çözülmüş mesajlar kalır (oturum zinciri değişti, anahtarlar geçersiz). */
   resetDeviceState(): Promise<void> {
     return this.rows.deleteStores(this.userId, ['device', 'groups'])
@@ -94,7 +100,7 @@ export class SealedVault implements Vault {
   /** Bu kullanıcının tüm deposunu siler: satırlar VE depo anahtarı. */
   async destroy(): Promise<void> {
     await this.rows.deleteUser(this.userId)
-    await this.keys.delete(this.userId)
+    await this.keyStore.delete(this.userId)
   }
 }
 

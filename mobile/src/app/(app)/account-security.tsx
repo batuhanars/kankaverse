@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/auth';
+import { useE2eeBackupStore } from '@/stores/e2eeBackup';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -18,6 +19,7 @@ import { theme } from '@/theme';
 export default function AccountSecurityScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
+  const backupEnabled = useE2eeBackupStore((s) => s.state?.enabled === true);
 
   if (!user) return null;
 
@@ -55,8 +57,17 @@ export default function AccountSecurityScreen() {
             icon="phone-portrait-outline"
             label={t('security.sessions.title')}
             onPress={() => router.push('/security-sessions')}
-            last
+            last={!backupEnabled}
           />
+          {/* E5a: yedek bayrağı kapalıysa satır hiç çıkmaz (boş yüzey yok). */}
+          {backupEnabled ? (
+            <Row
+              icon="cloud-upload-outline"
+              label={t('e2ee.backup.title')}
+              onPress={() => router.push('/backup-settings')}
+              last
+            />
+          ) : null}
         </View>
 
         {/* Yıkıcı eylem ayrı grupta ve en altta: yanlışlıkla dokunma mesafesini artırır. */}

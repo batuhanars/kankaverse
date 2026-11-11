@@ -4,6 +4,7 @@ import { SharedModule } from '../../shared/shared.module';
 import { E2eeChannelService } from './e2ee-channel.service';
 import { E2eeClaimService } from './e2ee-claim.service';
 import { E2eeDevicesService } from './e2ee-devices.service';
+import { E2eeExistsService } from './e2ee-exists.service';
 import { E2eeEnabledGuard } from './e2ee-enabled.guard';
 import { E2eeFlagService } from './e2ee-flag.service';
 import { E2eeGroupsService } from './e2ee-groups.service';
@@ -28,6 +29,7 @@ import { UserThrottlerGuard } from './user-throttler.guard';
     E2eeClaimService,
     E2eeGroupsService,
     E2eeMessageService,
+    E2eeExistsService,
     E2eeRevocationService,
   ],
   exports: [E2eeMessageService, E2eeRevocationService],
