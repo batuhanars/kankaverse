@@ -76,3 +76,12 @@ export function wrapMlsError(e: unknown, Kind: new (m: string) => E2eeError = Gr
   err.cause = e
   return err
 }
+
+/** Yedek parametresi geçersiz: tuz uzunluğu yanlış ya da Argon2id parametresi tabanın altında (E5a §2.1). */
+export class BackupParamsError extends E2eeError {}
+
+/** Yedek anahtarı açılamadı: yanlış şifre ya da kurcalanmış sarma. İkisi ayırt edilmez, mesaj içerik sızdırmaz. */
+export class BackupPasswordError extends E2eeError {}
+
+/** Yedek görüntüsü açılamadı: yanlış anahtar/bağlam ya da kurcalanmış bayt. */
+export class BackupSnapshotError extends E2eeError {}
