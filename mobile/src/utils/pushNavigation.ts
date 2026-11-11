@@ -17,6 +17,7 @@ export function resolvePushTarget(data: Record<string, unknown>): Href | null {
   const type = typeof data.type === 'string' ? data.type : null;
   const guildId = normalizeId(data.guildId);
   const channelId = normalizeId(data.channelId);
+  const messageId = normalizeId(data.messageId);
 
   switch (type) {
     case 'MENTION':
@@ -29,9 +30,13 @@ export function resolvePushTarget(data: Record<string, unknown>): Href | null {
       // `resolveRole` her zaman `undefined` → mesaj gövdesinde `@everyone`/rol etiketleri "@rol"
       // yedeğine düşüyor. Sunucu `data.guildId`yi zaten gönderiyor (bkz. dosya başı yorumu);
       // taşımamak bilinçli bir kısıtlama değil, kopyalanan bir eksiklikti. Artık taşınıyor.
+      // D99: bahsedilen/tepki verilen mesaja kaydir (CHANNEL_MESSAGE/DM_MESSAGE'da yok: yeni mesaj zaten en altta).
       return guildId
-        ? { pathname: '/channel/[id]', params: { id: channelId, name: '', guildId } }
-        : dmTarget(channelId);
+        ? {
+            pathname: '/channel/[id]',
+            params: { id: channelId, name: '', guildId, ...(messageId ? { jumpTo: messageId } : {}) },
+          }
+        : dmTarget(channelId, messageId);
     case 'CHANNEL_MESSAGE':
       // 2026-11-08: ortam kanalı düz mesajı, sunucu guildId'yi her zaman gönderiyor.
       if (!channelId || !guildId) return null;
@@ -65,10 +70,14 @@ export function resolveAiVideoId(data: Record<string, unknown>): string | null {
 
 /** M4a-2 (`notifications/incomingCall.ts`) de aynı hedefi kullanır: bildirim gövdesine dokununca
  *  o DM'e gidiliyor — push'un DM hedefiyle aynı çözümleme, kopya yok. */
-export function dmTarget(channelId: string): Href {
+export function dmTarget(channelId: string, jumpTo?: string | null): Href {
+  const jump = jumpTo ? { jumpTo } : {};
   const channel = useDmStore.getState().channels.find((c) => c.id === channelId);
-  if (channel) return dmRouteParams(channel);
-  return { pathname: '/dm/[id]', params: { id: channelId } };
+  if (channel) {
+    const r = dmRouteParams(channel);
+    return { pathname: r.pathname, params: { ...r.params, ...jump } };
+  }
+  return { pathname: '/dm/[id]', params: { id: channelId, ...jump } };
 }
 
 /** Android/FCM data payload'ı bazen `null`'ı string'e çevirir (`"null"`) — savunmacı normalize. */
