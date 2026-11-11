@@ -1,6 +1,6 @@
 # SPRINT E5a: Şifreli DM geçmişinin sunucu yedeği (yedek şifresi)
 
-> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı; §5 uyarı ve §6 gizlilik metni onaylı, §9 açık sorular PM önerisiyle kabul).** PM compose (Opus). **e2ee-core + e2ee-client + api + web + mobil.**
+> Durum: **TASARIM KİLİTLİ (2026-11-11, sahip onayı; §5 uyarı ve §6 gizlilik metni onaylı, §9 açık sorular PM önerisiyle kabul). Rev.1 (aynı gün, adım 0 sonucu, sahip onayı: mobilde native Argon2, §2.4).** PM compose (Opus). **e2ee-core + e2ee-client + api + web + mobil.**
 > Yol haritası: E0 ✅ → E1 ✅ → E3 ✅ → E4 (cihaz turu bekliyor) → **E5a yedek bu sprint** → E5b cihazdan cihaza aktarım → E2 grup DM → **herkese açılış** → E7 → E8.
 > 🔴 **R7 bölgesi, tamamı:** anahtar türetme ve yedek şifrelemesi (e2ee-core), yedek sahipliği ve silme (api), geri yükleme birleştirmesi (e2ee-client).
 > Dayanak: sahip kararı 2026-11-11 (iki yol, yedek şifresi, kurtarma anahtarı yok); kurul verdikti `knowledge/kurul/verdicts/2026-11-11-e5-yedek-ve-cihaz-aktarimi.md` (⚠ ŞARTLI, 6 koşul, sahip kabul etti); `SPRINT_E1_DM_E2EE_CONTRACT.md` §1 (ilkeler, yerel depo), `SPRINT_E4_E2EE_REPORT_CONTRACT.md` §2 (fk/sentAt).
@@ -31,6 +31,15 @@
 - Şifre UTF-8, **NFC normalize** (Türkçe karakter: aynı şifre iki klavyede aynı bayt).
 - `params = { m: KiB, t, p: 1 }`, blob başlığında saklanır (ileride artırılabilsin).
 - **Taban:** `m ≥ 19456` (19 MiB), `t ≥ 2`, `p = 1` (OWASP asgari). **Hedef:** orta Android'de ~1 sn (kurul k.2). Kesin değer adım 0 ölçümüyle sabitlenir (§7). Tabanın altına inen parametreyle türetme reddedilir (indirilen başlık dahil: sunucu düşük parametre dayatamaz).
+
+### §2.4 Rev.1 (2026-11-11): mobilde native Argon2
+**Adım 0 sonucu:** `@noble/hashes/argon2` taban ayarı (`m=19456,t=2,p=1`) Node'da 116 ms, **Redmi 14C (MT6769, Android 16, Hermes, release) 19 893 ms**. Saf JS mobilde kullanılamaz; web'de sorun yok.
+**Karar (sahip onayı):**
+- `deriveBackupKek` Argon2id işlevini enjekte alır: `CryptoProvider`'a (ya da ayrı bir porta) `argon2id(password: Uint8Array, salt, { m, t, p, dkLen }) → Promise<Uint8Array>` eklenir. e2ee-core NFC + UTF-8 dönüşümünü ve parametre tabanını kendisi yapar, işlevi yalnız hesap için çağırır.
+- **Web:** `@noble/hashes/argon2` (bugünkü yol).
+- **Mobil:** `mobile/modules/argon2/` yeni Expo yerel modülü (mevcut dört modülün deseni), Android'de Argon2'nin resmi C uygulamasını taşıyan hazır bir kütüphane (öncelik `argon2kt`; yoksa/uyumsuzsa resmi C kaynağı CMake ile). Bağımlılık PM onaylı. iOS kapsam dışı (Android-first).
+- **Uyum testi (zorunlu):** iki uygulama da RFC 9106 §5.3 Argon2id vektörünü birebir üretir, ayrıca sabit şifre/tuz/§2.1 tabanı için aynı çıktıyı verir (telefonda kurulan yedek web'de açılmalı). Mobil tarafı ölçüm ekranıyla cihazda doğrulanır.
+- **Adım 0b:** native modülle Redmi 14C'de ölçüm; hedef ~1 sn. Ölçüme göre §2.1 "hedef" parametresi sabitlenir (taban değişmez).
 
 ### §2.2 Sarma ve görüntü şifreleme
 - `BMK = random(32)`, kullanıcı başına, bir kez.
@@ -144,7 +153,7 @@ Tümü i18n (`e2ee.backup.*`), web `{'@'}` kaçışı. Em dash yok. Tarih/saat T
 5. Deploy (`E2EE_BACKUP=false`), bayrak izin listesinde açılır, cihaz turu.
 6. Gizlilik metni ve §5 uyarısı herkese açılışla.
 
-Native diff beklenmiyor (saf JS). Adım 0 aksini gösterirse ayrı karar.
+~~Native diff beklenmiyor (saf JS).~~ **Rev.1:** adım 0 sonucu native modül şart (§2.4). Mobil tarafı yeni dev build + yerel release derlemesi ister; E5a mobil vc69 ile çıkar.
 
 ## §8 DoD
 - Testler yeşil: core vektörleri; api §3.3; client: görüntü içeriği (§4.2 alanları, durum süzgeci), birleştirme tablosu (§4.5 her satır), silme boşluğu, yanlış şifre, keyVersion değişiminde 409 yolu.
