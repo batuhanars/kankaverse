@@ -84,7 +84,37 @@ export function frankingSuite(label: string) {
         provider,
         onWarn: () => {},
       }))!
-      expect((await again.hydrate(CH, [m1]))[0].e2eeStatus).toBe('unverified')
+      expect((await again.hydrate(CH, [{ ...m1, frankingTag: null }]))[0].e2eeStatus).toBe('unverified')
+    })
+
+    it('tag sonradan gelirse unverified, depodaki fk+gövdeyle terfi eder; yanlış tag unverified bırakır; gövde sızmaz', async () => {
+      const { A1, B1 } = await pairWithFranking()
+      const m1 = await send(A1, 'm1', 'gizli gövde')
+      await as(B1, (e) => e.onWelcome())
+
+      // 1) tag'siz v2: unverified, gövde ekranda yok.
+      const first = (await show(B1, [{ ...m1, frankingTag: null }]))[0]
+      expect(first).toMatchObject({ content: '', e2eeStatus: 'unverified' })
+
+      // 2) yanlış tag: unverified kalır; alıntı, kanıt ve bildirim yolu gövdeyi vermez.
+      const wrongTag = (m1.frankingTag![0] === 'A' ? 'B' : 'A') + m1.frankingTag!.slice(1)
+      const wrong = (await show(B1, [{ ...m1, frankingTag: wrongTag }]))[0]
+      expect(wrong).toMatchObject({ content: '', e2eeStatus: 'unverified' })
+      expect(await as(B1, (e) => e.quoteText('m1'))).toBeNull()
+      expect(await as(B1, (e) => e.collectEvidence(CH, 'm1', []))).toEqual([])
+      const local = (await E2eeEngine.openLocal('B', {
+        openVault: async () => B1.vault,
+        withLock: serialLock(),
+        provider,
+      }))!
+      expect(await local.decryptOffline({ ...m1, frankingTag: null })).toEqual({ kind: 'unavailable' })
+      expect(JSON.stringify([first, wrong])).not.toContain('gizli gövde')
+
+      // 3) doğru tag: çözme gerekmeden ok'a terfi, gövde görünür, kanıta girer.
+      const ok = (await show(B1, [m1]))[0]
+      expect(ok).toMatchObject({ content: 'gizli gövde', e2eeStatus: 'ok' })
+      expect(await as(B1, (e) => e.quoteText('m1'))).toBe('gizli gövde')
+      expect((await as(B1, (e) => e.collectEvidence(CH, 'm1', [])))[0]).toMatchObject({ body: 'gizli gövde' })
     })
 
     it('fk yerel kayda yazılır: alıcıda ve gönderende (kanıt çıktısında görünür)', async () => {

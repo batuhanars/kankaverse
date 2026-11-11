@@ -9,7 +9,7 @@ import type { E2eeContext } from './context'
 import { digestOf, type StoredMessage } from './localStore'
 import { devicesOf } from './registry'
 import { dropStaleGroup } from './staleGroup'
-import { decryptToRecord } from './decryptRecord'
+import { decryptToRecord, frankingHolds } from './decryptRecord'
 
 export interface WireMessage {
   id: string
@@ -104,7 +104,7 @@ export class Hydrator {
     const ct = fromB64(m.ciphertext!)
     const digest = digestOf(ct)
     const stored = await this.ctx.store.loadMessage(m.id)
-    if (stored?.digest === digest) return { kind: 'record', record: stored }
+    if (stored?.digest === digest) return { kind: 'record', record: await this.promoteIfVerified(m, stored) }
     await this.init()
     if (this.offline && !this.view) return { kind: 'unavailable' } // önbellek görünümü yok: iptal kuralı uygulanamaz
     if (this.isHidden(m)) return { kind: 'hidden' }
@@ -115,6 +115,20 @@ export class Hydrator {
       return this.offline ? { kind: 'unavailable' } : pending(final)
     }
     return this.decrypt(m, ct, digest, final)
+  }
+
+  /**
+   * `unverified` kayıt, mesaj şimdi (doğru) `frankingTag` ile geldiyse depodaki `fk`+gövde+`sentAt` ile yeniden
+   * doğrulanır; tutarsa `ok`'a terfi eder (çözme gerekmez). Tag yoksa/yanlışsa `unverified` kalır.
+   */
+  private async promoteIfVerified(m: WireMessage, stored: StoredMessage): Promise<StoredMessage> {
+    if (stored.status !== 'unverified' || stored.fk === undefined || stored.sentAt === undefined) return stored
+    const claim = { fk: stored.fk, body: stored.body, sentAt: stored.sentAt }
+    const ctx = { channelId: m.channelId, senderDeviceId: m.senderDeviceId ?? '', frankingTag: m.frankingTag }
+    if (!frankingHolds(claim, ctx)) return stored
+    const promoted: StoredMessage = { ...stored, status: 'ok' }
+    await this.ctx.store.saveMessage(promoted)
+    return promoted
   }
 
   private async decrypt(

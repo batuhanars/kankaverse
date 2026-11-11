@@ -323,7 +323,9 @@ export class E2eeEngine {
     if (r?.kind === 'hidden') return []
     const plain = { ...m, ciphertext: undefined } // şifreli yük ekran durumunda tutulmaz
     if (r?.kind === 'record') {
-      return [{ ...plain, content: r.record.body, e2eeStatus: r.record.status }]
+      // `unverified` kayıtta gövde yerelde durur ama ekrana ASLA çıkmaz (E4: "Bu mesaj doğrulanamadı").
+      const content = r.record.status === 'unverified' ? '' : r.record.body
+      return [{ ...plain, content, e2eeStatus: r.record.status }]
     }
     return [{ ...plain, content: '', e2eeStatus: 'undecryptable' as const }]
   }
