@@ -44,7 +44,12 @@ export class E2eeController {
     summary: 'Çağıran için uçtan uca şifreleme açık mı (bayrak kapalıyken de cevap verir)',
   })
   status(@CurrentUser() user: RequestUser) {
-    return { enabled: this.flag.isEligible(user.id), franking: this.flag.franking };
+    return {
+      enabled: this.flag.isEligible(user.id),
+      franking: this.flag.franking,
+      // E5a: yedek bayrağı ayrıca uygunluk ister; kapalıyken istemci yedek arayüzünü göstermez.
+      backup: this.flag.isEligible(user.id) && this.flag.backup,
+    };
   }
 
   @Post('devices')

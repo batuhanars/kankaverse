@@ -11,10 +11,17 @@ const prismaMock = {
   notificationPref: { deleteMany: jest.fn() },
   recoveryCode: { deleteMany: jest.fn() },
   recentGame: { deleteMany: jest.fn() },
+  externalAccount: { deleteMany: jest.fn() },
+  externalLinkState: { deleteMany: jest.fn() },
+  streamAnnounceOptIn: { deleteMany: jest.fn() },
   e2eeDevice: { updateMany: jest.fn() },
   e2eeKeyPackage: { deleteMany: jest.fn() },
+  e2eeBackup: { deleteMany: jest.fn() },
+  e2eeBackupSnapshot: { findMany: jest.fn(), deleteMany: jest.fn() },
   $transaction: jest.fn(),
 };
+
+const storageMock = { delete: jest.fn() };
 
 // ── Mock ConfigService ───────────────────────────────────────────────────────
 const configMock = {
@@ -22,7 +29,7 @@ const configMock = {
 };
 
 function makeJob() {
-  return new PurgeJob(prismaMock as any, configMock as any);
+  return new PurgeJob(prismaMock as any, configMock as any, storageMock as any);
 }
 
 function resetMocks() {
@@ -34,8 +41,15 @@ function resetMocks() {
   prismaMock.notificationPref.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.recoveryCode.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.recentGame.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.externalAccount.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.externalLinkState.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.streamAnnounceOptIn.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.e2eeDevice.updateMany.mockResolvedValue({ count: 0 });
   prismaMock.e2eeKeyPackage.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.e2eeBackup.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.e2eeBackupSnapshot.findMany.mockResolvedValue([]);
+  prismaMock.e2eeBackupSnapshot.deleteMany.mockResolvedValue({ count: 0 });
+  storageMock.delete.mockResolvedValue(undefined);
   // Varsayılan: interaktif transaction, tx = prismaMock'un kendisi
   prismaMock.$transaction.mockImplementation(
     async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock),
@@ -135,6 +149,25 @@ describe('PurgeJob.run — Sprint R6a §2 asgari kimlik imhası', () => {
     expect(prismaMock.recoveryCode.deleteMany).toHaveBeenCalledWith({
       where: { userId: 'user-123' },
     });
+  });
+
+  it('E5a: hesap imhasi yedek anahtar kaydini, goruntu satirlarini ve nesneleri siler; nesne hatasi imhayi bozmaz', async () => {
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'user-123' }]);
+    configMock.get.mockReturnValue(true);
+    prismaMock.e2eeBackupSnapshot.findMany.mockResolvedValue([
+      { objectKey: 'e2ee-backup/user-123/d1/aa' },
+      { objectKey: 'e2ee-backup/user-123/d2/bb' },
+    ]);
+    storageMock.delete.mockRejectedValueOnce(new Error('s3 down'));
+
+    await job.run();
+
+    expect(prismaMock.e2eeBackupSnapshot.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-123' },
+    });
+    expect(prismaMock.e2eeBackup.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-123' } });
+    expect(storageMock.delete).toHaveBeenCalledTimes(2);
+    expect(storageMock.delete).toHaveBeenCalledWith('e2ee-backup/user-123/d2/bb');
   });
 
   it('birden fazla aday → her biri için ayrı transaction, biri başarısız olsa diğeri etkilenmez', async () => {

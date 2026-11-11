@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { revokeUserDevicesInTx } from '../../modules/e2ee/e2ee-revocation.service';
+import { StorageService } from '../../shared/storage/storage.service';
 
 @Injectable()
 export class PurgeJob {
@@ -12,6 +13,7 @@ export class PurgeJob {
   constructor(
     private prisma: PrismaService,
     private config: ConfigService,
+    private storage: StorageService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
@@ -72,6 +74,7 @@ export class PurgeJob {
    * yer almıyor — R7 incelemesinde bu yorumun onaylanması gerekiyor.
    */
   private async purgeUser(userId: string): Promise<void> {
+    let backupKeys: string[] = [];
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: userId },
@@ -111,6 +114,24 @@ export class PurgeJob {
       await tx.externalAccount.deleteMany({ where: { userId } });
       await tx.externalLinkState.deleteMany({ where: { userId } });
       await tx.streamAnnounceOptIn.deleteMany({ where: { userId } });
+      // E5a (KVKK, kurul k.4): şifreli DM yedeği. Kullanıcı satırı silinmediği (anonimleştirildiği) için
+      // User Cascade'i DEVREYE GİRMEZ; anahtar kaydı ve görüntü satırları açıkça silinir.
+      // Görüntü tablosunun User ilişkisi yok; nesneler transaction sonrası silinir.
+      const snaps = await tx.e2eeBackupSnapshot.findMany({
+        where: { userId },
+        select: { objectKey: true },
+      });
+      backupKeys = snaps.map((x) => x.objectKey);
+      await tx.e2eeBackupSnapshot.deleteMany({ where: { userId } });
+      await tx.e2eeBackup.deleteMany({ where: { userId } });
     });
+    // Nesne silme en iyi çaba (yetim risk kabul edildi); hata imhayı başarısız saymaz, anahtar loglanır.
+    for (const key of backupKeys) {
+      try {
+        await this.storage.delete(key);
+      } catch (err) {
+        this.logger.error(`E2EE yedek nesnesi silinemedi (yetim kalabilir): ${key}: ${(err as Error).message}`);
+      }
+    }
   }
 }

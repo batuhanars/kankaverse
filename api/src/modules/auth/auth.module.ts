@@ -11,5 +11,6 @@ import { E2eeModule } from '../e2ee/e2ee.module';
   imports: [PassportModule, JwtModule.register({}), SharedModule, E2eeModule],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
+  exports: [AuthService], // E5a: yedek sıfırla/sil aynı reauth'u (verifyReauth) kullanır
 })
 export class AuthModule {}
