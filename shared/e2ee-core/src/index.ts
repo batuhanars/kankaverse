@@ -10,6 +10,7 @@ export {
 } from './group'
 export type { PendingCommit, WelcomeOut } from './pending'
 export type { ExpectedDevice } from './members'
+export { tunePurePrecompute } from './pure/suite'
 export { webProvider, pureProvider, detectWebProvider, type CryptoProvider } from './provider'
 export { decodePayload, encodePayload, textPayload, type DecodedPayload, type TextPayload } from './payload'
 export { SerialQueue } from './queue'

@@ -1,5 +1,5 @@
 import type { NotificationPreview } from '@kankaverse/e2ee-client';
-import { openLocalMobileEngine } from '@/e2ee/startEngine';
+import { flushPushCryptoMetrics, openLocalMobileEngine } from '@/e2ee/startEngine';
 import { useE2eeStore } from '@/stores/e2ee';
 import { loadCachedUserId } from './headlessEngine';
 import type { PushE2ee } from './e2eePayload';
@@ -50,5 +50,6 @@ export async function decryptOfflineForPush(
     // hata türü bile loglanmaz: sonuç unavailable, bildirim genel metinle kalır
   }
   metric(Date.now() - t0, result.kind, cold);
+  flushPushCryptoMetrics();
   return result;
 }
