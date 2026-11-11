@@ -48,6 +48,7 @@
 - Görüntü: `AES-256-GCM(BMK, nonce12, plaintext, aad = "kv-e5-snap-v1|" + userId + "|" + deviceId + "|" + keyVersion)`. AAD, sunucunun görüntüleri kullanıcılar/cihazlar arasında takas etmesini engeller.
 - `plaintext` = UTF-8 JSON `{ v: 1, deviceId, createdAt, messages: StoredMessage[] }`. Sıkıştırma YOK (metin, YAGNI; §3.3 boyut sınırı yeterli).
 - Test vektörleri: sabit şifre/tuz/parametre → sabit KEK; sarma/açma; yanlış şifre; kurcalanmış AAD.
+- **R7-1 notu (2026-11-11):** AAD'deki `userId`/`deviceId` cuid'dir ve `|` içermez (düz birleştirmenin belirsizlik koşulu). Web'de noble Argon2id ana iş parçacığını ~1 sn bloklar: adım 3/4'te web türetmesi Web Worker'da çalışır.
 
 ### §2.3 Şifre kuralı (istemcide, tek fonksiyon `checkBackupPassword`)
 - **En az 12 karakter** (NFC sonrası, grafem değil kod noktası).
