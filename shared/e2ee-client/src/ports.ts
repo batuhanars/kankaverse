@@ -106,6 +106,8 @@ export interface E2eeApi {
   commits(channelId: string, since: number): Promise<Reply<E2eeCommitRow[]>>
   welcomes(): Promise<Reply<E2eeWelcomeRow[]>>
   ackWelcome(id: string): Promise<Reply<null>>
+  /** E5a Rev.2 §4.7: kanalda hâlâ var olan (silinmemiş) mesaj kimlikleri; `ids` 1..500. İçerik yok. */
+  messagesExist(channelId: string, ids: string[]): Promise<Reply<{ existing: string[] }>>
   /** E5a yedek uçları (§3.2). Hata kodları: E2EE_BACKUP_KEY_VERSION (409), E2EE_BACKUP_NOT_CONFIGURED (404) vb. */
   backupGet(): Promise<Reply<BackupInfo>>
   /** Kurulum (keyVersion 1) ya da şifre değişimi (aynı keyVersion, yeniden sarma). */

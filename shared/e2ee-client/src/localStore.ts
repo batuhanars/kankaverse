@@ -163,8 +163,11 @@ export class LocalStore {
     if (markDirty) await this.markBackupDirty()
   }
 
-  /** Silinen mesajın yerel kaydını düşer (E5a §4.1). Kayıt varsa yedek kirlenir. */
-  async deleteMessage(id: string): Promise<void> {
+  /**
+   * Silinen mesajın yerel kaydını düşer (E5a §4.1). Kayıt varsa yedek kirlenir; görüntü kurarken tespit edilen
+   * silmelerde (`markDirty=false`) görüntü zaten o kayıt çıkarılarak kurulur.
+   */
+  async deleteMessage(id: string, markDirty = true): Promise<void> {
     let existed = true
     try {
       existed = (await this.vault.get('messages', id)) !== null
@@ -172,7 +175,7 @@ export class LocalStore {
       // bozuk kayıt: yine de sil, yedek yenilensin
     }
     await this.vault.delete('messages', id)
-    if (existed) await this.markBackupDirty()
+    if (existed && markDirty) await this.markBackupDirty()
   }
 
   messageIds(): Promise<string[]> {

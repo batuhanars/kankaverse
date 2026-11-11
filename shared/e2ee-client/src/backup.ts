@@ -19,6 +19,7 @@ import {
   type BackupPasswordRejection,
 } from '@kankaverse/e2ee-core'
 import { fromB64, toB64 } from './b64'
+import { missingIds } from './backupExists'
 import { buildSnapshot, parseSnapshot, pickCandidates, shouldWrite, type SnapshotContent } from './backupSnapshot'
 import type { E2eeContext } from './context'
 import type { StoredMessage } from './localStore'
@@ -54,7 +55,7 @@ export type BackupRunResult =
 type SkipReason = Extract<BackupRunResult, { status: 'skipped' }>['reason']
 type Prepared =
   | { skipped: SkipReason }
-  | { bmk: Uint8Array; keyVersion: number; deviceId: string; content: SnapshotContent }
+  | { bmk: Uint8Array; keyVersion: number; deviceId: string; records: StoredMessage[] }
 
 export interface RestoreResult {
   restored: number
@@ -189,8 +190,9 @@ export class BackupManager {
   private async runOnce(now: number): Promise<BackupRunResult> {
     const prep = await this.d.run((ctx) => this.prepare(ctx, now))
     if ('skipped' in prep) return { status: 'skipped', reason: prep.skipped }
-    const { bmk, deviceId, keyVersion, content } = prep
+    const { bmk, deviceId, keyVersion } = prep
     try {
+      const content = buildSnapshot(deviceId, now, await this.dropDeleted(prep.records))
       const sealed = sealSnapshot(bmk, utf8(JSON.stringify(content)), this.d.userId, deviceId, keyVersion)
       const ref = { deviceId, size: sealed.length, sha256: toHex(sha256(sealed)), keyVersion }
       const { data } = await this.d.api.snapshotPresign(ref)
@@ -222,11 +224,24 @@ export class BackupManager {
     const ids = await ctx.store.messageIds()
     for (const [i, id] of ids.entries()) {
       const rec = await ctx.store.loadMessage(id).catch(() => null) // bozuk tek kayıt yedeği durdurmaz
-      if (rec) records.push(rec)
+      if (rec && (rec.status === 'ok' || rec.status === 'unverified')) records.push(rec) // yalnız gövdesi olanlar (§4.2)
       if (i % YIELD_EVERY === YIELD_EVERY - 1) await ctx.yieldToUi?.()
     }
     await ctx.store.patchFlags({ backupDirty: false, backupInFlight: true })
-    return { bmk: key.bmk, keyVersion: key.keyVersion, deviceId, content: buildSnapshot(deviceId, now, records) }
+    return { bmk: key.bmk, keyVersion: key.keyVersion, deviceId, records }
+  }
+
+  /**
+   * Sunucuda artık olmayan (çevrimdışıyken silinmiş) kayıtları yerelden siler ve listeden çıkarır (§4.7).
+   * Ağ, kilit DIŞINDA; hata fırlar ve görüntü o tur yüklenmez (kirli kalır, `failed`).
+   */
+  private async dropDeleted(records: StoredMessage[]): Promise<StoredMessage[]> {
+    const gone = await missingIds(this.d.api, records, true)
+    if (gone.size === 0) return records
+    await this.d.run(async (ctx) => {
+      for (const id of gone) await ctx.store.deleteMessage(id, false)
+    })
+    return records.filter((r) => !gone.has(r.id))
   }
 
   /** 409 (sürüm değişti) ve 404 (yedek kapatıldı): yerel BMK artık geçersiz, düşürülür. Diğerleri tekrar denenir. */
@@ -259,7 +274,10 @@ export class BackupManager {
       else badSnapshots++
     }
     const allowed = new Set(accessibleEncryptedChannelIds)
-    const candidates = [...pickCandidates(snapshots).values()]
+    const picked = [...pickCandidates(snapshots).values()]
+    // Sunucuda silinmiş mesaj geri gelmez (§4.7). Kontrol başarısızsa hiçbir şey yazılmaz (hata fırlar).
+    const gone = await missingIds(this.d.api, picked.filter((m) => allowed.has(m.channelId)), false)
+    const candidates = picked.filter((m) => !gone.has(m.id))
     const counts = await this.d.run(async (ctx) => {
       let restored = 0
       for (const [i, m] of candidates.entries()) {
@@ -271,7 +289,7 @@ export class BackupManager {
         if (i % YIELD_EVERY === YIELD_EVERY - 1) await ctx.yieldToUi?.()
       }
       if (restored > 0) await ctx.store.markBackupDirty() // bu cihazın görüntüsü de güncellensin
-      return { restored, skipped: candidates.length - restored }
+      return { restored, skipped: picked.length - restored }
     })
     return { ...counts, badSnapshots }
   }

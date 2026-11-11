@@ -299,6 +299,75 @@ export function backupSuite(label: string) {
     })
   })
 
+  describe(`[${label}] E5a Rev.2 yedek: sunucuda silinen mesaj (§4.7)`, () => {
+    it('çevrimdışıyken silinen mesaj görüntüde yok, yerelden de silinir; geri yüklemede gelmez', async () => {
+      const p = await configured([rec('m1', 'ok', 'silinmis'), rec('m2', 'ok', 'duruyor')])
+      server.goneMessages.add('m1') // başka cihazdan silindi, bu cihaz çevrimdışıydı
+      expect(await bk(p).runBackupIfDue(T0)).toMatchObject({ status: 'uploaded', messages: 1 })
+      expect(await getRec(p, 'm1')).toBeNull()
+      expect(await getRec(p, 'm2')).not.toBeNull()
+      // Silme görüntüye zaten yansıdı: yeniden yedek gerekmez.
+      expect(await bk(p).runBackupIfDue(T0 + 7 * H)).toEqual({ status: 'skipped', reason: 'not-dirty' })
+      const d2 = await deviceWith([])
+      await bk(d2).restoreBackup([CH])
+      expect(await getRec(d2, 'm1')).toBeNull()
+      expect(await getRec(d2, 'm2')).toMatchObject({ body: 'duruyor' })
+    })
+
+    it('kontrol ağ hatasında görüntü YÜKLENMEZ, yerel kayıtlara dokunulmaz, kirli kalır; sonra yüklenir', async () => {
+      const p = await configured([rec('m1', 'ok', 'a'), rec('m2', 'ok', 'b')])
+      server.goneMessages.add('m1')
+      server.existsError = Object.assign(new Error('ağ yok'), { response: { status: 503, data: {} } })
+      const puts = server.backup.puts
+      expect(await bk(p).runBackupIfDue(T0)).toEqual({ status: 'failed', code: undefined })
+      expect(server.backup.puts).toBe(puts)
+      expect(await getRec(p, 'm1')).not.toBeNull() // kontrol yapılamadı: silme kararı verilmedi
+      expect((await local(p).loadFlags()).backupDirty).toBe(true)
+      server.existsError = null
+      expect(await bk(p).runBackupIfDue(T0 + 60_000)).toMatchObject({ status: 'uploaded', messages: 1 })
+    })
+
+    it('kanal başına 500\'lük gruplar; yalnız ok/unverified kayıtlar sorulur', async () => {
+      const many = Array.from({ length: 1203 }, (_, i) => rec(`a${i}`, 'ok', 'x'))
+      const p = await configured([...many, { ...rec('b1', 'ok', 'y'), channelId: 'ch2' }, rec('bad', 'undecryptable', '')])
+      await bk(p).runBackupIfDue(T0)
+      const calls = server.existsCalls.map((c) => `${c.channelId}:${c.count}`).sort()
+      expect(calls).toEqual(['ch1:203', 'ch1:500', 'ch1:500', 'ch2:1'])
+    })
+
+    it('erişilemeyen kanal (403) yedeği takmaz: o kanalın kayıtları korunur, diğer kanal yine denetlenir', async () => {
+      server.noAccessChannels.add('ch-eski')
+      server.goneMessages.add('x1')
+      const p = await configured([
+        { ...rec('e1', 'ok', 'eski kanal'), channelId: 'ch-eski' },
+        rec('x1', 'ok', 'silinmis'),
+        rec('k1', 'ok', 'duruyor'),
+      ])
+      expect(await bk(p).runBackupIfDue(T0)).toMatchObject({ status: 'uploaded', messages: 2 })
+      expect(await getRec(p, 'e1')).not.toBeNull()
+      expect(await getRec(p, 'x1')).toBeNull()
+    })
+
+    it('geri yükleme: sunucuda silinmiş aday yazılmaz ve atlanan sayılır', async () => {
+      const d1 = await configured([rec('a', 'ok', 'duruyor'), rec('b', 'ok', 'sonradan silindi')])
+      await bk(d1).runBackupIfDue(T0)
+      server.goneMessages.add('b') // yedekten sonra silindi
+      const d2 = await deviceWith([])
+      expect(await bk(d2).restoreBackup([CH])).toEqual({ restored: 1, skipped: 1, badSnapshots: 0 })
+      expect(await getRec(d2, 'b')).toBeNull()
+      expect(await getRec(d2, 'a')).toMatchObject({ body: 'duruyor' })
+    })
+
+    it('geri yükleme: kontrol ağ hatasında hata fırlar ve hiçbir şey yazılmaz', async () => {
+      const d1 = await configured([rec('a', 'ok', 'x')])
+      await bk(d1).runBackupIfDue(T0)
+      const d2 = await deviceWith([])
+      server.existsError = new Error('ağ yok')
+      await expect(bk(d2).restoreBackup([CH])).rejects.toThrow('ağ yok')
+      expect(await getRec(d2, 'a')).toBeNull()
+    })
+  })
+
   describe(`[${label}] E5a yedek: geri yükleme`, () => {
     it('gerçek akış: yeni cihaz kilit açar, geri yükler, mesajlar ok ve fk/sentAt/digest korunur', async () => {
       server.franking = true
