@@ -455,6 +455,9 @@ model Message {
   encrypted        Boolean           @default(false)
   ciphertext       Bytes?
   senderDeviceId   String?
+  // E4 (franking): şifreli mesajda gönderen taahhüdü = HMAC-SHA256(fk, canon), 32 bayt. Sunucu içeriği
+  // görmeden saklar; şikâyette şikâyetçinin ilettiği içerik bununla doğrulanır. Şifresizde null.
+  frankingTag      Bytes?
 
   @@index([channelId, createdAt])
   @@index([channelId, pinnedAt])
@@ -682,25 +685,48 @@ enum ModActionType {
 }
 
 model Report {
-  id              String       @id @default(cuid())
+  id              String           @id @default(cuid())
   reporterId      String
-  reporter        User         @relation("Reporter", fields: [reporterId], references: [id])
+  reporter        User             @relation("Reporter", fields: [reporterId], references: [id])
   targetType      ReportTarget
   targetId        String
   reason          ReportReason
   description     String?
-  status          ReportStatus @default(OPEN)
-  priority        Int          @default(0)
-  // 🔴 KURUL §0: contextSnapshot = yalnız minimal referans — kullanıcı içeriği/kanıt YAKALANMAZ
-  // Gerçek kanıt-yakalama hukuk görüşü sonrası (KVKK dayanak + retention)
+  status          ReportStatus     @default(OPEN)
+  priority        Int              @default(0)
+  // contextSnapshot = yalnız minimal referans (içerik burada TUTULMAZ). E4 (sahip kararı 2026-11-11):
+  // mesaj şikâyetlerinde kanıt (hedef + önceki 5 mesaj) `ReportEvidence` satırlarında saklanır;
+  // kapanıştan 90 gün sonra (`evidencePurgeAt`) silinir. Eski "KURUL §0: içerik yakalanmaz" kuralı kalktı.
   contextSnapshot Json
   resolvedById    String?
-  resolvedBy      User?        @relation("ReportResolver", fields: [resolvedById], references: [id])
+  resolvedBy      User?            @relation("ReportResolver", fields: [resolvedById], references: [id])
   resolvedAt      DateTime?
-  createdAt       DateTime     @default(now())
+  evidencePurgeAt DateTime? // E4: resolvedAt + 90 gün; silme işi bu tarih geçen raporların kanıtını siler
+  evidence        ReportEvidence[]
+  createdAt       DateTime         @default(now())
 
   @@index([status, priority])
   @@index([targetType, targetId])
+}
+
+/// E4: şikâyet kanıtı. Mesaj sonradan silinse de kalır (messageId yalnız referans, FK yok).
+/// Ekler referanstır (id/tür/boyut/depolama anahtarı); dosya KOPYALANMAZ.
+model ReportEvidence {
+  id          String   @id @default(cuid())
+  reportId    String
+  report      Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  messageId   String
+  authorId    String?
+  channelId   String
+  content     String // şifrelide şikâyetçinin ilettiği düz metin; şifresizde sunucunun okuduğu
+  attachments Json // [{ id, contentType, size, storageKey }]
+  messageAt   DateTime // mesajın createdAt'i
+  source      String // 'server' | 'reporter'
+  verified    Boolean // server: true; reporter: franking doğrulandıysa true
+  isTarget    Boolean // şikâyet edilen mesaj (false = bağlam)
+  createdAt   DateTime @default(now())
+
+  @@index([reportId])
 }
 
 model ModerationAction {

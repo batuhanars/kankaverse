@@ -81,6 +81,46 @@ describe('E2eeMessageService.planSend (§2.5)', () => {
   });
 });
 
+describe('E4 frankingTag (§3.2)', () => {
+  const TAG = toB64(new Uint8Array(32).fill(9));
+
+  it('şifresiz kanala frankingTag → 422 E2EE_NOT_ENCRYPTED (ciphertext olmasa da)', async () => {
+    const { prisma, svc } = setup();
+    prisma.e2eeGroup.findUnique.mockResolvedValue(null);
+    await expect(
+      svc.planSend(CALLER, 'ch', { content: 'x', frankingTag: TAG }),
+    ).rejects.toMatchObject({
+      status: 422,
+      response: { error: 'E2EE_NOT_ENCRYPTED' },
+    });
+  });
+
+  it('şifreli kanalda isteğe bağlı: verilirse 32 bayt plana girer, verilmezse null', async () => {
+    const { prisma, svc } = setup();
+    prisma.e2eeGroup.findUnique.mockResolvedValue({ channelId: 'ch' });
+    const withTag = await svc.planSend(CALLER, 'ch', { ciphertext: CT, frankingTag: TAG });
+    expect(Array.from((withTag as { frankingTag: Uint8Array }).frankingTag)).toEqual(
+      Array(32).fill(9),
+    );
+    await expect(svc.planSend(CALLER, 'ch', { ciphertext: CT })).resolves.toMatchObject({
+      frankingTag: null,
+    });
+  });
+
+  it('düzenleme: şifresiz mesajda frankingTag → 422; şifreli mesajda yeni tag plana girer', async () => {
+    const { svc } = setup();
+    await expect(
+      svc.planEdit(CALLER, { encrypted: false }, { content: 'x', frankingTag: TAG }),
+    ).rejects.toMatchObject({ status: 422 });
+    const plan = await svc.planEdit(
+      CALLER,
+      { encrypted: true },
+      { ciphertext: CT, frankingTag: TAG },
+    );
+    expect((plan as { frankingTag: Uint8Array }).frankingTag).toHaveLength(32);
+  });
+});
+
 describe('E2eeMessageService.planEdit', () => {
   it('şifresiz mesaj + düz içerik → şifresiz plan; ciphertext → 422', async () => {
     const { svc } = setup();

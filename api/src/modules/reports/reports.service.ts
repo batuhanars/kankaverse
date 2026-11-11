@@ -2,11 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateReportDto } from './dto/create-report.dto';
 import { ReportReason } from '@prisma/client';
+import { EvidenceRow, ReportEvidenceService } from './report-evidence.service';
 
 /**
- * KURUL §0 — contextSnapshot minimal referans:
+ * contextSnapshot minimal referans (içerik burada TUTULMAZ):
  *   { targetType, targetId, reason, reportedAt }
- *   Kullanıcı içeriği/kanıt YAKALANMAZ. Gerçek kanıt-yakalama hukuk sonrası.
+ * E4 (sahip kararı 2026-11-11): mesaj şikâyetinde kanıt (hedef + önceki 5 mesaj) `ReportEvidence`
+ * satırlarında saklanır; şikâyet kapanınca 90 gün sonra silinir (`ReportEvidenceService`).
  *
  * Priority hesabı (R7):
  *   CSAM / MINOR_SAFETY → 100 (en yüksek — dakikalar içinde insan incelemesi)
@@ -28,12 +30,15 @@ function calcPriority(reason: ReportReason): number {
 
 @Injectable()
 export class ReportsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private evidenceService: ReportEvidenceService,
+  ) {}
 
   async create(reporterId: string, dto: CreateReportDto) {
     const priority = calcPriority(dto.reason);
 
-    // §0 KURUL: contextSnapshot = YALNIZCA minimal referans — içerik yok
+    // contextSnapshot = YALNIZCA minimal referans — içerik `ReportEvidence`'ta
     const contextSnapshot: Record<string, string> = {
       targetType: dto.targetType,
       targetId: dto.targetId,
@@ -42,7 +47,7 @@ export class ReportsService {
     };
 
     // C35 §5.1: webhook mesajı raporu webhook kimliğini ve SORUMLU üyeyi (oluşturan) taşır; moderatör
-    // "webhook mesajı, sorumlu: X" görür. İçerik yakalanmaz (KURUL §0 değişmedi), yalnız iki referans.
+    // "webhook mesajı, sorumlu: X" görür. Snapshot'a içerik girmez, yalnız iki referans.
     if (dto.targetType === 'MESSAGE') {
       const target = await this.prisma.message.findUnique({
         where: { id: dto.targetId },
@@ -54,6 +59,13 @@ export class ReportsService {
       }
     }
 
+    // E4: kanıt, rapor ile TEK yazımda (iç içe create → tek transaction); doğrulama hatası raporu da düşürür.
+    // Önceliklendirme (calcPriority) kanıttan etkilenmez.
+    const evidence: EvidenceRow[] =
+      dto.targetType === 'MESSAGE'
+        ? await this.evidenceService.build(reporterId, dto.targetId, dto.evidence)
+        : [];
+
     const report = await this.prisma.report.create({
       data: {
         reporterId,
@@ -64,6 +76,7 @@ export class ReportsService {
         status: 'OPEN',
         priority,
         contextSnapshot,
+        ...(evidence.length > 0 ? { evidence: { create: evidence } } : {}),
       },
       select: { id: true, status: true, priority: true, createdAt: true },
     });

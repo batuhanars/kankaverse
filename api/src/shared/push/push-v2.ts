@@ -34,6 +34,8 @@ export interface V2E2eePayload {
   ciphertext: string;
   senderDeviceId: string;
   createdAt: string;
+  /** E4 — mesajda parmak izi varsa (base64, 32 bayt); telefon çözünce doğrular. */
+  frankingTag?: string;
 }
 
 export interface V2ReadData {

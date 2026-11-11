@@ -16,8 +16,8 @@ export class ModerationController {
   /** GET /moderation/queue — öncelikli moderasyon kuyruğu (OPEN+TRIAGED) */
   @Get('moderation/queue')
   @ApiOperation({ summary: 'Moderasyon kuyruğu (öncelik desc, tarih asc)' })
-  getQueue() {
-    return this.moderationService.getQueue();
+  getQueue(@CurrentUser() user: { id: string }) {
+    return this.moderationService.getQueue(user.id);
   }
 
   /** POST /moderation/actions — aksiyon uygula + AuditLog yaz */

@@ -3778,6 +3778,65 @@ describe('MessagesService — E1 şifreli mesaj', () => {
     });
   });
 
+  it('E4: frankingTag mesaja yazılır ve DTO içinde base64 döner; tag yoksa alan YOK (v1 istemci)', async () => {
+    const TAG = new Uint8Array(32).fill(3);
+    e2eeMock.planSend.mockResolvedValue({
+      encrypted: true,
+      senderDeviceId: 'dev-1',
+      ciphertext: CT,
+      frankingTag: TAG,
+    });
+    prismaMock.message.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ ...makeMsg('m-fk', new Date()), ...data }),
+    );
+    const dto = await service.create(USER_ID, CHANNEL_ID, { ciphertext: 'AQIDBA==' }, 'fam-1');
+    expect(
+      (prismaMock.message.create.mock.calls[0][0] as { data: Record<string, unknown> }).data
+        .frankingTag,
+    ).toBe(TAG);
+    expect(dto).toMatchObject({ frankingTag: Buffer.from(TAG).toString('base64') });
+
+    e2eeMock.planSend.mockResolvedValue({
+      encrypted: true,
+      senderDeviceId: 'dev-1',
+      ciphertext: CT,
+      frankingTag: null,
+    });
+    const v1 = await service.create(USER_ID, CHANNEL_ID, { ciphertext: 'AQIDBA==' }, 'fam-1');
+    expect('frankingTag' in v1).toBe(false);
+  });
+
+  it('E4: düzenlemede yeni tag eskisinin yerine geçer; tag verilmezse eski silinir (null)', async () => {
+    prismaMock.message.findUnique.mockResolvedValue({
+      id: 'm-enc',
+      authorId: USER_ID,
+      deletedAt: null,
+      webhookId: null,
+      encrypted: true,
+    });
+    prismaMock.message.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ ...makeMsg('m-enc', new Date()), ...data }),
+    );
+    const NEW = new Uint8Array(32).fill(5);
+    e2eeMock.planEdit.mockResolvedValue({
+      encrypted: true,
+      senderDeviceId: 'dev-2',
+      ciphertext: CT,
+      frankingTag: NEW,
+    });
+    await service.editMessage(USER_ID, CHANNEL_ID, 'm-enc', { ciphertext: 'AQIDBA==' });
+    e2eeMock.planEdit.mockResolvedValue({
+      encrypted: true,
+      senderDeviceId: 'dev-2',
+      ciphertext: CT,
+      frankingTag: null,
+    });
+    await service.editMessage(USER_ID, CHANNEL_ID, 'm-enc', { ciphertext: 'AQIDBA==' });
+    const calls = prismaMock.message.update.mock.calls as { data: Record<string, unknown> }[][];
+    expect(calls[0][0].data.frankingTag).toBe(NEW);
+    expect(calls[1][0].data.frankingTag).toBeNull();
+  });
+
   it('şifresiz mesaj DTO sunda encrypted/ciphertext alanı YOK (mevcut istemciler değişmez)', async () => {
     prismaMock.message.create.mockResolvedValue(makeMsg('m-plain', new Date()));
     const dto = await service.create(USER_ID, CHANNEL_ID, { content: 'selam' });

@@ -6,10 +6,16 @@ import { E2EE_ERRORS, fromB64 } from './e2ee.util';
 
 export type E2eeSendPlan =
   | { encrypted: false }
-  | { encrypted: true; senderDeviceId: string; ciphertext: Uint8Array<ArrayBuffer> };
+  | {
+      encrypted: true;
+      senderDeviceId: string;
+      ciphertext: Uint8Array<ArrayBuffer>;
+      /** E4: yoksa null (v1 istemci; düzenlemede verilmezse eski tag silinir, yeni içerikle uyuşmaz). */
+      frankingTag: Uint8Array<ArrayBuffer> | null;
+    };
 
 type CallerRef = Pick<RequestUser, 'id' | 'tokenFamily'>;
-type Payload = { content?: string; ciphertext?: string };
+type Payload = { content?: string; ciphertext?: string; frankingTag?: string };
 
 /**
  * Mesaj uçlarının E2EE kuralları (§2.5). Kanal şifreli ⇔ `E2eeGroup` satırı var (bayrağa BAKILMAZ:
@@ -33,7 +39,9 @@ export class E2eeMessageService {
       select: { channelId: true },
     });
     if (!group) {
-      if (dto.ciphertext !== undefined) throw E2EE_ERRORS.notEncrypted();
+      if (dto.ciphertext !== undefined || dto.frankingTag !== undefined) {
+        throw E2EE_ERRORS.notEncrypted();
+      }
       return { encrypted: false };
     }
     return this.encryptedPlan(caller, dto);
@@ -46,7 +54,9 @@ export class E2eeMessageService {
     dto: Payload,
   ): Promise<E2eeSendPlan> {
     if (!message.encrypted) {
-      if (dto.ciphertext !== undefined) throw E2EE_ERRORS.notEncrypted();
+      if (dto.ciphertext !== undefined || dto.frankingTag !== undefined) {
+        throw E2EE_ERRORS.notEncrypted();
+      }
       return { encrypted: false };
     }
     return this.encryptedPlan(caller, dto);
@@ -56,6 +66,11 @@ export class E2eeMessageService {
     if (dto.content !== undefined || dto.ciphertext === undefined) throw E2EE_ERRORS.required();
     if (!caller) throw E2EE_ERRORS.deviceRequired();
     const device = await this.devices.requireActiveDevice(caller);
-    return { encrypted: true, senderDeviceId: device.id, ciphertext: fromB64(dto.ciphertext) };
+    return {
+      encrypted: true,
+      senderDeviceId: device.id,
+      ciphertext: fromB64(dto.ciphertext),
+      frankingTag: dto.frankingTag === undefined ? null : fromB64(dto.frankingTag),
+    };
   }
 }

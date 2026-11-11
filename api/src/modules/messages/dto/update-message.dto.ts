@@ -1,7 +1,16 @@
-import { IsString, MaxLength, IsNotEmpty, IsOptional, IsBase64, IsInt, Min } from 'class-validator';
+import {
+  IsString,
+  MaxLength,
+  IsNotEmpty,
+  IsOptional,
+  IsBase64,
+  IsInt,
+  Matches,
+  Min,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MESSAGE_CONTENT_MAX } from '../messages.constants';
-import { E2EE_CIPHERTEXT_MAX_B64 } from '../../e2ee/e2ee.constants';
+import { E2EE_CIPHERTEXT_MAX_B64, FRANKING_TAG_B64_RE } from '../../e2ee/e2ee.constants';
 
 export class UpdateMessageDto {
   @ApiProperty({
@@ -31,4 +40,15 @@ export class UpdateMessageDto {
   @IsInt()
   @Min(0)
   epoch?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'E4: yeni şifreli yükün taahhüdü (base64, tam 32 bayt). Eskisinin yerine geçer; verilmezse eski silinir (yeni içerikle uyuşmaz).',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(FRANKING_TAG_B64_RE, {
+    message: 'Parmak izi, 32 baytlık geçerli bir base64 değeri olmalı.',
+  })
+  frankingTag?: string;
 }

@@ -43,10 +43,13 @@ const prismaMock = {
 
 describe('ReportsService', () => {
   let service: ReportsService;
+  // E4: kanıt üretimi ayrı serviste (report-evidence.service.spec.ts); burada yalnız önceliklendirme/snapshot.
+  const evidenceMock = { build: jest.fn() };
 
   beforeEach(() => {
     jest.resetAllMocks();
-    service = new ReportsService(prismaMock as any);
+    evidenceMock.build.mockResolvedValue([]);
+    service = new ReportsService(prismaMock as any, evidenceMock as any);
   });
 
   it('CSAM reason → priority 100 (en yuksek)', async () => {
@@ -101,8 +104,8 @@ describe('ReportsService', () => {
     expect(createCall.data.priority).toBe(0);
   });
 
-  // §0 KURUL kontrolu: contextSnapshot minimal — icerik yok
-  it('contextSnapshot yalniz minimal referans icerir — icerik/kanit YOK (§0 KURUL)', async () => {
+  // E4: icerik/kanit contextSnapshot'ta DEGIL, ReportEvidence satirlarinda tutulur
+  it('contextSnapshot yalniz minimal referans icerir — icerik/kanit ReportEvidence tablosunda (E4)', async () => {
     prismaMock.report.create.mockResolvedValue({ id: 'rpt-5' });
 
     await service.create('reporter-1', {
@@ -121,7 +124,7 @@ describe('ReportsService', () => {
     expect(snapshot.reason).toBe('HARASSMENT');
     expect(snapshot.reportedAt).toBeDefined();
 
-    // ICERIK OLMAMALI — §0 KURUL kisiti
+    // ICERIK OLMAMALI — kanit ReportEvidence'ta
     expect(snapshot.content).toBeUndefined();
     expect(snapshot.messageContent).toBeUndefined();
     expect(snapshot.userProfile).toBeUndefined();
@@ -133,6 +136,24 @@ describe('ReportsService', () => {
     expect(keys).toEqual(
       expect.arrayContaining(['targetType', 'targetId', 'reason', 'reportedAt']),
     );
+  });
+
+  it('E4: MESSAGE hedefinde kanit uretilir ve rapor ile ic ice (tek yazim) olusturulur', async () => {
+    const rows = [{ messageId: 'm1', isTarget: true }];
+    evidenceMock.build.mockResolvedValue(rows);
+    prismaMock.report.create.mockResolvedValue({ id: 'rpt-ev' });
+
+    await service.create('reporter-1', { targetType: 'MESSAGE', targetId: 'm1', reason: 'SPAM' });
+
+    expect(evidenceMock.build).toHaveBeenCalledWith('reporter-1', 'm1', undefined);
+    expect(prismaMock.report.create.mock.calls[0][0].data.evidence).toEqual({ create: rows });
+  });
+
+  it('E4: MESSAGE disi hedefte kanit sorgusu acilmaz', async () => {
+    prismaMock.report.create.mockResolvedValue({ id: 'rpt-u' });
+    await service.create('reporter-1', { targetType: 'USER', targetId: 'u1', reason: 'SPAM' });
+    expect(evidenceMock.build).not.toHaveBeenCalled();
+    expect(prismaMock.report.create.mock.calls[0][0].data.evidence).toBeUndefined();
   });
 
   it('create → jenerik { id } doner', async () => {
@@ -184,6 +205,78 @@ describe('ModeratorGuard', () => {
 });
 
 // ── Test: ModerationModuleService — Action + AuditLog ─────────────────────────
+
+describe('ModerationModuleService.getQueue (E4 kanit + denetim)', () => {
+  let service: ModerationModuleService;
+  const baseReport = {
+    targetType: 'MESSAGE',
+    targetId: 'm1',
+    reason: 'SPAM',
+    description: null,
+    status: 'OPEN',
+    priority: 0,
+    contextSnapshot: {},
+    reporterId: 'r1',
+    createdAt: new Date('2026-11-11T10:00:00Z'),
+  };
+  const ev = {
+    id: 'e1',
+    messageId: 'm1',
+    authorId: 'a1',
+    channelId: 'c1',
+    content: 'x',
+    attachments: [],
+    messageAt: new Date('2026-11-11T09:59:00Z'),
+    source: 'server',
+    verified: true,
+    isTarget: true,
+  };
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    prismaMock.auditLog.createMany = jest.fn().mockResolvedValue({ count: 0 });
+    service = new ModerationModuleService(prismaMock as any);
+  });
+
+  it('kanit hedef-once/zaman sirasiyla istenir ve kanitli her sikayet icin EVIDENCE_VIEW denetimi yazilir', async () => {
+    prismaMock.report.findMany.mockResolvedValue([
+      { ...baseReport, id: 'rpt-a', evidence: [ev, { ...ev, id: 'e2', isTarget: false }] },
+      { ...baseReport, id: 'rpt-b', evidence: [] },
+    ]);
+
+    const result = await service.getQueue('mod-1');
+
+    expect(prismaMock.report.findMany.mock.calls[0][0].select.evidence.orderBy).toEqual([
+      { isTarget: 'desc' },
+      { messageAt: 'asc' },
+    ]);
+    expect(prismaMock.auditLog.createMany).toHaveBeenCalledTimes(1);
+    expect(prismaMock.auditLog.createMany.mock.calls[0][0].data).toEqual([
+      {
+        actorId: 'mod-1',
+        action: 'report.evidence_view',
+        entityType: 'Report',
+        entityId: 'rpt-a',
+        metadata: { evidenceCount: 2 },
+      },
+    ]);
+    expect(result[0].evidence).toHaveLength(2);
+    expect(result[0].evidence[0].messageAt).toBe('2026-11-11T09:59:00.000Z');
+    expect(result[1].evidence).toEqual([]);
+  });
+
+  it('kanitsiz kuyruk denetim satiri yazmaz', async () => {
+    prismaMock.report.findMany.mockResolvedValue([{ ...baseReport, id: 'rpt-b', evidence: [] }]);
+    await service.getQueue('mod-1');
+    expect(prismaMock.auditLog.createMany).not.toHaveBeenCalled();
+  });
+
+  it('denetim yazilamazsa yanit donmez (kanit gorunmez)', async () => {
+    prismaMock.report.findMany.mockResolvedValue([{ ...baseReport, id: 'rpt-a', evidence: [ev] }]);
+    prismaMock.auditLog.createMany.mockRejectedValue(new Error('db'));
+    await expect(service.getQueue('mod-1')).rejects.toThrow('db');
+  });
+});
 
 describe('ModerationModuleService.createAction', () => {
   let service: ModerationModuleService;
@@ -249,6 +342,24 @@ describe('ModerationModuleService.createAction', () => {
     const updateCall = prismaMock.report.update.mock.calls[0][0];
     expect(updateCall.data.status).toBe('RESOLVED');
     expect(updateCall.data.resolvedById).toBe(MOD_ID);
+  });
+
+  it('E4: kapanista evidencePurgeAt = resolvedAt + 90 gun', async () => {
+    prismaMock.report.findUnique.mockResolvedValue({ id: 'rpt-linked', status: 'OPEN' });
+    prismaMock.user.findUnique.mockResolvedValue({ id: TARGET_ID, deletedAt: null });
+    prismaMock.moderationAction.create.mockResolvedValue({ id: 'action-9', type: 'WARN' });
+    prismaMock.auditLog.create.mockResolvedValue({});
+    prismaMock.report.update.mockResolvedValue({});
+
+    await service.createAction(MOD_ID, {
+      targetUserId: TARGET_ID,
+      type: 'WARN',
+      reason: 'Uyari',
+      relatedReportId: 'rpt-linked',
+    });
+
+    const { resolvedAt, evidencePurgeAt } = prismaMock.report.update.mock.calls[0][0].data;
+    expect(evidencePurgeAt.getTime() - resolvedAt.getTime()).toBe(90 * 24 * 60 * 60 * 1000);
   });
 
   it('targetUserId bulunamadi → NotFoundException', async () => {

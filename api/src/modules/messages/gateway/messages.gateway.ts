@@ -966,11 +966,19 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     limitSize = true,
   ): { e2ee?: V2E2eePayload } {
     if (this.config.get<boolean>('e2eePushCiphertext') !== true) return {};
-    const { encrypted, ciphertext, senderDeviceId, createdAt } = messageDto;
+    const { encrypted, ciphertext, senderDeviceId, createdAt, frankingTag } = messageDto;
     if (encrypted !== true || typeof ciphertext !== 'string') return {};
     if (typeof senderDeviceId !== 'string' || typeof createdAt !== 'string') return {};
     if (limitSize && ciphertext.length > E2EE_PUSH_MAX_CIPHERTEXT) return {};
-    return { e2ee: { ciphertext, senderDeviceId, createdAt } };
+    // E4: tag varsa (44 karakter) yükle birlikte gider.
+    return {
+      e2ee: {
+        ciphertext,
+        senderDeviceId,
+        createdAt,
+        ...(typeof frankingTag === 'string' ? { frankingTag } : {}),
+      },
+    };
   }
 
   /**

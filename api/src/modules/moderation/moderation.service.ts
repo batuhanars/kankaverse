@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateActionDto, MediaTarget } from './dto/create-action.dto';
+import { REPORT_EVIDENCE_RETENTION_DAYS } from '../e2ee/e2ee.constants';
 
 /**
  * Moderasyon kuyruk + aksiyon servisi (R7 — insan incelemesi zorunlu).
@@ -20,9 +21,11 @@ export class ModerationModuleService {
   /**
    * GET /moderation/queue
    * OPEN + TRIAGED raporlar, priority DESC + createdAt ASC.
-   * CSAM raporunda ham içerik zaten saklanmıyor (contextSnapshot minimal) — güvenli.
+   * E4: mesaj şikâyetlerinde kanıt (hedef önce, sonra zaman sırası) `evidence` alanında döner; ek = yalnız
+   * referans (önizleme yok). 🔴 R7: kanıt içeren her yanıt, içerdiği her şikâyet için denetim kaydı
+   * (`report.evidence_view`: kim, ne zaman, hangi şikâyet) yazar. Kayıt yazılamazsa yanıt DÖNMEZ.
    */
-  async getQueue() {
+  async getQueue(moderatorId: string) {
     const reports = await this.prisma.report.findMany({
       where: { status: { in: ['OPEN', 'TRIAGED'] } },
       orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
@@ -37,8 +40,25 @@ export class ModerationModuleService {
         contextSnapshot: true,
         reporterId: true,
         createdAt: true,
+        evidence: {
+          orderBy: [{ isTarget: 'desc' }, { messageAt: 'asc' }],
+          select: {
+            id: true,
+            messageId: true,
+            authorId: true,
+            channelId: true,
+            content: true,
+            attachments: true,
+            messageAt: true,
+            source: true,
+            verified: true,
+            isTarget: true,
+          },
+        },
       },
     });
+
+    await this.auditEvidenceViews(moderatorId, reports);
 
     return reports.map((r) => ({
       id: r.id,
@@ -54,7 +74,30 @@ export class ModerationModuleService {
       contextSnapshot: r.contextSnapshot,
       reporterId: r.reporterId,
       createdAt: r.createdAt.toISOString(),
+      // E4: kanıt yoksa boş dizi ("kanıt iletilmedi")
+      evidence: r.evidence.map((e) => ({ ...e, messageAt: e.messageAt.toISOString() })),
     }));
+  }
+
+  /**
+   * E4 §1.4: kanıt içeren her şikâyet için bir `AuditLog` satırı (mevcut denetim altyapısı; yeni tablo yok).
+   * Tek `createMany`. Metadata yalnız sayı; içerik denetim kaydına ASLA girmez.
+   */
+  private async auditEvidenceViews(
+    moderatorId: string,
+    reports: { id: string; evidence: unknown[] }[],
+  ) {
+    const viewed = reports.filter((r) => r.evidence.length > 0);
+    if (viewed.length === 0) return;
+    await this.prisma.auditLog.createMany({
+      data: viewed.map((r) => ({
+        actorId: moderatorId,
+        action: 'report.evidence_view',
+        entityType: 'Report',
+        entityId: r.id,
+        metadata: { evidenceCount: r.evidence.length },
+      })),
+    });
   }
 
   /**
@@ -136,12 +179,17 @@ export class ModerationModuleService {
 
     // relatedReportId varsa raporu RESOLVED yap
     if (dto.relatedReportId) {
+      const resolvedAt = new Date();
       await this.prisma.report.update({
         where: { id: dto.relatedReportId },
         data: {
           status: 'RESOLVED',
           resolvedById: moderatorId,
-          resolvedAt: new Date(),
+          resolvedAt,
+          // E4 §3.4: kanıt kapanıştan 90 gün sonra silinir (silme işi bu tarihe bakar)
+          evidencePurgeAt: new Date(
+            resolvedAt.getTime() + REPORT_EVIDENCE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+          ),
         },
       });
     }
