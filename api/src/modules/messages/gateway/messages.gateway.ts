@@ -837,6 +837,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         content,
         createdAt: messageDto['createdAt'] as string,
         ...(encrypted ? { encrypted: true } : {}),
+        // E3 Rev.5: masaüstü/liste sohbet açık değilken de çözebilsin (soket: boyut sınırı yok).
+        ...this.e2eePushField(messageDto, false),
       },
       senderId: (messageDto['author'] as Record<string, string>)['id'],
     };
@@ -956,13 +958,18 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
    * E3 §2.1 — şifreli DM mesajının v2 push verisine şifreli yük. Yalnız bayrak açık + mesaj şifreli +
    * base64 uzunluğu sınır altındaysa; aksi hâlde boş (bildirim genel metinle çıkar). Veri, mesaj
    * kaydında zaten duran şifreli yüktür; düz içerik buraya hiç gelmez, loglanmaz.
+   * `limitSize=false` (E3 Rev.5, `dm.message` soketi): aynı bayrak ve şifreli-mesaj kuralı, boyut sınırı yok
+   * (sınır FCM yük tavanı içindir, soketin değil).
    */
-  private e2eePushField(messageDto: Record<string, unknown>): { e2ee?: V2E2eePayload } {
+  private e2eePushField(
+    messageDto: Record<string, unknown>,
+    limitSize = true,
+  ): { e2ee?: V2E2eePayload } {
     if (this.config.get<boolean>('e2eePushCiphertext') !== true) return {};
     const { encrypted, ciphertext, senderDeviceId, createdAt } = messageDto;
     if (encrypted !== true || typeof ciphertext !== 'string') return {};
     if (typeof senderDeviceId !== 'string' || typeof createdAt !== 'string') return {};
-    if (ciphertext.length > E2EE_PUSH_MAX_CIPHERTEXT) return {};
+    if (limitSize && ciphertext.length > E2EE_PUSH_MAX_CIPHERTEXT) return {};
     return { e2ee: { ciphertext, senderDeviceId, createdAt } };
   }
 

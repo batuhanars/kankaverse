@@ -808,6 +808,38 @@ describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
       expect(emits[emits.length - 1][2].lastMessage.id).toBe('msg-plain');
     });
 
+    describe('dm.message soketi e2ee alanı (Rev.5)', () => {
+      const lastOf = () =>
+        emitToUserMock.mock.calls.filter((c: any[]) => c[1] === 'dm.message').pop()![2].lastMessage;
+
+      it('bayrak açık + şifreli → e2ee var; 2800 üstü ciphertext de var (sınır yok)', async () => {
+        setup(true);
+        const dto = encDto();
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, dto);
+        expect(lastOf().e2ee).toEqual({
+          ciphertext: B64_OK,
+          senderDeviceId: SENDER_DEVICE,
+          createdAt: dto['createdAt'],
+        });
+        const big = 'A'.repeat(E2EE_PUSH_MAX_CIPHERTEXT + 1);
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto({ ciphertext: big }));
+        expect(lastOf().e2ee.ciphertext).toBe(big);
+        expect(lastOf().content).toBe(E2EE_PUSH_GENERIC_TEXT);
+      });
+
+      it('bayrak kapalı → e2ee yok', async () => {
+        setup(false);
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto());
+        expect(lastOf().e2ee).toBeUndefined();
+      });
+
+      it('şifresiz → e2ee yok (bayrak açık olsa da)', async () => {
+        setup(true);
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+        expect(lastOf().e2ee).toBeUndefined();
+      });
+    });
+
     it('şifreli mesajdan MENTION push yolu çıkmaz (mentions boş → erken döner)', async () => {
       setup(false);
       await gateway.notifyMentions(DM_CHANNEL_ID, encDto({ mentions: [], mentionRoles: [] }));
