@@ -25,6 +25,7 @@ import { useToastStore } from '@/stores/toast'
 import { useAiVideoViewer } from '@/composables/useAiVideoViewer'
 import { i18n } from '@/i18n'
 import { getAccessToken, refreshAccessToken } from '@/api/axios'
+import { isDefinitiveRefreshRejection } from '@/api/refreshRejection'
 import {
   _bindTypingEmitters,
   handleTypingUpdate,
@@ -208,9 +209,12 @@ export function useSocket() {
       try {
         await refreshAccessToken()
         socket?.connect() // auth callback taze token'ı okur (sunucu io disconnect'inden sonra manuel reconnect gerekir)
-      } catch {
+      } catch (refreshError) {
         socket?.disconnect()
-        window.dispatchEvent(new CustomEvent('kv:auth:expired'))
+        // D97: yalnız kesin red oturumu düşürür; ağ/5xx'te kullanıcı atılmaz.
+        if (isDefinitiveRefreshRejection(refreshError)) {
+          window.dispatchEvent(new CustomEvent('kv:auth:expired'))
+        }
       }
     })
 

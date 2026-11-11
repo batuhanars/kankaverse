@@ -10,6 +10,7 @@ import {
   setRefreshToken,
   setSessionExpiredHandler,
 } from '@/api/http';
+import { isDefinitiveRefreshRejection } from '@/api/refreshRejection';
 import { resetSocket } from '@/realtime/socket';
 import { clearPushToken } from '@/notifications/push';
 import { clearResume } from '@/utils/resumeLastScreen';
@@ -73,10 +74,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await refreshAccessToken();
         const user = await authApi.me();
         set({ user, status: 'authenticated' });
-      } catch {
-        clearAccessToken();
-        await clearRefreshToken();
-        await wipeE2ee(); // oturum yok: yerel şifreli depo kimseye ait değil
+      } catch (e) {
+        // D97: ağ/zaman aşımı/5xx oturumu bitirmez. Token ve şifreli depo korunur (bir sonraki açılış
+        // yeniden dener); yalnız kesin red (401/403/token yok) oturumu siler.
+        if (isDefinitiveRefreshRejection(e)) {
+          clearAccessToken();
+          await clearRefreshToken();
+          await wipeE2ee(); // oturum yok: yerel şifreli depo kimseye ait değil
+        }
         set({ user: null, status: 'unauthenticated' });
       }
     })();

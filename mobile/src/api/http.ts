@@ -2,6 +2,7 @@ import axios, { create as createAxios, type AxiosInstance, type InternalAxiosReq
 import * as Device from 'expo-device';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { isDefinitiveRefreshRejection } from '@/api/refreshRejection';
 
 // Sprint M0 contract §3 — hedefe göre değişir (README "Ortam Kurulumu"). Emülatör varsayılanı
 // 10.0.2.2 (host makine); .env / .env.example bunu belgeler.
@@ -161,10 +162,13 @@ http.interceptors.response.use(
         original.headers = original.headers ?? {};
         original.headers.Authorization = `Bearer ${newToken}`;
         return http(original);
-      } catch {
-        clearAccessToken();
-        await clearRefreshToken();
-        onSessionExpired?.();
+      } catch (refreshError) {
+        // D97: yalnız kesin red oturumu düşürür; ağ/zaman aşımı/5xx'te token kalır, orijinal hata döner.
+        if (isDefinitiveRefreshRejection(refreshError)) {
+          clearAccessToken();
+          await clearRefreshToken();
+          onSessionExpired?.();
+        }
       }
     }
     return Promise.reject(error);
