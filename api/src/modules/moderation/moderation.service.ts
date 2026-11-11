@@ -21,11 +21,10 @@ export class ModerationModuleService {
   /**
    * GET /moderation/queue
    * OPEN + TRIAGED raporlar, priority DESC + createdAt ASC.
-   * E4: mesaj şikâyetlerinde kanıt (hedef önce, sonra zaman sırası) `evidence` alanında döner; ek = yalnız
-   * referans (önizleme yok). 🔴 R7: kanıt içeren her yanıt, içerdiği her şikâyet için denetim kaydı
-   * (`report.evidence_view`: kim, ne zaman, hangi şikâyet) yazar. Kayıt yazılamazsa yanıt DÖNMEZ.
+   * E4 Rev.1: kuyruk kanıt İÇERİĞİ döndürmez, yalnız `evidenceCount` + `hasUnverified`; denetim kaydı
+   * yazmaz. İçerik `GET /moderation/reports/:id` ucundadır (her görüntüleme denetlenir).
    */
-  async getQueue(moderatorId: string) {
+  async getQueue() {
     const reports = await this.prisma.report.findMany({
       where: { status: { in: ['OPEN', 'TRIAGED'] } },
       orderBy: [{ priority: 'desc' }, { createdAt: 'asc' }],
@@ -40,6 +39,51 @@ export class ModerationModuleService {
         contextSnapshot: true,
         reporterId: true,
         createdAt: true,
+        // içerik SEÇİLMEZ: yalnız sayı ve doğrulanmamış var mı
+        evidence: { select: { verified: true } },
+      },
+    });
+
+    return reports.map((r) => ({
+      id: r.id,
+      targetType: r.targetType,
+      targetId: r.targetId,
+      reason: r.reason,
+      description: r.description,
+      status: r.status,
+      priority: r.priority,
+      // CSAM raporu için "render etme, manuel escalate" notu
+      csamFlag: r.reason === 'CSAM',
+      // contextSnapshot: minimal referans (targetType/targetId/reason/reportedAt) — içerik yok
+      contextSnapshot: r.contextSnapshot,
+      reporterId: r.reporterId,
+      createdAt: r.createdAt.toISOString(),
+      evidenceCount: r.evidence.length,
+      hasUnverified: r.evidence.some((e) => !e.verified),
+    }));
+  }
+
+  /**
+   * GET /moderation/reports/:id — şikâyet + kanıt (önce hedef, sonra zaman sırası). Ek = yalnız referans.
+   * 🔴 R7 §1.4: her görüntüleme `AuditLog`'a `report.evidence_view` yazar (kim, ne zaman, hangi şikâyet;
+   * metadata yalnız sayı, içerik ASLA). Denetim yazılamazsa yanıt DÖNMEZ.
+   */
+  async getReport(moderatorId: string, reportId: string) {
+    const r = await this.prisma.report.findUnique({
+      where: { id: reportId },
+      select: {
+        id: true,
+        targetType: true,
+        targetId: true,
+        reason: true,
+        description: true,
+        status: true,
+        priority: true,
+        contextSnapshot: true,
+        reporterId: true,
+        createdAt: true,
+        resolvedAt: true,
+        evidencePurgeAt: true,
         evidence: {
           orderBy: [{ isTarget: 'desc' }, { messageAt: 'asc' }],
           select: {
@@ -57,10 +101,21 @@ export class ModerationModuleService {
         },
       },
     });
+    if (!r) {
+      throw new NotFoundException({ message: 'Rapor bulunamadı.', error: 'REPORT_NOT_FOUND' });
+    }
 
-    await this.auditEvidenceViews(moderatorId, reports);
+    await this.prisma.auditLog.create({
+      data: {
+        actorId: moderatorId,
+        action: 'report.evidence_view',
+        entityType: 'Report',
+        entityId: r.id,
+        metadata: { evidenceCount: r.evidence.length },
+      },
+    });
 
-    return reports.map((r) => ({
+    return {
       id: r.id,
       targetType: r.targetType,
       targetId: r.targetId,
@@ -68,36 +123,15 @@ export class ModerationModuleService {
       description: r.description,
       status: r.status,
       priority: r.priority,
-      // CSAM raporu için "render etme, manuel escalate" notu
       csamFlag: r.reason === 'CSAM',
-      // contextSnapshot: minimal referans (targetType/targetId/reason/reportedAt) — içerik yok
       contextSnapshot: r.contextSnapshot,
       reporterId: r.reporterId,
       createdAt: r.createdAt.toISOString(),
-      // E4: kanıt yoksa boş dizi ("kanıt iletilmedi")
+      resolvedAt: r.resolvedAt?.toISOString() ?? null,
+      evidencePurgeAt: r.evidencePurgeAt?.toISOString() ?? null,
+      // kanıt yoksa boş dizi ("kanıt iletilmedi")
       evidence: r.evidence.map((e) => ({ ...e, messageAt: e.messageAt.toISOString() })),
-    }));
-  }
-
-  /**
-   * E4 §1.4: kanıt içeren her şikâyet için bir `AuditLog` satırı (mevcut denetim altyapısı; yeni tablo yok).
-   * Tek `createMany`. Metadata yalnız sayı; içerik denetim kaydına ASLA girmez.
-   */
-  private async auditEvidenceViews(
-    moderatorId: string,
-    reports: { id: string; evidence: unknown[] }[],
-  ) {
-    const viewed = reports.filter((r) => r.evidence.length > 0);
-    if (viewed.length === 0) return;
-    await this.prisma.auditLog.createMany({
-      data: viewed.map((r) => ({
-        actorId: moderatorId,
-        action: 'report.evidence_view',
-        entityType: 'Report',
-        entityId: r.id,
-        metadata: { evidenceCount: r.evidence.length },
-      })),
-    });
+    };
   }
 
   /**

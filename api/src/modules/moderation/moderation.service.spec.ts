@@ -206,7 +206,7 @@ describe('ModeratorGuard', () => {
 
 // ── Test: ModerationModuleService — Action + AuditLog ─────────────────────────
 
-describe('ModerationModuleService.getQueue (E4 kanit + denetim)', () => {
+describe('ModerationModuleService kuyruk (iceriksiz) + getReport (E4 Rev.1)', () => {
   let service: ModerationModuleService;
   const baseReport = {
     targetType: 'MESSAGE',
@@ -234,47 +234,76 @@ describe('ModerationModuleService.getQueue (E4 kanit + denetim)', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    prismaMock.auditLog.createMany = jest.fn().mockResolvedValue({ count: 0 });
     service = new ModerationModuleService(prismaMock as any);
   });
 
-  it('kanit hedef-once/zaman sirasiyla istenir ve kanitli her sikayet icin EVIDENCE_VIEW denetimi yazilir', async () => {
+  it('kuyruk icerik SECMEZ/DONMEZ: yalniz evidenceCount + hasUnverified; denetim yazmaz', async () => {
     prismaMock.report.findMany.mockResolvedValue([
-      { ...baseReport, id: 'rpt-a', evidence: [ev, { ...ev, id: 'e2', isTarget: false }] },
-      { ...baseReport, id: 'rpt-b', evidence: [] },
+      { ...baseReport, id: 'a', evidence: [{ verified: true }, { verified: false }] },
+      { ...baseReport, id: 'b', evidence: [{ verified: true }] },
+      { ...baseReport, id: 'c', evidence: [] },
     ]);
 
-    const result = await service.getQueue('mod-1');
+    const result = await service.getQueue();
 
-    expect(prismaMock.report.findMany.mock.calls[0][0].select.evidence.orderBy).toEqual([
+    expect(prismaMock.report.findMany.mock.calls[0][0].select.evidence).toEqual({
+      select: { verified: true },
+    });
+    expect(result.map((r) => [r.evidenceCount, r.hasUnverified])).toEqual([
+      [2, true],
+      [1, false],
+      [0, false],
+    ]);
+    expect(result[0]).not.toHaveProperty('evidence');
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('getReport: kanit hedef-once/zaman sirasi istenir, report.evidence_view yazilir, icerik doner', async () => {
+    prismaMock.report.findUnique.mockResolvedValue({
+      ...baseReport,
+      id: 'rpt-a',
+      resolvedAt: null,
+      evidencePurgeAt: null,
+      evidence: [ev, { ...ev, id: 'e2', isTarget: false }],
+    });
+    prismaMock.auditLog.create.mockResolvedValue({});
+
+    const r = await service.getReport('mod-1', 'rpt-a');
+
+    expect(prismaMock.report.findUnique.mock.calls[0][0].select.evidence.orderBy).toEqual([
       { isTarget: 'desc' },
       { messageAt: 'asc' },
     ]);
-    expect(prismaMock.auditLog.createMany).toHaveBeenCalledTimes(1);
-    expect(prismaMock.auditLog.createMany.mock.calls[0][0].data).toEqual([
-      {
+    expect(prismaMock.auditLog.create).toHaveBeenCalledWith({
+      data: {
         actorId: 'mod-1',
         action: 'report.evidence_view',
         entityType: 'Report',
         entityId: 'rpt-a',
         metadata: { evidenceCount: 2 },
       },
-    ]);
-    expect(result[0].evidence).toHaveLength(2);
-    expect(result[0].evidence[0].messageAt).toBe('2026-11-11T09:59:00.000Z');
-    expect(result[1].evidence).toEqual([]);
+    });
+    expect(r.evidence).toHaveLength(2);
+    expect(r.evidence[0].messageAt).toBe('2026-11-11T09:59:00.000Z');
+    expect(r.evidence[0].content).toBe('x');
   });
 
-  it('kanitsiz kuyruk denetim satiri yazmaz', async () => {
-    prismaMock.report.findMany.mockResolvedValue([{ ...baseReport, id: 'rpt-b', evidence: [] }]);
-    await service.getQueue('mod-1');
-    expect(prismaMock.auditLog.createMany).not.toHaveBeenCalled();
+  it('getReport: denetim yazilamazsa yanit donmez', async () => {
+    prismaMock.report.findUnique.mockResolvedValue({
+      ...baseReport,
+      id: 'rpt-a',
+      resolvedAt: null,
+      evidencePurgeAt: null,
+      evidence: [ev],
+    });
+    prismaMock.auditLog.create.mockRejectedValue(new Error('db'));
+    await expect(service.getReport('mod-1', 'rpt-a')).rejects.toThrow('db');
   });
 
-  it('denetim yazilamazsa yanit donmez (kanit gorunmez)', async () => {
-    prismaMock.report.findMany.mockResolvedValue([{ ...baseReport, id: 'rpt-a', evidence: [ev] }]);
-    prismaMock.auditLog.createMany.mockRejectedValue(new Error('db'));
-    await expect(service.getQueue('mod-1')).rejects.toThrow('db');
+  it('getReport: rapor yoksa 404 REPORT_NOT_FOUND, denetim yazilmaz', async () => {
+    prismaMock.report.findUnique.mockResolvedValue(null);
+    await expect(service.getReport('mod-1', 'yok')).rejects.toThrow(NotFoundException);
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
   });
 });
 

@@ -85,7 +85,7 @@ describe('ReportEvidenceService (E4 §3.3)', () => {
       expect(rows.slice(1).every((r) => !r.isTarget && r.source === 'server' && r.verified)).toBe(
         true,
       );
-      expect(membership.requireChannelAccess).not.toHaveBeenCalled();
+      expect(membership.requireChannelAccess).toHaveBeenCalledWith('rep', 'ch1'); // Rev.1: şifresizde de kapı
       // bağlam sorgusu: aynı kanal, silinmemiş, şifresiz, hedeften önce, 5 adet, yeniden eskiye
       expect(prisma.message.findMany.mock.calls[0][0]).toMatchObject({
         where: {
@@ -105,6 +105,32 @@ describe('ReportEvidenceService (E4 §3.3)', () => {
       const rows = await svc.build('rep', 't', undefined);
       expect(rows).toHaveLength(1);
       expect(prisma.message.findUnique.mock.calls[0][0].where).toEqual({ id: 't' });
+    });
+
+    it('Rev.1: erişemeyen şikâyetçi (üye değil) şifresiz mesajı şikâyet edemez; bağlam sorgusu açılmaz', async () => {
+      prisma.message.findUnique.mockResolvedValue(plain('t', 10));
+      membership.requireChannelAccess.mockRejectedValue(
+        new HttpException('NOT_CHANNEL_MEMBER', 403),
+      );
+      await expect(svc.build('rep', 't', undefined)).rejects.toMatchObject({ status: 403 });
+      expect(prisma.message.findMany).not.toHaveBeenCalled();
+    });
+
+    it('Rev.1: hedef clearedAt öncesiyse 422; bağlam sorgusu createdAt > clearedAt ile süzülür', async () => {
+      prisma.message.findUnique.mockResolvedValue(plain('t', 10));
+      prisma.channelMember.findUnique.mockResolvedValue({ clearedAt: at(12) });
+      await expect(svc.build('rep', 't', undefined)).rejects.toMatchObject({
+        status: 422,
+        response: { error: 'REPORT_EVIDENCE_INVALID' },
+      });
+
+      prisma.channelMember.findUnique.mockResolvedValue({ clearedAt: at(5) });
+      prisma.message.findMany.mockResolvedValue([]);
+      await svc.build('rep', 't', undefined);
+      expect(prisma.message.findMany.mock.calls[0][0].where.createdAt).toEqual({
+        lt: at(10),
+        gt: at(5),
+      });
     });
 
     it('hedef mesaj yoksa kanıt yok (şikâyet yine oluşur)', async () => {
@@ -157,7 +183,7 @@ describe('ReportEvidenceService (E4 §3.3)', () => {
       expect((await svc.build('rep', 't', [item('t')] as never))[0].verified).toBe(false);
     });
 
-    it('evidence yok/boş → kanıt satırı yok, üyelik sorgusu bile açılmaz', async () => {
+    it('evidence yok/boş → kanıt satırı yok (erişim kapısı yine uygulanır)', async () => {
       prisma.message.findUnique.mockResolvedValue(enc('t', 10));
       await expect(svc.build('rep', 't', undefined)).resolves.toEqual([]);
       await expect(svc.build('rep', 't', [])).resolves.toEqual([]);

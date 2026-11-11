@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ModerationModuleService } from './moderation.service';
 import { CreateActionDto } from './dto/create-action.dto';
@@ -16,8 +25,17 @@ export class ModerationController {
   /** GET /moderation/queue — öncelikli moderasyon kuyruğu (OPEN+TRIAGED) */
   @Get('moderation/queue')
   @ApiOperation({ summary: 'Moderasyon kuyruğu (öncelik desc, tarih asc)' })
-  getQueue(@CurrentUser() user: { id: string }) {
-    return this.moderationService.getQueue(user.id);
+  getQueue() {
+    return this.moderationService.getQueue();
+  }
+
+  /** GET /moderation/reports/:id — şikâyet + kanıt içeriği; her görüntüleme AuditLog'a yazılır */
+  @Get('moderation/reports/:id')
+  @ApiOperation({
+    summary: 'Şikâyet ayrıntısı + kanıt (hedef önce, zaman sırası); denetim kaydı yazar',
+  })
+  getReport(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+    return this.moderationService.getReport(user.id, id);
   }
 
   /** POST /moderation/actions — aksiyon uygula + AuditLog yaz */

@@ -59,20 +59,47 @@ export class ReportEvidenceService {
       select: EVIDENCE_MESSAGE_SELECT,
     });
     if (!target) return [];
+
+    // Rev.1 §3.6: erişim kapısı HER mesaj şikâyetinde (şifreli/şifresiz). Tahmin edilen mesaj kimliğiyle
+    // başkalarının özel yazışması kuyruğa taşınamaz. PENDING mesaj isteğinde alıcı da kanal üyesidir
+    // (requireChannelAccess dmRequestStatus'a bakmaz), istek mesajını şikâyet edebilir.
+    const clearedAt = await this.requireAccess(reporterId, target);
+
     return target.encrypted
-      ? this.fromReporter(reporterId, target, evidence ?? [])
-      : this.fromServer(target);
+      ? this.fromReporter(target, evidence ?? [], clearedAt)
+      : this.fromServer(target, clearedAt);
+  }
+
+  /**
+   * Şikâyetçi kanala erişebilmeli (mevcut kapı: 403) ve hedef, "sohbeti temizle" (`clearedAt`)
+   * tarihinden sonra olmalı (aksi 422). Döner: şikâyetçinin görme tabanı (`clearedAt`, yoksa null).
+   */
+  private async requireAccess(reporterId: string, target: EvidenceMessage): Promise<Date | null> {
+    await this.membership.requireChannelAccess(reporterId, target.channelId);
+    const member = await this.prisma.channelMember.findUnique({
+      where: { channelId_userId: { channelId: target.channelId, userId: reporterId } },
+      select: { clearedAt: true },
+    });
+    const clearedAt = member?.clearedAt ?? null;
+    if (clearedAt && target.createdAt <= clearedAt) {
+      throw invalidEvidence('Şikâyet edilen mesaj erişilemiyor.');
+    }
+    return clearedAt;
   }
 
   /** Şifresiz: hedef (silinmiş olsa da) + aynı kanalda ondan önceki 5 silinmemiş mesaj; sunucu kaydı. */
-  private async fromServer(target: EvidenceMessage): Promise<EvidenceRow[]> {
+  private async fromServer(
+    target: EvidenceMessage,
+    clearedAt: Date | null,
+  ): Promise<EvidenceRow[]> {
     const context = await this.prisma.message.findMany({
       where: {
         channelId: target.channelId,
         deletedAt: null,
         encrypted: false,
         id: { not: target.id },
-        createdAt: { lt: target.createdAt },
+        // şikâyetçinin göremediği (temizlediği) mesaj bağlama girmez
+        createdAt: { lt: target.createdAt, ...(clearedAt ? { gt: clearedAt } : {}) },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: CONTEXT_MESSAGES,
@@ -89,14 +116,11 @@ export class ReportEvidenceService {
    * (`verified:false`); karar verirken buna göre tartılır. Kanal/üyelik ihlali → reddedilir.
    */
   private async fromReporter(
-    reporterId: string,
     target: EvidenceMessage,
     items: ReportEvidenceItemDto[],
+    clearedAt: Date | null,
   ): Promise<EvidenceRow[]> {
     if (items.length === 0) return []; // kanıt iletilmedi: moderatör "kanıt iletilmedi" görür
-
-    // Şikâyetçi bu kanalın üyesi olmalı (mevcut kapı: 403 NOT_CHANNEL_MEMBER)
-    await this.membership.requireChannelAccess(reporterId, target.channelId);
 
     const ids = items.map((i) => i.messageId);
     if (new Set(ids).size !== ids.length)
@@ -111,19 +135,13 @@ export class ReportEvidenceService {
     });
     const byId = new Map(found.map((m) => [m.id, m]));
 
-    // Şikâyetçinin "sohbeti temizle" tarihinden önceki mesajlara erişimi yoktur
-    const member = await this.prisma.channelMember.findUnique({
-      where: { channelId_userId: { channelId: target.channelId, userId: reporterId } },
-      select: { clearedAt: true },
-    });
-
     return items.map((item) => {
       const msg = byId.get(item.messageId);
       if (
         !msg ||
         msg.channelId !== target.channelId ||
         !msg.encrypted ||
-        (member?.clearedAt && msg.createdAt <= member.clearedAt)
+        (clearedAt && msg.createdAt <= clearedAt)
       ) {
         throw invalidEvidence('Kanıt mesajlarından biri bu sohbete ait değil ya da erişilemiyor.');
       }
