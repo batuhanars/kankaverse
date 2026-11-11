@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { toB64 } from '../src/b64'
 import { E2eeEngine } from '../src/engine'
 import { serialLock } from '../src/lock'
+import { backupDeps } from './fakeBackup'
 import { as, CH, login, provider, send, server, show, type Msg, type Profile } from './flowSuite'
 import { MemoryVault } from './memoryVault'
 
@@ -66,6 +67,7 @@ export function notificationSuite(label: string) {
       const writes = countGroupWrites(B1)
       const lock = serialLock()
       const online = (await E2eeEngine.start('B', {
+        ...backupDeps(server),
         api: server.apiFor('B', B1.family),
         openVault: async () => B1.vault,
         withLock: lock,
@@ -170,6 +172,7 @@ export function notificationSuite(label: string) {
       await as(B1, (e) => e.onWelcome())
       const yielded = vi.fn(async () => {})
       const online = (await E2eeEngine.start('B', {
+        ...backupDeps(server),
         api: server.apiFor('B', B1.family),
         openVault: async () => B1.vault,
         withLock: serialLock(),

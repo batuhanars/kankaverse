@@ -1,6 +1,7 @@
 // Testler için bellekte sahte E2EE sunucusu: sözleşme §2 uçlarının kurallarını (atomik KeyPackage, epoch kapısı,
 // iptal edilen cihazın 403'ü) taklit eder. Gerçek HTTP kanıtı ayrıca scripts/e2ee-e2e ile alınır.
 import type { E2eeApi, E2eeChannelState } from '../src/ports'
+import { FakeBackupStore } from './fakeBackup'
 
 interface Dev {
   id: string
@@ -41,6 +42,15 @@ export class FakeServer {
   conflictOnce = false
   /** `/e2ee/status.franking` (E4 §2.2): istemcinin v2 gönderip göndermeyeceği. */
   franking = false
+  /** E5a yedek uçları (bayrak, anahtar kayıtları, görüntü satırları, nesne deposu). */
+  backup = new FakeBackupStore()
+  /** E5a Rev.2 §4.7 varlık kontrolü: varsayılan her mesaj var; silinmiş/olmayan kimlikler buraya. */
+  goneMessages = new Set<string>()
+  /** Çağıranın erişemediği kanallar (403). */
+  noAccessChannels = new Set<string>()
+  /** Doluysa varlık kontrolü bu hatayla düşer (ağ/5xx). */
+  existsError: Error | null = null
+  existsCalls: { channelId: string; count: number }[] = []
   private seq = 0
 
   revoke(deviceId: string, at: Date) {
@@ -68,7 +78,7 @@ export class FakeServer {
     }
     const ok = <T>(data: T) => Promise.resolve({ data })
     const api = {
-      status: () => ok({ enabled: true, franking: this.franking }),
+      status: () => ok({ enabled: true, franking: this.franking, backup: this.backup.enabled }),
       registerDevice: (key: string) => {
         const existing = this.deviceOfFamily(family)
         if (existing) {
@@ -172,6 +182,13 @@ export class FakeServer {
         this.welcomes.find((w) => w.id === id)!.done = true
         return ok(null)
       },
+      messagesExist: (channelId: string, ids: string[]) => {
+        this.existsCalls.push({ channelId, count: ids.length })
+        if (this.existsError) throw this.existsError
+        if (this.noAccessChannels.has(channelId)) throw fail(403, 'NOT_CHANNEL_MEMBER')
+        return ok({ existing: ids.filter((id) => !this.goneMessages.has(id)) })
+      },
+      ...this.backup.api(userId, () => active().id),
     }
     return api as unknown as E2eeApi
   }

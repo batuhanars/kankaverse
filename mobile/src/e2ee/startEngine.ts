@@ -2,6 +2,8 @@
 // pureProvider (Hermes'te crypto.subtle yok), mobil HTTP. Motor mantığı burada YOK.
 import { E2eeEngine, serialLock, type WarningHandler } from '@kankaverse/e2ee-client'
 import { pureProvider, tunePurePrecompute, utf8Path } from '@kankaverse/e2ee-core'
+import { nativeArgon2id } from '@modules/argon2'
+import { blobTransport } from './blobTransport'
 import { meterProvider } from './cryptoMetrics'
 import { mobileE2eeApi } from './mobileApi'
 import { openMobileVault } from './sqliteRows'
@@ -54,6 +56,8 @@ export function startMobileEngine(userId: string, onWarn: WarningHandler): Promi
     openVault: openMobileVault,
     withLock,
     provider: pureProvider,
+    argon2: nativeArgon2id, // E5a §2.4: saf JS ~20 sn, native ~0,8 sn
+    blob: blobTransport,
     onWarn,
     log,
     yieldToUi,

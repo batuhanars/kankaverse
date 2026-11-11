@@ -12,7 +12,17 @@ export { GroupNotReadyError, type E2eeContext } from './context'
 export { DeviceRemovedError, type ChannelInfo } from './channelSync'
 export { DeviceBrokenError } from './deviceSetup'
 export { serialLock } from './lock'
-export { e2eeErrorCode } from './errors'
+export { BackupLockedError, BackupNotConfiguredError, e2eeErrorCode } from './errors'
+export {
+  BACKUP_MIN_INTERVAL_MS,
+  BackupManager,
+  type BackupRunResult,
+  type BackupState,
+  type PasswordResult,
+  type RestoreResult,
+} from './backup'
+export { BackupScheduler, BACKUP_FIRST_DELAY_MS, BACKUP_MAX_DELAY_MS, type Timers } from './backupScheduler'
+export { buildSnapshot, parseSnapshot, pickCandidates, shouldWrite, type SnapshotContent, type SnapshotMessage } from './backupSnapshot'
 export { fromB64, toB64 } from './b64'
 export type { StoredStatus, StoredMessage } from './localStore'
 export type { WireMessage } from './hydrate'

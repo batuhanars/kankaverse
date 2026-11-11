@@ -3,6 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { extractErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth';
+import { forgetE2eeMessage } from '@/stores/e2ee';
 
 /**
  * Mesaj panelinin akışı (M1d-C §2.4): hangi mesaja uzun basıldı, tepki aç/kapa, kopyala, sil.
@@ -86,6 +87,7 @@ export function useMessageActions(channelId: string) {
     setDeleting(true);
     try {
       await messagesApi.remove(channelId, deleteTarget.id);
+      void forgetE2eeMessage(channelId, deleteTarget.id); // E5a §4.1
       setDeleteTarget(null);
     } finally {
       setDeleting(false);

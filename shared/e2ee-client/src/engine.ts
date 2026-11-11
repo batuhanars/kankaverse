@@ -11,6 +11,7 @@ import {
 } from '@kankaverse/e2ee-core'
 import { fromB64, toB64 } from './b64'
 import { DeviceRemovedError, groupForSend, openChannel, syncChannel, type ChannelInfo } from './channelSync'
+import { BackupManager } from './backup'
 import type { E2eeContext } from './context'
 import { DeviceBrokenError, ensureDevice } from './deviceSetup'
 import { Hydrator, type OwnEntry, type OwnPlain, type Resolution, type WireMessage } from './hydrate'
@@ -51,7 +52,7 @@ function previewOf(r: Resolution | undefined): NotificationPreview {
 }
 
 /** `openLocal` bağımlılıkları: ağ ve uyarı yok. */
-export type LocalEngineDeps = Omit<EngineDeps, 'api' | 'onWarn'>
+export type LocalEngineDeps = Omit<EngineDeps, 'api' | 'onWarn' | 'argon2' | 'blob'>
 
 export interface SentCipher {
   ciphertext: string
@@ -84,6 +85,8 @@ export class E2eeEngine {
   private own: OwnPlain = new Map()
   /** `/e2ee/status` bayrağı (E4 §2.2): true iken v2 yük + frankingTag gönderilir. */
   private franking = false
+  /** E5a yedek motoru: yalnız `start` ile kurulan (ağlı) motorda var; `openLocal` motorunda yok. */
+  readonly backup: BackupManager | null
 
   private constructor(
     userId: string,
@@ -91,6 +94,8 @@ export class E2eeEngine {
     vault: Vault,
     api: E2eeApi | null,
     onWarn: WarningHandler,
+    backup: Pick<EngineDeps, 'argon2' | 'blob'> | null = null,
+    backupEnabled = false,
   ) {
     this.userId = userId
     this.vault = vault
@@ -102,6 +107,18 @@ export class E2eeEngine {
     this.log = deps.log ?? ((m, e) => console.error(m, e))
     this.yieldToUi = deps.yieldToUi
     this.metric = deps.metric
+    this.backup =
+      api && backup
+        ? new BackupManager({
+            userId,
+            api,
+            blob: backup.blob,
+            argon2: backup.argon2,
+            enabled: backupEnabled,
+            run: (task) => this.run(task),
+            log: this.log,
+          })
+        : null
   }
 
   /** `null` = bu hesap için E2EE kapalı (bayrak/izin listesi). Cihaz kurulamazsa hata (uyarı ayrıca verilir). */
@@ -110,7 +127,7 @@ export class E2eeEngine {
     const { data } = await deps.api.status()
     if (!data.enabled) return null
     const vault = await deps.openVault(userId)
-    const engine = new E2eeEngine(userId, deps, vault, deps.api, deps.onWarn)
+    const engine = new E2eeEngine(userId, deps, vault, deps.api, deps.onWarn, deps, data.backup === true)
     engine.franking = data.franking === true
     try {
       await engine.run(async () => {
@@ -140,6 +157,11 @@ export class E2eeEngine {
     deps.metric?.('push-step vault-open', t1 - t0, 1)
     deps.metric?.('push-step device-open', Date.now() - t1, 1)
     return hasDevice ? engine : null
+  }
+
+  /** Silinen şifreli mesajın yerel kaydını düşer ve yedeği kirletir (E5a §4.1): silinen içerik yedekte yaşamaz. */
+  forgetMessage(messageId: string): Promise<void> {
+    return this.run((ctx) => ctx.store.deleteMessage(messageId))
   }
 
   /** Bayrağı depoya yazar (yalnız değişince): ağsız motor (hızlı cevap) son bilineni kullanır. */

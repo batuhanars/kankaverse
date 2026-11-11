@@ -344,6 +344,7 @@ async function confirmDelete() {
   try {
     await messagesApi.deleteMessage(props.channel.id, deleteTargetId.value)
     messagesStore.removeMessage(props.channel.id, deleteTargetId.value)
+    void e2eeStore.forgetMessage(props.channel.id, deleteTargetId.value) // E5a §4.1
   } catch {
     // WS zaten kaldıracak; sessizce yut
   } finally {

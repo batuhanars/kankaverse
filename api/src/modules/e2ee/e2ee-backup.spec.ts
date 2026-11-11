@@ -218,7 +218,7 @@ describe('E2eeBackupService: kurulum / değişim (§3.2 PUT key)', () => {
       t.svc.putKey('u1', { ...t.material, params: { m: 19456, t: 2, p: 1 }, keyVersion: 1 }),
     ).resolves.toBeDefined();
     for (const params of [
-      { m: 1_048_577, t: 4, p: 1 },
+      { m: 262_145, t: 4, p: 1 },
       { m: 65536, t: 17, p: 1 },
       { m: 65536, t: 4, p: 2 },
     ]) {

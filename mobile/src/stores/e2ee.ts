@@ -90,6 +90,19 @@ export async function syncE2eeChannel(channelId: string): Promise<void> {
   await engine.onGroupChanged(channelId).catch((e) => console.error('[E2EE] senkron', e instanceof Error ? e.name : ''));
 }
 
+/**
+ * E5a §4.1 silme boşluğu: şifreli DM mesajı silinince yerel düz kaydı da silinir (yedekte yaşamasın).
+ * Tek giriş: soket `message.deleted` ve yerel silme aynı yerden geçer. Şifreli DM değilse hiçbir şey yapmaz.
+ */
+export async function forgetE2eeMessage(channelId: string, messageId: string): Promise<void> {
+  await ready;
+  const engine = get().engine;
+  if (!engine || !(await isOneToOneDm(channelId))) return;
+  await engine
+    .forgetMessage(messageId)
+    .catch((e) => console.error('[E2EE] yerel kayıt silinemedi', e instanceof Error ? e.name : ''));
+}
+
 /** Şifreli mesaj çözülemiyorsa (motor yok/hata) baloncuk "çözülemedi" durumu göstersin, boş balon değil. */
 const undecryptable = (m: MessageDto): MessageDto =>
   m.encrypted ? { ...m, content: '', ciphertext: undefined, e2eeStatus: 'undecryptable' } : m;

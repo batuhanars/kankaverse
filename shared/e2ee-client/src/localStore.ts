@@ -10,7 +10,7 @@ import {
   type Group,
   utf8,
 } from '@kankaverse/e2ee-core'
-import { toB64 } from './b64'
+import { fromB64, toB64 } from './b64'
 import type { E2eeChannelState, Vault } from './ports'
 
 /**
@@ -32,11 +32,26 @@ export interface StoredMessage {
   sentAt?: number
 }
 
-interface Flags {
+export interface Flags {
   lastResortUploaded: boolean
   /** Son bilinen `/e2ee/status.franking`: ağsız motor (bildirim hızlı cevabı) hangi sürümü göndereceğini buradan bilir. */
   franking?: boolean
+  /** E5a: son başarılı yedeğin zamanı (ms). */
+  lastBackupAt?: number
+  /** E5a: son yedekten beri mesaj eklendi/değişti/silindi. */
+  backupDirty?: boolean
+  /** E5a: yükleme başladı, bitmedi. Süreç yarıda ölürse (MIUI dondurma) bir sonraki açılışta baştan denenir. */
+  backupInFlight?: boolean
 }
+
+/** Bu cihazda açılmış yedek ana anahtarı (BMK). Vault zaten şifreli; ek sarma yok. */
+export interface BackupKeyRecord {
+  bmk: Uint8Array
+  keyVersion: number
+}
+
+const BACKUP_KEY = 'backupKey'
+const BACKUP_FLAGS = ['lastBackupAt', 'backupDirty', 'backupInFlight'] as const
 
 /** Ciphertext'in kısa özeti (SHA-256 ilk 16 bayt). Gizli değil; yalnız sürüm ayırt etmek için. */
 export function digestOf(ciphertext: Uint8Array): string {
@@ -68,6 +83,34 @@ export class LocalStore {
 
   saveFlags(flags: Flags): Promise<void> {
     return this.vault.put('device', 'flags', utf8(JSON.stringify(flags)))
+  }
+
+  /** Bu cihazda yedek açık mı: `device` bölümünde `{ bmk(b64), keyVersion }`. */
+  async loadBackupKey(): Promise<BackupKeyRecord | null> {
+    const bytes = await this.vault.get('device', BACKUP_KEY)
+    if (!bytes) return null
+    const rec = JSON.parse(fromUtf8(bytes)) as { bmk: string; keyVersion: number }
+    return { bmk: fromB64(rec.bmk), keyVersion: rec.keyVersion }
+  }
+
+  saveBackupKey(rec: BackupKeyRecord): Promise<void> {
+    const json = JSON.stringify({ bmk: toB64(rec.bmk), keyVersion: rec.keyVersion })
+    return this.vault.put('device', BACKUP_KEY, utf8(json))
+  }
+
+  deleteBackupKey(): Promise<void> {
+    return this.vault.delete('device', BACKUP_KEY)
+  }
+
+  /** Bayrakların bir kısmını günceller (oku-değiştir-yaz; çağıran motor kilidindedir). */
+  async patchFlags(patch: Partial<Flags>): Promise<void> {
+    await this.saveFlags({ ...(await this.loadFlags()), ...patch })
+  }
+
+  /** Yedeğe girecek bir şey değişti. Zaten kirliyse yazılmaz (her mesajda ikinci yazım olmasın). */
+  async markBackupDirty(): Promise<void> {
+    const flags = await this.loadFlags()
+    if (!flags.backupDirty) await this.saveFlags({ ...flags, backupDirty: true })
   }
 
   async loadGroup(channelId: string): Promise<Group | null> {
@@ -114,11 +157,42 @@ export class LocalStore {
     return bytes ? (JSON.parse(fromUtf8(bytes)) as StoredMessage) : null
   }
 
-  saveMessage(msg: StoredMessage): Promise<void> {
-    return this.vault.put('messages', msg.id, utf8(JSON.stringify(msg)))
+  /** Mesaj yazımı yedeği kirletir (E5a §4.3). Toplu geri yüklemede `markDirty=false`, sonunda tek işaret konur. */
+  async saveMessage(msg: StoredMessage, markDirty = true): Promise<void> {
+    await this.vault.put('messages', msg.id, utf8(JSON.stringify(msg)))
+    if (markDirty) await this.markBackupDirty()
   }
 
-  resetDeviceState(): Promise<void> {
-    return this.vault.resetDeviceState()
+  /**
+   * Silinen mesajın yerel kaydını düşer (E5a §4.1). Kayıt varsa yedek kirlenir; görüntü kurarken tespit edilen
+   * silmelerde (`markDirty=false`) görüntü zaten o kayıt çıkarılarak kurulur.
+   */
+  async deleteMessage(id: string, markDirty = true): Promise<void> {
+    let existed = true
+    try {
+      existed = (await this.vault.get('messages', id)) !== null
+    } catch {
+      // bozuk kayıt: yine de sil, yedek yenilensin
+    }
+    await this.vault.delete('messages', id)
+    if (existed && markDirty) await this.markBackupDirty()
+  }
+
+  messageIds(): Promise<string[]> {
+    return this.vault.keys('messages')
+  }
+
+  /**
+   * Oturum zinciri değişince cihaz + grup durumu gider, ama BMK ve yedek bayrakları KORUNUR: BMK kullanıcı
+   * başınadır (şifre + hesap), cihaz zincirinden bağımsız geçerliliğini sürdürür. Vault yalnız `device`
+   * bölümünü topluca siler; koruma burada, tek yerde.
+   */
+  async resetDeviceState(): Promise<void> {
+    const key = await this.loadBackupKey()
+    const flags = await this.loadFlags()
+    await this.vault.resetDeviceState()
+    if (key) await this.saveBackupKey(key)
+    const kept = Object.fromEntries(BACKUP_FLAGS.flatMap((k) => (flags[k] === undefined ? [] : [[k, flags[k]]])))
+    if (Object.keys(kept).length > 0) await this.saveFlags({ lastResortUploaded: false, ...kept })
   }
 }

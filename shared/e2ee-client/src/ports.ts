@@ -1,6 +1,6 @@
 // Platforma özgü kısımların arayüzleri (E1 §6.3). Motor bunları kullanır, uygulamaz: web ve mobil
 // kendi adaptörlerini enjekte eder. Böylece MLS akışı tek yerde durur, depolama/ağ/kilit istemciye ait kalır.
-import type { CryptoProvider } from '@kankaverse/e2ee-core'
+import type { Argon2idFn, BackupKdfParams, CryptoProvider } from '@kankaverse/e2ee-core'
 
 /** Sunucunun cihaz kaydı için döndürdüğü cihaz bilgisi (iptal edilmişler dahil). */
 export interface E2eeDeviceInfo {
@@ -40,13 +40,45 @@ export interface Reply<T> {
   data: T
 }
 
+/** Yedek uçlarının yük şekilleri (E5a §3.2). Baytlar base64; `keyVersion` anahtar sürümü. */
+export interface BackupKeyMaterial {
+  salt: string
+  params: BackupKdfParams
+  wrappedKey: string
+}
+
+/** Hassas işlem doğrulaması (Sprint 2B reauth): mevcut şifre, 2FA varsa TOTP. */
+export interface Reauth {
+  currentPassword: string
+  totpCode?: string
+}
+
+export interface BackupSnapshotInfo {
+  deviceId: string
+  size: number
+  updatedAt: string
+}
+
+/** `GET /e2ee/backup`: yedek kurulu değilse yalnız `configured: false` ve görüntü listesi. */
+export type BackupInfo =
+  | { configured: false; snapshots: BackupSnapshotInfo[] }
+  | ({ configured: true; keyVersion: number; snapshots: BackupSnapshotInfo[] } & BackupKeyMaterial)
+
+/** Görüntü yükleme/commit gövdesi: `sha256` şifreli baytların küçük harf hex özeti. */
+export interface SnapshotRef {
+  deviceId: string
+  size: number
+  sha256: string
+  keyVersion: number
+}
+
 /**
  * Sunucu uçları (E1 §2). Baytlar base64 metin. Hata, `response.data.error` makine kodunu taşıyan bir
  * nesne olarak fırlatılır (axios hatası zaten böyle; mobil adaptör aynı şekli üretir).
  */
 export interface E2eeApi {
   /** `franking`: E4 §2.2, true iken istemci v2 yük (parmak izi) gönderir; eski sunucuda yok = false. */
-  status(): Promise<Reply<{ enabled: boolean; franking?: boolean }>>
+  status(): Promise<Reply<{ enabled: boolean; franking?: boolean; backup?: boolean }>>
   /** Platform bilgisini (web/android) adaptör ekler; motor bilmez. */
   registerDevice(signatureKey: string): Promise<Reply<{ deviceId: string }>>
   available(): Promise<Reply<{ available: number }>>
@@ -74,6 +106,30 @@ export interface E2eeApi {
   commits(channelId: string, since: number): Promise<Reply<E2eeCommitRow[]>>
   welcomes(): Promise<Reply<E2eeWelcomeRow[]>>
   ackWelcome(id: string): Promise<Reply<null>>
+  /** E5a Rev.2 §4.7: kanalda hâlâ var olan (silinmemiş) mesaj kimlikleri; `ids` 1..500. İçerik yok. */
+  messagesExist(channelId: string, ids: string[]): Promise<Reply<{ existing: string[] }>>
+  /** E5a yedek uçları (§3.2). Hata kodları: E2EE_BACKUP_KEY_VERSION (409), E2EE_BACKUP_NOT_CONFIGURED (404) vb. */
+  backupGet(): Promise<Reply<BackupInfo>>
+  /** Kurulum (keyVersion 1) ya da şifre değişimi (aynı keyVersion, yeniden sarma). */
+  backupPutKey(body: BackupKeyMaterial & { keyVersion: number }): Promise<Reply<{ keyVersion: number }>>
+  /** "Şifremi unuttum": reauth + yeni anahtar kaydı. keyVersion sunucuda +1, yanıtta döner. */
+  backupReset(body: BackupKeyMaterial & Reauth): Promise<Reply<{ keyVersion: number }>>
+  backupDelete(reauth: Reauth): Promise<Reply<null>>
+  snapshotPresign(ref: SnapshotRef): Promise<Reply<{ url: string }>>
+  snapshotCommit(ref: SnapshotRef): Promise<Reply<{ deviceId: string; size: number; keyVersion: number }>>
+  /** Kendi görüntüm için kısa ömürlü indirme adresi + bütünlük özeti. */
+  snapshotGetUrl(
+    deviceId: string,
+  ): Promise<Reply<{ url: string; deviceId: string; size: number; sha256: string; keyVersion: number }>>
+}
+
+/**
+ * Presigned adrese ham bayt aktarımı (E5a §4). Gövde `application/octet-stream`; Authorization BAŞLIĞI
+ * GÖNDERİLMEZ (adres kendi imzasını taşır, API token'ı depoya sızmasın). Hata fırlatır.
+ */
+export interface BlobTransport {
+  put(url: string, bytes: Uint8Array): Promise<void>
+  get(url: string): Promise<Uint8Array>
 }
 
 /** Vault bölümleri: cihaz anahtarları, MLS grup durumu, çözülmüş mesajlar. */
@@ -87,6 +143,8 @@ export interface Vault {
   get(store: VaultStore, key: string): Promise<Uint8Array | null>
   put(store: VaultStore, key: string, bytes: Uint8Array): Promise<void>
   delete(store: VaultStore, key: string): Promise<void>
+  /** Bölümdeki tüm anahtarlar (yedek görüntüsü `messages` bölümünü bununla gezer). */
+  keys(store: VaultStore): Promise<string[]>
   /** Cihaz + grup durumunu siler, çözülmüş mesajlar kalır (oturum zinciri değişti, anahtarlar geçersiz). */
   resetDeviceState(): Promise<void>
   /** Bu kullanıcının tüm deposunu (anahtar dahil) siler. */
@@ -107,6 +165,10 @@ export interface EngineDeps {
   withLock: WithLock
   /** Web: webProvider (WebCrypto). Mobil: pureProvider (saf noble). */
   provider: CryptoProvider
+  /** Yedek anahtarı türetimi (E5a §2.4): web Worker'da noble, mobil native modül. */
+  argon2: Argon2idFn
+  /** Yedek görüntüsünü presigned adrese yükler/indirir. */
+  blob: BlobTransport
   onWarn: WarningHandler
   /** İsteğe bağlı günlük; içerik (mesaj metni, anahtar) ASLA verilmez. Varsayılan: console.error. */
   log?: (message: string, error?: unknown) => void

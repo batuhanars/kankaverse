@@ -5,6 +5,7 @@ import {
   BackupSnapshotError,
   BACKUP_KDF_DEFAULT,
   BACKUP_KDF_FLOOR,
+  BACKUP_KDF_MAX,
   SNAPSHOT_VERSION,
   checkBackupPassword,
   deriveBackupKek,
@@ -61,6 +62,9 @@ describe('deriveBackupKek parametre denetimi', () => {
     ['p=2', { m: 19456, t: 2, p: 2 }],
     ['p=0', { m: 19456, t: 2, p: 0 }],
     ['tam sayı değil', { m: 19456.5, t: 2, p: 1 }],
+    ['m üst sınırın üstü', { m: 262145, t: 4, p: 1 }],
+    ['t üst sınırın üstü', { m: 65536, t: 17, p: 1 }],
+    ['aşırı bellek (4 GiB)', { m: 4194304, t: 4, p: 1 }],
   ])('%s reddedilir (Argon2 çağrılmaz)', async (_n, params) => {
     await expect(derive(SALT, params)).rejects.toBeInstanceOf(BackupParamsError)
   })
@@ -68,6 +72,17 @@ describe('deriveBackupKek parametre denetimi', () => {
   it('15 ve 17 baytlık tuz reddedilir', async () => {
     await expect(derive(new Uint8Array(15), BACKUP_KDF_FLOOR)).rejects.toBeInstanceOf(BackupParamsError)
     await expect(derive(new Uint8Array(17), BACKUP_KDF_FLOOR)).rejects.toBeInstanceOf(BackupParamsError)
+  })
+
+  it('üst sınırın kendisi (m=262144, t=16) kabul edilir; hedef parametre sınırın içinde', async () => {
+    expect(BACKUP_KDF_DEFAULT.m).toBeLessThanOrEqual(BACKUP_KDF_MAX.m)
+    expect(BACKUP_KDF_DEFAULT.t).toBeLessThanOrEqual(BACKUP_KDF_MAX.t)
+    let seen: { m: number; t: number } | undefined
+    await deriveBackupKek(PASSWORD, SALT, BACKUP_KDF_MAX, async (_pw, _s, o) => {
+      seen = o
+      return new Uint8Array(32)
+    })
+    expect(seen).toMatchObject({ m: 262144, t: 16 })
   })
 
   it('tabanın üstü (m=19457, t=3) kabul edilir', async () => {

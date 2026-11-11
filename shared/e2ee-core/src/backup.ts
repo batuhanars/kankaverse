@@ -20,6 +20,8 @@ export interface BackupKdfParams {
 
 /** Alt sınır (OWASP asgari). Türetme bunun altına inen parametreyi reddeder; indirilen başlık dahil. */
 export const BACKUP_KDF_FLOOR: BackupKdfParams = { m: 19456, t: 2, p: 1 }
+/** Üst sınır (256 MiB): kötü niyetli ya da bozuk sunucu kaydı dev bellek dayatıp uygulamayı çökertmesin. API ile aynı değer. */
+export const BACKUP_KDF_MAX: BackupKdfParams = { m: 262144, t: 16, p: 1 }
 /** Yeni yedekte kullanılan hedef (adım 0b ölçümü: telefonda ~0,8 sn). */
 export const BACKUP_KDF_DEFAULT: BackupKdfParams = { m: 65536, t: 4, p: 1 }
 
@@ -39,7 +41,7 @@ const SALT_LENGTH = 16
 const NONCE_LENGTH = 12
 export const SNAPSHOT_VERSION = 1
 
-/** Türetmeden önce parametre tabanı denetlenir; sunucu düşük parametre dayatamaz. */
+/** Türetmeden önce taban ve üst sınır denetlenir; sunucu ne düşük ne de aşırı yüksek parametre dayatabilir. */
 function assertParams(params: BackupKdfParams): void {
   const { m, t, p } = params
   if (!Number.isInteger(m) || !Number.isInteger(t) || !Number.isInteger(p)) {
@@ -47,6 +49,9 @@ function assertParams(params: BackupKdfParams): void {
   }
   if (m < BACKUP_KDF_FLOOR.m || t < BACKUP_KDF_FLOOR.t || p !== BACKUP_KDF_FLOOR.p) {
     throw new BackupParamsError('Argon2id parametreleri tabanın altında')
+  }
+  if (m > BACKUP_KDF_MAX.m || t > BACKUP_KDF_MAX.t) {
+    throw new BackupParamsError('Argon2id parametreleri üst sınırın üstünde')
   }
 }
 
