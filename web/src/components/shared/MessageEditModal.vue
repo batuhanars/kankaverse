@@ -106,9 +106,9 @@ function insertEmoji(emoji: string) {
         <!-- Düzenlenen mesajın önizlemesi (yalnız metin; v-html DOMPurify'dan geçer) -->
         <div
           class="px-3 py-2 rounded-[var(--kv-radius-md)] text-[14px] break-words max-h-[30vh] overflow-y-auto min-h-0"
-          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-primary);"
+          style="background-color: var(--kv-accent-500); color: #fff;"
         >
-          <div class="kv-md" v-html="previewHtml" />
+          <div class="kv-md kv-edit-preview" v-html="previewHtml" />
         </div>
 
         <p v-if="error" class="text-[12px] shrink-0" style="color: var(--kv-danger);">{{ error }}</p>
@@ -147,3 +147,15 @@ function insertEmoji(emoji: string) {
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+/* Önizleme kor zeminde: bahsetme ve bağlantılar da kor renkli olduğu için beyaza çekilir (okunurluk). */
+.kv-edit-preview :deep(.kv-mention) {
+  background-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.kv-edit-preview :deep(a) {
+  color: #fff;
+  text-decoration: underline;
+}
+</style>
