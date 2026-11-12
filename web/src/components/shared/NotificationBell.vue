@@ -33,7 +33,7 @@ function openRequests() {
 }
 
 // "Tümünü okundu işaretle" — çan bildirimleri OKUNDU + ortam/kanal kırmızı rozetleri varsa aktif.
-// (Çan, açılışta kendi bildirimlerini okur; bu yüzden buton guild/kanal rozetlerini de gözetir.)
+// (Buton çan bildirimleriyle birlikte guild/kanal rozetlerini de gözetir.)
 const hasAnyUnread = computed(
   () =>
     notificationsStore.unreadCount > 0 ||
@@ -53,9 +53,10 @@ onClickOutside(bellRef, () => { showNotifications.value = false })
 function openNotifications() {
   showNotifications.value = !showNotifications.value
   if (showNotifications.value) {
-    // Panel ilk açılışta REST'ten tam ilk sayfayı çek (snapshot yalnız okunmamışları taşır)
+    // Panel ilk açılışta REST'ten tam ilk sayfayı çek (snapshot yalnız okunmamışları taşır).
+    // Açılış okundu İŞARETLEMEZ (2026-11-12 sahip kararı): satır tıklanınca tek tek, başlıktaki
+    // butonla toplu okunur. Otomatik işaretleme butonu hiç kullanılamaz kılıyordu.
     void notificationsStore.loadMore()
-    void notificationsStore.markAllRead()
   }
 }
 

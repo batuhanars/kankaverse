@@ -86,7 +86,7 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       }));
       await get().refreshUnreadCount();
     } catch {
-      // sessizce yut — satır okunmamış kalır, bir sonraki odaklanmada markAllRead toparlar
+      // sessizce yut — satır okunmamış kalır, kullanıcı tekrar dokunabilir
     }
   },
 }));

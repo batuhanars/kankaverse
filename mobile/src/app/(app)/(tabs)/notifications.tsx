@@ -113,24 +113,21 @@ export default function NotificationsScreen() {
   const markAllRead = useNotificationsStore((s) => s.markAllRead);
   const markRead = useNotificationsStore((s) => s.markRead);
 
-  // Sprint M1d-0 DoD turu (sahip bulgusu 2026-07-31) — okundu işaretleme MOUNT'ta değil, her
-  // ODAKLANMADA çalışır. Kusurun kökü: sekme ekranları Expo Router'da oturum boyunca mount'lu kalır,
-  // yani `useEffect(..., [])` bir kez çalışıp bir daha çalışmıyordu → o andan sonra gelen HİÇBİR
-  // bildirim okundu olmuyordu (uygulama yeniden açılana kadar rozet kırmızı kalıyordu). Web'de aynı
-  // iş panel her açılışında oluyor (NotificationBell.vue); mobilde panelin karşılığı sekmenin
-  // odaklanmasıdır. Liste sırayla tazelenir (`fetchFirstPage` → `markAllRead`): ters sırada
-  // markAllRead'in yerel damgası, sonradan gelen listeye yetişemez ve satırlar okunmamış görünürdü.
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const hasUnread = unreadCount > 0 || items.some((n) => !n.readAt);
+
+  // Liste her ODAKLANMADA tazelenir (sekme ekranları oturum boyunca mount'lu kalır, M1d-0 dersi).
+  // 2026-11-12 sahip kararı: odaklanma artık okundu İŞARETLEMEZ. Kullanıcı bildirime dokununca o
+  // satır okunur; hepsini birden okumak için başlıktaki buton var (web çanıyla aynı davranış).
   useFocusEffect(
     useCallback(() => {
-      fetchFirstPage().then(() => markAllRead());
+      void fetchFirstPage();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
 
   function onItemPress(n: NotificationDto) {
-    // Dokunulan bildirim okundu işaretlenir (web NotificationBell.vue ile aynı semantik). Odaklanma
-    // kancası çoğu durumu zaten kapatır; bu satır sekme ZATEN odaktayken gelen bildirimi karşılar —
-    // o durumda odaklanma olayı bir daha tetiklenmez, dokunuş tek sinyaldir.
+    // Dokunulan bildirim okundu işaretlenir (web NotificationBell.vue ile aynı semantik).
     void markRead(n.id);
     // Kanka isteği bildirimi artık ÖLÜ DEĞİL (sahip bulgusu 2026-07-30). M1a'da tıklanamazdı çünkü
     // gidilecek bir yer yoktu; M1b Arkadaş Ekle ekranını getirdi, hedef artık var. Sahip tam olarak
@@ -196,7 +193,19 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.flex} edges={['top']}>
-      <Text style={styles.title}>{t('notification.title')}</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>{t('notification.title')}</Text>
+        <Pressable
+          disabled={!hasUnread}
+          onPress={() => void markAllRead()}
+          hitSlop={8}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.markAll, !hasUnread && styles.markAllDisabled]}>
+            {t('notification.markAllRead')}
+          </Text>
+        </Pressable>
+      </View>
       <NotificationPermissionBanner />
 
       {loading && items.length === 0 && (
@@ -280,13 +289,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.bgContent,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: theme.layout.panelGap,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
   title: {
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.xl,
     fontWeight: '700',
-    paddingHorizontal: theme.layout.panelGap,
-    paddingTop: 8,
-    paddingBottom: 12,
+    flexShrink: 1,
+  },
+  markAll: {
+    color: theme.colors.accent500,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '600',
+  },
+  markAllDisabled: {
+    opacity: 0.4,
   },
   permissionBanner: {
     flexDirection: 'row',
