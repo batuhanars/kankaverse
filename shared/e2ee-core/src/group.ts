@@ -186,7 +186,18 @@ export class Group {
       })
       // Bir commit/proposal bu yoldan sızıp durumu ilerletemez: yalnız uygulama mesajı kabul.
       if (result.kind !== 'applicationMessage') throw new DecryptError('Uygulama mesajı değil')
-      const senderDeviceId = deviceIdOf(getLeafNodeAt(result.newState, result.senderLeafIndex).credential)
+      // Gönderen, mesajın KENDİ epoch'unun ağacından okunur (2026-11-12 sahip bulgusu). ts-mls eski epoch
+      // mesajını o epoch'un ağacıyla çözer ve yaprak numarasını o ağaca göre verir; şimdiki ağaçta o koltukta
+      // artık başka cihaz olabilir (çıkış + yeni giriş) ya da koltuk boş olabilir. Şimdiki ağaçtan okumak
+      // sahte "tanınmayan cihaz" alarmı ya da daha kötüsü, mesajı koltuğun yeni sahibine atfetmek demekti.
+      const msgEpoch = message.privateMessage.epoch
+      const senderTree =
+        msgEpoch === this.state.groupContext.epoch
+          ? result.newState.ratchetTree
+          : this.state.historicalReceiverData.get(msgEpoch)?.ratchetTree
+      if (!senderTree) throw new DecryptError('Mesajın epoch ağacı yok')
+      const senderLeaf = getLeafNodeAt({ ...result.newState, ratchetTree: senderTree }, result.senderLeafIndex)
+      const senderDeviceId = deviceIdOf(senderLeaf.credential)
       if (senderDeviceId !== expectedSenderDeviceId) throw new SenderMismatchError(expectedSenderDeviceId, senderDeviceId)
       this.state = result.newState
       result.consumed.forEach(zeroOutUint8Array)
