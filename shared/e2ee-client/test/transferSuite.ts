@@ -3,8 +3,8 @@
 import { describe, expect, it } from 'vitest'
 import { TransferCommitError, fromUtf8, utf8 } from '@kankaverse/e2ee-core'
 import { TransferPayloadError, TransferSessionError } from '../src/errors'
-import type { StoredMessage } from '../src/localStore'
-import { CH, login, server, type Profile } from './flowSuite'
+import { LocalStore, type StoredMessage } from '../src/localStore'
+import { CH, login, provider, server, type Profile } from './flowSuite'
 
 const tr = (p: Profile) => p.engine.transfer!
 const rec = (id: string, status: StoredMessage['status'], body: string, channelId = CH): StoredMessage => ({
@@ -164,6 +164,15 @@ export function transferSuite(label: string) {
       expect(await full.engine.historyPrompt()).toBe('none')
       await putRec(full, rec('m2', 'undecryptable', ''))
       expect(await full.engine.historyPrompt()).toBe('asked') // "none" işaretledi, bir daha taranmaz
+    })
+
+    it('geçmiş bandı: güncellenen eski cihazda (yeni kayıt değil) cihaz öncesi kayıt olsa da çıkmaz', async () => {
+      const old = await login('A')
+      const store = new LocalStore(old.vault, provider)
+      await store.patchFlags({ historyFresh: false }) // bu sürümden önce kaydolmuş cihaz
+      await putRec(old, rec('m1', 'undecryptable', ''))
+      expect(await old.engine.historyPrompt()).toBe('none')
+      expect(await old.engine.historyPrompt()).toBe('asked')
     })
 
     it('bayrak kapalıyken motorda aktarım yok', async () => {

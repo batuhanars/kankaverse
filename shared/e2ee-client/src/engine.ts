@@ -401,7 +401,13 @@ export class E2eeEngine {
    */
   async historyPrompt(): Promise<'asked' | 'missing' | 'none'> {
     return this.run(async (ctx) => {
-      if ((await ctx.store.loadFlags()).historyAsked) return 'asked'
+      const flags = await ctx.store.loadFlags()
+      if (flags.historyAsked) return 'asked'
+      // Güncellenen eski cihaz (yeni kayıt değil): bant hiç çıkmaz, sessiz kapı ayarlarda.
+      if (!flags.historyFresh) {
+        await ctx.store.patchFlags({ historyAsked: true })
+        return 'none'
+      }
       const ids = await ctx.store.messageIds()
       if (ids.length === 0) return 'missing'
       for (const id of ids) {

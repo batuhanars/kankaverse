@@ -47,6 +47,8 @@ export interface Flags {
    * oturum zinciri değişince (yeni cihaz) silinir, yeni cihazda bant bir kez daha sorulur.
    */
   historyAsked?: boolean
+  /** E5b §4.4: bu cihaz bu sürümle yeni kaydoldu (yerelde cihaz yoktu). Bant yalnız bunda değerlendirilir. */
+  historyFresh?: boolean
 }
 
 /** Bu cihazda açılmış yedek ana anahtarı (BMK). Vault zaten şifreli; ek sarma yok. */

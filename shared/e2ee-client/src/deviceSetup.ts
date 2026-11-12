@@ -20,12 +20,16 @@ export async function ensureDevice(
   store: LocalStore,
   provider: CryptoProvider,
 ): Promise<Device> {
-  const device = (await store.loadDevice()) ?? (await createDevice(provider))
+  const existing = await store.loadDevice()
+  const device = existing ?? (await createDevice(provider))
   const { data } = await api.registerDevice(toB64(device.signaturePublicKey))
   // Kimlik değişirse credential'lar yanlış kimliği taşırdı: sessizce devam yerine dur.
   if (device.deviceId !== null && device.deviceId !== data.deviceId) throw new DeviceBrokenError()
   device.assignDeviceId(data.deviceId)
   await store.saveDevice(device)
+  // E5b §4.4: geçmiş bandı yalnız YENİ kaydolan cihazda (sahip bulgusu 2026-11-12: güncellenen eski cihazda
+  // da çıkıyordu). KeyPackage yüklemesinden ÖNCE: ağ hatasında da cihaz "yeni" işaretli kalır.
+  if (!existing) await store.patchFlags({ historyFresh: true })
   await topUpKeyPackages(api, store, device)
   return device
 }
