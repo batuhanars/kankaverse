@@ -6,11 +6,17 @@ import type {
   E2eeChannelState,
   E2eeCommitRow,
   E2eeWelcomeRow,
+  TransferPending,
+  TransferStatus,
+  TransferView,
 } from '@kankaverse/e2ee-client'
 import http from '@/api/http'
 
+type TransferStep = { id: string; status: TransferStatus }
+type TransferBlobRef = { size: number; sha256: string }
+
 export const mobileE2eeApi: E2eeApi = {
-  status: () => http.get<{ enabled: boolean; franking?: boolean; backup?: boolean }>('/e2ee/status'),
+  status: () => http.get<{ enabled: boolean; franking?: boolean; backup?: boolean; transfer?: boolean }>('/e2ee/status'),
   registerDevice: (signatureKey) =>
     http.post<{ deviceId: string }>('/e2ee/devices', { platform: 'android', signatureKey }),
   available: () => http.get<{ available: number }>('/e2ee/devices/me'),
@@ -48,4 +54,15 @@ export const mobileE2eeApi: E2eeApi = {
     http.get<{ url: string; deviceId: string; size: number; sha256: string; keyVersion: number }>(
       `/e2ee/backup/snapshot/${deviceId}`,
     ),
+  // E5b aktarım uçları (§3.2). Çağıranın cihazı sunucuda oturumdan çözülür.
+  transferCreate: (commit) => http.post<{ id: string; expiresAt: string }>('/e2ee/transfer', { commit }),
+  transferPending: () => http.get<TransferPending | null>('/e2ee/transfer/pending'),
+  transferGet: (id) => http.get<TransferView>(`/e2ee/transfer/${id}`),
+  transferAccept: (id, pub) => http.post<TransferStep>(`/e2ee/transfer/${id}/accept`, { pub }),
+  transferReveal: (id, pub, nonce) => http.post<TransferStep>(`/e2ee/transfer/${id}/reveal`, { pub, nonce }),
+  transferUpload: (id, blob) => http.post<{ url: string }>(`/e2ee/transfer/${id}/upload`, blob),
+  transferCommit: (id, blob) => http.post<TransferStep>(`/e2ee/transfer/${id}/commit`, blob),
+  transferBlob: (id) => http.get<{ url: string; size: number; sha256: string }>(`/e2ee/transfer/${id}/blob`),
+  transferDone: (id) => http.post<TransferStep>(`/e2ee/transfer/${id}/done`),
+  transferCancel: (id) => http.post<TransferStep>(`/e2ee/transfer/${id}/cancel`),
 }

@@ -12,6 +12,7 @@ import {
 import { fromB64, toB64 } from './b64'
 import { DeviceRemovedError, groupForSend, openChannel, syncChannel, type ChannelInfo } from './channelSync'
 import { BackupManager } from './backup'
+import { TransferManager } from './transfer'
 import type { E2eeContext } from './context'
 import { DeviceBrokenError, ensureDevice } from './deviceSetup'
 import { Hydrator, type OwnEntry, type OwnPlain, type Resolution, type WireMessage } from './hydrate'
@@ -87,6 +88,8 @@ export class E2eeEngine {
   private franking = false
   /** E5a yedek motoru: yalnız `start` ile kurulan (ağlı) motorda var; `openLocal` motorunda yok. */
   readonly backup: BackupManager | null
+  /** E5b cihazdan cihaza aktarım: ağlı motorda ve `/e2ee/status.transfer` açıkken var. */
+  readonly transfer: TransferManager | null
 
   private constructor(
     userId: string,
@@ -96,6 +99,7 @@ export class E2eeEngine {
     onWarn: WarningHandler,
     backup: Pick<EngineDeps, 'argon2' | 'blob'> | null = null,
     backupEnabled = false,
+    transferEnabled = false,
   ) {
     this.userId = userId
     this.vault = vault
@@ -119,6 +123,16 @@ export class E2eeEngine {
             log: this.log,
           })
         : null
+    this.transfer =
+      api && backup && transferEnabled
+        ? new TransferManager({
+            userId,
+            api,
+            blob: backup.blob,
+            run: (task) => this.run(task),
+            log: this.log,
+          })
+        : null
   }
 
   /** `null` = bu hesap için E2EE kapalı (bayrak/izin listesi). Cihaz kurulamazsa hata (uyarı ayrıca verilir). */
@@ -127,7 +141,16 @@ export class E2eeEngine {
     const { data } = await deps.api.status()
     if (!data.enabled) return null
     const vault = await deps.openVault(userId)
-    const engine = new E2eeEngine(userId, deps, vault, deps.api, deps.onWarn, deps, data.backup === true)
+    const engine = new E2eeEngine(
+      userId,
+      deps,
+      vault,
+      deps.api,
+      deps.onWarn,
+      deps,
+      data.backup === true,
+      data.transfer === true,
+    )
     engine.franking = data.franking === true
     try {
       await engine.run(async () => {

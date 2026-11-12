@@ -20,7 +20,8 @@ import {
 } from '@kankaverse/e2ee-core'
 import { fromB64, toB64 } from './b64'
 import { missingIds } from './backupExists'
-import { buildSnapshot, parseSnapshot, pickCandidates, shouldWrite, type SnapshotContent } from './backupSnapshot'
+import { buildSnapshot, parseSnapshot, pickCandidates, type SnapshotContent } from './backupSnapshot'
+import { collectBodies, dropDeleted, mergeCandidates } from './historyRecords'
 import type { E2eeContext } from './context'
 import type { StoredMessage } from './localStore'
 import { BackupLockedError, BackupNotConfiguredError, e2eeErrorCode } from './errors'
@@ -28,7 +29,6 @@ import type { BackupInfo, BackupKeyMaterial, BackupSnapshotInfo, BlobTransport, 
 
 /** İki yedek arası en az süre (§4.3). */
 export const BACKUP_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000
-const YIELD_EVERY = 100
 
 type Configured = Extract<BackupInfo, { configured: true }>
 export type PasswordResult = { ok: true; keyVersion: number } | { ok: false; reason: BackupPasswordRejection }
@@ -224,13 +224,7 @@ export class BackupManager {
     }
     const deviceId = (await ctx.getDevice()).deviceId
     if (!deviceId) return { skipped: 'no-key' }
-    const records: StoredMessage[] = []
-    const ids = await ctx.store.messageIds()
-    for (const [i, id] of ids.entries()) {
-      const rec = await ctx.store.loadMessage(id).catch(() => null) // bozuk tek kayıt yedeği durdurmaz
-      if (rec && (rec.status === 'ok' || rec.status === 'unverified')) records.push(rec) // yalnız gövdesi olanlar (§4.2)
-      if (i % YIELD_EVERY === YIELD_EVERY - 1) await ctx.yieldToUi?.()
-    }
+    const records = await collectBodies(ctx) // yalnız gövdesi olanlar (§4.2), bozuk tek kayıt durdurmaz
     await ctx.store.patchFlags({ backupDirty: false, backupInFlight: true })
     return { bmk: key.bmk, keyVersion: key.keyVersion, deviceId, records }
   }
@@ -239,13 +233,8 @@ export class BackupManager {
    * Sunucuda artık olmayan (çevrimdışıyken silinmiş) kayıtları yerelden siler ve listeden çıkarır (§4.7).
    * Ağ, kilit DIŞINDA; hata fırlar ve görüntü o tur yüklenmez (kirli kalır, `failed`).
    */
-  private async dropDeleted(records: StoredMessage[]): Promise<StoredMessage[]> {
-    const gone = await missingIds(this.d.api, records, true)
-    if (gone.size === 0) return records
-    await this.d.run(async (ctx) => {
-      for (const id of gone) await ctx.store.deleteMessage(id, false)
-    })
-    return records.filter((r) => !gone.has(r.id))
+  private dropDeleted(records: StoredMessage[]): Promise<StoredMessage[]> {
+    return dropDeleted(this.d.api, this.d.run, records)
   }
 
   /** 409 (sürüm değişti) ve 404 (yedek kapatıldı): yerel BMK artık geçersiz, düşürülür. Diğerleri tekrar denenir. */
@@ -283,16 +272,7 @@ export class BackupManager {
     const gone = await missingIds(this.d.api, picked.filter((m) => allowed.has(m.channelId)), false)
     const candidates = picked.filter((m) => !gone.has(m.id))
     const counts = await this.d.run(async (ctx) => {
-      let restored = 0
-      for (const [i, m] of candidates.entries()) {
-        const local = allowed.has(m.channelId) ? await ctx.store.loadMessage(m.id).catch(() => null) : undefined
-        if (local !== undefined && shouldWrite(local, m)) {
-          await ctx.store.saveMessage({ ...m }, false)
-          restored++
-        }
-        if (i % YIELD_EVERY === YIELD_EVERY - 1) await ctx.yieldToUi?.()
-      }
-      if (restored > 0) await ctx.store.markBackupDirty() // bu cihazın görüntüsü de güncellensin
+      const restored = await mergeCandidates(ctx, candidates, allowed) // yazılırsa bu cihazın görüntüsü de güncellenir
       return { restored, skipped: picked.length - restored }
     })
     return { ...counts, badSnapshots }

@@ -78,7 +78,7 @@ export interface SnapshotRef {
  */
 export interface E2eeApi {
   /** `franking`: E4 §2.2, true iken istemci v2 yük (parmak izi) gönderir; eski sunucuda yok = false. */
-  status(): Promise<Reply<{ enabled: boolean; franking?: boolean; backup?: boolean }>>
+  status(): Promise<Reply<{ enabled: boolean; franking?: boolean; backup?: boolean; transfer?: boolean }>>
   /** Platform bilgisini (web/android) adaptör ekler; motor bilmez. */
   registerDevice(signatureKey: string): Promise<Reply<{ deviceId: string }>>
   available(): Promise<Reply<{ available: number }>>
@@ -121,6 +121,49 @@ export interface E2eeApi {
   snapshotGetUrl(
     deviceId: string,
   ): Promise<Reply<{ url: string; deviceId: string; size: number; sha256: string; keyVersion: number }>>
+  /** E5b aktarım uçları (§3.2). Çağıranın cihazı oturumdan çözülür. 410 E2EE_TRANSFER_EXPIRED, 409 _STATE, 403 _ROLE. */
+  transferCreate(commit: string): Promise<Reply<{ id: string; expiresAt: string }>>
+  transferPending(): Promise<Reply<TransferPending | null>>
+  transferGet(id: string): Promise<Reply<TransferView>>
+  transferAccept(id: string, pub: string): Promise<Reply<{ id: string; status: TransferStatus }>>
+  transferReveal(id: string, pub: string, nonce: string): Promise<Reply<{ id: string; status: TransferStatus }>>
+  transferUpload(id: string, blob: { size: number; sha256: string }): Promise<Reply<{ url: string }>>
+  transferCommit(id: string, blob: { size: number; sha256: string }): Promise<Reply<{ id: string; status: TransferStatus }>>
+  transferBlob(id: string): Promise<Reply<{ url: string; size: number; sha256: string }>>
+  transferDone(id: string): Promise<Reply<{ id: string; status: TransferStatus }>>
+  transferCancel(id: string): Promise<Reply<{ id: string; status: TransferStatus }>>
+}
+
+/** E5b: cihaz bilgisi (onay ekranı). `name` oturumdaki cihaz adı ("Chrome, Windows"); IP yok. */
+export interface TransferDeviceInfo {
+  platform: string | null
+  name: string | null
+  createdAt: string | null
+}
+
+/** `GET /e2ee/transfer/pending`: eski cihaza gösterilecek açık istek. */
+export interface TransferPending {
+  id: string
+  newDevice: TransferDeviceInfo
+  createdAt: string
+  expiresAt: string
+}
+
+export type TransferStatus = 'PENDING' | 'ACCEPTED' | 'REVEALED' | 'UPLOADED' | 'DONE' | 'CANCELLED' | 'EXPIRED'
+
+/** `GET /e2ee/transfer/:id`: rolüne göre karşı tarafın açık malzemesi (base64). */
+export interface TransferView {
+  id: string
+  status: TransferStatus
+  expiresAt: string
+  newDeviceId: string
+  oldDeviceId: string | null
+  /** Yalnız yeni cihaza: eski cihazın geçici açık anahtarı. */
+  oldPub?: string
+  /** Yalnız eski cihaza: taahhüt ve (açıldıysa) yeni cihazın anahtarı + rastgeleliği. */
+  commit?: string
+  newPub?: string
+  nonce?: string
 }
 
 /**

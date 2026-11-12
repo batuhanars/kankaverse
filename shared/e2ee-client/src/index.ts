@@ -12,7 +12,16 @@ export { GroupNotReadyError, type E2eeContext } from './context'
 export { DeviceRemovedError, type ChannelInfo } from './channelSync'
 export { DeviceBrokenError } from './deviceSetup'
 export { serialLock } from './lock'
-export { BackupLockedError, BackupNotConfiguredError, e2eeErrorCode } from './errors'
+export {
+  BackupLockedError,
+  BackupNotConfiguredError,
+  TransferPayloadError,
+  TransferSessionError,
+  TransferTooLargeError,
+  e2eeErrorCode,
+} from './errors'
+export { TransferManager } from './transfer'
+export { isBeforeDevice, reachedDeviceBoundary, visibleMessages, type VisibilityMessage } from './historyVisibility'
 export {
   BACKUP_MIN_INTERVAL_MS,
   BackupManager,

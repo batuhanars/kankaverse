@@ -2,6 +2,7 @@
 // iptal edilen cihazın 403'ü) taklit eder. Gerçek HTTP kanıtı ayrıca scripts/e2ee-e2e ile alınır.
 import type { E2eeApi, E2eeChannelState } from '../src/ports'
 import { FakeBackupStore } from './fakeBackup'
+import { FakeTransferStore } from './fakeTransfer'
 
 interface Dev {
   id: string
@@ -44,6 +45,8 @@ export class FakeServer {
   franking = false
   /** E5a yedek uçları (bayrak, anahtar kayıtları, görüntü satırları, nesne deposu). */
   backup = new FakeBackupStore()
+  /** E5b aktarım: yük nesneleri yedekle aynı sahte depoda. */
+  transfer = new FakeTransferStore(this.backup)
   /** E5a Rev.2 §4.7 varlık kontrolü: varsayılan her mesaj var; silinmiş/olmayan kimlikler buraya. */
   goneMessages = new Set<string>()
   /** Çağıranın erişemediği kanallar (403). */
@@ -78,7 +81,8 @@ export class FakeServer {
     }
     const ok = <T>(data: T) => Promise.resolve({ data })
     const api = {
-      status: () => ok({ enabled: true, franking: this.franking, backup: this.backup.enabled }),
+      status: () =>
+        ok({ enabled: true, franking: this.franking, backup: this.backup.enabled, transfer: this.transfer.enabled }),
       registerDevice: (key: string) => {
         const existing = this.deviceOfFamily(family)
         if (existing) {
@@ -189,6 +193,7 @@ export class FakeServer {
         return ok({ existing: ids.filter((id) => !this.goneMessages.has(id)) })
       },
       ...this.backup.api(userId, () => active().id),
+      ...this.transfer.api(userId, () => active().id),
     }
     return api as unknown as E2eeApi
   }

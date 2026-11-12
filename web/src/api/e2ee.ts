@@ -8,14 +8,22 @@ import type {
   E2eeWelcomeRow,
   Reauth,
   SnapshotRef,
+  TransferPending,
+  TransferStatus,
+  TransferView,
 } from '@kankaverse/e2ee-client'
 
 // E1 §2 uçları (axios adaptörü). Tipler ve arayüz paylaşılan pakette (shared/e2ee-client). Envelope axios'ta açılır.
 export { e2eeErrorCode } from '@kankaverse/e2ee-client'
 
+type TransferStep = { id: string; status: TransferStatus }
+type TransferBlobRef = { size: number; sha256: string }
+
 export const e2eeApi = {
   status: () =>
-    http.get<{ enabled: boolean; franking?: boolean; backup?: boolean }>('/e2ee/status'),
+    http.get<{ enabled: boolean; franking?: boolean; backup?: boolean; transfer?: boolean }>(
+      '/e2ee/status',
+    ),
   registerDevice: (signatureKey: string) =>
     http.post<{ deviceId: string }>('/e2ee/devices', { platform: 'web', signatureKey }),
   available: () => http.get<{ available: number }>('/e2ee/devices/me'),
@@ -67,4 +75,21 @@ export const e2eeApi = {
     http.get<{ url: string; deviceId: string; size: number; sha256: string; keyVersion: number }>(
       `/e2ee/backup/snapshot/${deviceId}`,
     ),
+  // E5b aktarım uçları (§3.2). Çağıranın cihazı sunucuda oturumdan çözülür.
+  transferCreate: (commit: string) =>
+    http.post<{ id: string; expiresAt: string }>('/e2ee/transfer', { commit }),
+  transferPending: () => http.get<TransferPending | null>('/e2ee/transfer/pending'),
+  transferGet: (id: string) => http.get<TransferView>(`/e2ee/transfer/${id}`),
+  transferAccept: (id: string, pub: string) =>
+    http.post<TransferStep>(`/e2ee/transfer/${id}/accept`, { pub }),
+  transferReveal: (id: string, pub: string, nonce: string) =>
+    http.post<TransferStep>(`/e2ee/transfer/${id}/reveal`, { pub, nonce }),
+  transferUpload: (id: string, blob: TransferBlobRef) =>
+    http.post<{ url: string }>(`/e2ee/transfer/${id}/upload`, blob),
+  transferCommit: (id: string, blob: TransferBlobRef) =>
+    http.post<TransferStep>(`/e2ee/transfer/${id}/commit`, blob),
+  transferBlob: (id: string) =>
+    http.get<{ url: string; size: number; sha256: string }>(`/e2ee/transfer/${id}/blob`),
+  transferDone: (id: string) => http.post<TransferStep>(`/e2ee/transfer/${id}/done`),
+  transferCancel: (id: string) => http.post<TransferStep>(`/e2ee/transfer/${id}/cancel`),
 } satisfies E2eeApi
