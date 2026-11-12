@@ -147,6 +147,11 @@ export default function NotificationsScreen() {
       router.push('/friends-add');
       return;
     }
+    // E5b §4.5: "bu sen değilsen" bildirimi → oturumlar (push dokunuşuyla aynı hedef, sahip turu 2026-11-12).
+    if (n.type === 'E2EE_TRANSFER') {
+      router.push('/security-sessions');
+      return;
+    }
     // Sprint M1d-0 — Kankalar ekranı geldi, FRIEND_ACCEPT artık hedefli.
     if (n.type === 'FRIEND_ACCEPT') {
       router.push('/friends-list');
@@ -242,6 +247,7 @@ export default function NotificationsScreen() {
             const clickable =
               item.type === 'FRIEND_REQUEST' ||
               item.type === 'FRIEND_ACCEPT' ||
+              item.type === 'E2EE_TRANSFER' ||
               (item.type === 'GUILD_INVITE' && !!item.preview) ||
               (item.type === 'EVENT_CREATED' && !!item.guildId) ||
               ((item.type === 'AI_VIDEO_READY' || item.type === 'AI_VIDEO_FAILED') && !!item.aiVideoId) ||

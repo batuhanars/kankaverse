@@ -166,6 +166,9 @@ async function onItemClick(n: NotificationDto) {
   } else if ((n.type === 'AI_VIDEO_READY' || n.type === 'AI_VIDEO_FAILED') && n.aiVideoId) {
     // C49 — sonuç açık gelsin: görüntüleme kipinde diyalog (aşağıda mount edilir)
     openView(n.aiVideoId)
+  } else if (n.type === 'E2EE_TRANSFER') {
+    // E5b §4.5: "bu sen değilsen" bildirimi → oturumlar (tanımadığın cihazı kapat). Push ile aynı hedef.
+    router.push({ name: 'settings-security' })
   }
 }
 </script>
