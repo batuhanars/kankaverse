@@ -3,9 +3,9 @@
 //
 // Anahtar hiyerarşisi: şifre --Argon2id--> KEK --sarar--> BMK --şifreler--> yedek görüntüsü.
 // Sunucu yalnız sarılı BMK ve şifreli görüntüyü görür.
-import { gcm } from '@noble/ciphers/aes.js'
 import { argon2id } from '@noble/hashes/argon2.js'
-import { concat, utf8 } from './bytes'
+import { open, seal } from './aead'
+import { utf8 } from './bytes'
 import { BackupParamsError, BackupPasswordError, BackupSnapshotError } from './errors'
 import { randomBytes } from './pure/random'
 
@@ -38,7 +38,6 @@ export const nobleArgon2id: Argon2idFn = async (password, salt, { m, t, p, dkLen
 
 const KEY_LENGTH = 32
 const SALT_LENGTH = 16
-const NONCE_LENGTH = 12
 export const SNAPSHOT_VERSION = 1
 
 /** Türetmeden önce taban ve üst sınır denetlenir; sunucu ne düşük ne de aşırı yüksek parametre dayatabilir. */
@@ -76,22 +75,6 @@ export async function deriveBackupKek(
 export const newBackupKey = (): Uint8Array => randomBytes(KEY_LENGTH)
 
 export const newBackupSalt = (): Uint8Array => randomBytes(SALT_LENGTH)
-
-/** nonce(12) || AES-256-GCM(key, nonce, plaintext, aad). Nonce her çağrıda yeni rastgele. */
-function seal(key: Uint8Array, plaintext: Uint8Array, aad: string): Uint8Array {
-  const nonce = randomBytes(NONCE_LENGTH)
-  return concat(nonce, gcm(key, nonce, utf8(aad)).encrypt(plaintext))
-}
-
-/** seal'in tersi. Kısa girdi ya da GCM doğrulama hatası `null` döner; çağıran kendi hata türünü fırlatır. */
-function open(key: Uint8Array, sealed: Uint8Array, aad: string): Uint8Array | null {
-  if (sealed.length < NONCE_LENGTH) return null
-  try {
-    return gcm(key, sealed.subarray(0, NONCE_LENGTH), utf8(aad)).decrypt(sealed.subarray(NONCE_LENGTH))
-  } catch {
-    return null
-  }
-}
 
 const bmkAad = (userId: string, keyVersion: number) => `kv-e5-bmk-v1|${userId}|${keyVersion}`
 const snapAad = (userId: string, deviceId: string, keyVersion: number) =>

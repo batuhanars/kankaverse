@@ -85,3 +85,12 @@ export class BackupPasswordError extends E2eeError {}
 
 /** Yedek görüntüsü açılamadı: yanlış anahtar/bağlam ya da kurcalanmış bayt. */
 export class BackupSnapshotError extends E2eeError {}
+
+/** E5b: yeni cihazın açtığı anahtar taahhüdüyle uyuşmuyor (araya giren anahtar ya da bozuk kayıt). Aktarım iptal. */
+export class TransferCommitError extends E2eeError {}
+
+/** E5b: geçersiz açık anahtar ya da sıfır ortak sır (düşük dereceli nokta). Aktarım iptal. */
+export class TransferKeyError extends E2eeError {}
+
+/** E5b: aktarım yükü açılamadı (yanlış anahtar/bağlam ya da kurcalanmış bayt). */
+export class TransferOpenError extends E2eeError {}

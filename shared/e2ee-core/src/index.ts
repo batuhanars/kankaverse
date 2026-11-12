@@ -47,6 +47,21 @@ export {
 } from './backup'
 export { checkBackupPassword, suggestBackupPassword, type BackupPasswordCheck, type BackupPasswordRejection } from './backupPassword'
 export { fromBase64, toBase64 } from './bytes'
+export {
+  TRANSFER_MAX_BYTES,
+  deriveTransferSecrets,
+  formatSas,
+  newTransferKeyPair,
+  newTransferNonce,
+  openTransfer,
+  sealTransfer,
+  transferCommit,
+  verifyTransferCommit,
+  wipe,
+  type TransferKeyPair,
+  type TransferSecrets,
+  type TransferTranscript,
+} from './transfer'
 export { SerialQueue } from './queue'
 // Tek UTF-8 yolu (yerleşik varsa o, yoksa katı saf JS); istemciler TextDecoder'ı doğrudan kullanmaz.
 export { fromUtf8, utf8, utf8Path, InvalidUtf8Error } from './utf8'
