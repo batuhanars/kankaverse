@@ -6,7 +6,7 @@
  */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { checkBackupPassword } from '@kankaverse/e2ee-core'
+import { checkBackupPassword, suggestBackupPassword } from '@kankaverse/e2ee-core'
 import { useAuthStore } from '@/stores/auth'
 import KvModal from '@/components/ui/KvModal.vue'
 import KvInput from '@/components/ui/KvInput.vue'
@@ -30,12 +30,31 @@ const password = ref('')
 const repeat = ref('')
 const acked = ref(false)
 
+// Güçlü şifre önerisi (sahip kararı 2026-11-12): iki alana birden yazılır, görünür kutuda kopyalanır.
+// Kullanıcı alanı öneriden farklı bir şeye çevirirse kutu kapanır. Öneri yalnız bu bileşende yaşar.
+const suggested = ref('')
+const copied = ref(false)
+const identity = computed(() => ({ username: auth.user?.username ?? '', email: auth.user?.email ?? '' }))
+const showSuggestion = computed(() => suggested.value !== '' && suggested.value === password.value)
+function suggest() {
+  suggested.value = suggestBackupPassword(identity.value)
+  password.value = suggested.value
+  repeat.value = suggested.value
+  copied.value = false
+}
+async function copySuggestion() {
+  try {
+    await navigator.clipboard.writeText(suggested.value)
+    copied.value = true
+  } catch {
+    copied.value = false // izin yoksa kullanıcı kutudaki metni elle seçer
+  }
+}
+
 const needsOld = computed(() => props.mode === 'change')
 const needsAck = computed(() => props.mode !== 'change')
 const check = computed(() =>
-  password.value
-    ? checkBackupPassword(password.value, { username: auth.user?.username ?? '', email: auth.user?.email ?? '' })
-    : null,
+  password.value ? checkBackupPassword(password.value, identity.value) : null,
 )
 const ruleText = computed(() =>
   check.value && !check.value.ok ? t(`e2ee.backup.rules.${check.value.reason}`) : '',
@@ -71,6 +90,33 @@ function submit() {
         :label="t('e2ee.backup.fields.oldPassword')"
         type="password"
       />
+      <div class="flex flex-col gap-2">
+        <button
+          type="button"
+          class="self-start text-[13px] font-semibold cursor-pointer"
+          style="color: var(--kv-accent-500);"
+          :disabled="loading"
+          @click="suggest"
+        >
+          🔑 {{ t('e2ee.backup.suggest.button') }}
+        </button>
+        <div
+          v-if="showSuggestion"
+          class="flex flex-col gap-1.5 p-3 rounded-[var(--kv-radius-md)] border"
+          style="border-color: var(--kv-border-strong); background: var(--kv-bg-elevated);"
+        >
+          <span class="text-[11px] font-semibold uppercase tracking-wide" style="color: var(--kv-text-secondary);">
+            {{ t('e2ee.backup.suggest.title') }}
+          </span>
+          <div class="flex items-center gap-3">
+            <code class="flex-1 min-w-0 break-all text-[14px] select-all" style="color: var(--kv-text-primary);">{{ suggested }}</code>
+            <button type="button" class="shrink-0 text-[13px] font-semibold cursor-pointer" style="color: var(--kv-text-secondary);" @click="copySuggestion">
+              {{ copied ? t('e2ee.backup.suggest.copied') : t('e2ee.backup.suggest.copy') }}
+            </button>
+          </div>
+          <span class="text-[13px]" style="color: var(--kv-text-primary);">{{ t('e2ee.backup.suggest.hint') }}</span>
+        </div>
+      </div>
       <KvInput
         v-model="password"
         :label="t(needsOld ? 'e2ee.backup.fields.newPassword' : 'e2ee.backup.fields.password')"

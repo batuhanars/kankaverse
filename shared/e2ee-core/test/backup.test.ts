@@ -8,6 +8,7 @@ import {
   BACKUP_KDF_MAX,
   SNAPSHOT_VERSION,
   checkBackupPassword,
+  suggestBackupPassword,
   deriveBackupKek,
   newBackupKey,
   newBackupSalt,
@@ -234,5 +235,44 @@ describe('checkBackupPassword (E5a §2.3)', () => {
   it('boş kimlik alanları sorun çıkarmaz', () => {
     expect(reason('abcdefghijkl', { username: '', email: '' })).toBe('ok')
     expect(reason('abcdefghijkl', { username: '', email: '@x.y' })).toBe('ok')
+  })
+})
+
+describe('suggestBackupPassword (sahip kararı 2026-11-12)', () => {
+  const ctx = { username: 'batuhan', email: 'ornek.kisi@example.com' }
+
+  it('4x5 biçim, karışan karakter yok, kuraldan geçer', () => {
+    for (let i = 0; i < 200; i++) {
+      const pw = suggestBackupPassword(ctx)
+      expect(pw).toMatch(/^[A-HJ-NP-Za-km-z2-9]{5}(-[A-HJ-NP-Za-km-z2-9]{5}){3}$/)
+      expect(checkBackupPassword(pw, ctx).ok).toBe(true)
+    }
+  })
+
+  it('her çağrı farklı (rastgelelik gerçekten kullanılıyor)', () => {
+    const set = new Set(Array.from({ length: 50 }, () => suggestBackupPassword(ctx)))
+    expect(set.size).toBe(50)
+  })
+
+  it('alfabe dışı baytlar atılır (modülo yanlılığı yok)', () => {
+    // İlk çağrı yalnız atılacak baytlar (>= 224) döner; ikinci çağrı 0,1,2... → "ABCDE-...".
+    let round = 0
+    const random = (n: number) =>
+      round++ === 0 ? new Uint8Array(n).fill(250) : Uint8Array.from({ length: n }, (_, i) => i % 56)
+    expect(suggestBackupPassword(ctx, random).startsWith('ABCDE-FGHJK-')).toBe(true)
+    expect(round).toBe(2)
+  })
+
+  it('kimliği içeren aday atılır, yenisi üretilir', () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+    const enc = (s: string) => [...s].map((c) => alphabet.indexOf(c))
+    // İlk aday ilk grubunda kullanıcı adını ("kanka") taşır → ret; sonraki çağrı çeşitli aday verir.
+    const first = Uint8Array.from([...enc('kanka'), ...enc('Q2rT5'), ...enc('wZmK8'), ...enc('pYbcd')])
+    let round = 0
+    const random = (n: number) =>
+      round++ === 0 ? first : Uint8Array.from({ length: n }, (_, i) => (i * 7) % 56)
+    const pw = suggestBackupPassword({ username: 'kanka', email: 'x@y.z' }, random)
+    expect(pw.toLocaleLowerCase('tr')).not.toContain('kanka')
+    expect(round).toBeGreaterThan(1)
   })
 })

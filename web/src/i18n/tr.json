@@ -1536,6 +1536,17 @@
         "newRepeat": "Yeni yedek şifresi (tekrar)"
       },
       "ack": "Bu şifreyi unutursam yedeğimi kimse açamaz, anladım",
+      "suggest": {
+        "button": "Güçlü şifre öner",
+        "title": "Önerilen şifre",
+        "hint": "Bu şifreyi şimdi bir yere not et. Unutursan yedeğin açılmaz.",
+        "copy": "Kopyala",
+        "copied": "Kopyalandı"
+      },
+      "reauth": {
+        "passwordLabel": "Hesap şifren",
+        "hint": "Yedek şifreni değil, giriş yaparken kullandığın şifreyi gir."
+      },
       "rules": {
         "too-short": "Şifre en az 12 karakter olmalı.",
         "too-few-distinct": "Şifrede en az 6 farklı karakter olmalı.",

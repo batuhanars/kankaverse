@@ -1,5 +1,6 @@
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { ReauthFields as ReauthValue } from '@/api/auth';
+import { SecretTextInput } from '@/components/security/SecretTextInput';
 import { useAuthStore } from '@/stores/auth';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -22,19 +23,25 @@ interface Props {
   onChange: (next: ReauthValue) => void;
   /** Kaydetme sürerken alanlar kilitlenir (çift gönderim + yarı yazılmış istek). */
   disabled?: boolean;
+  /**
+   * Varsayılan "Mevcut Şifre". Yedek ekranında (sıfırla/kapat) "Hesap şifren" + açıklama verilir:
+   * orada "mevcut şifre" yedek şifresi sanılıyordu (sahip bulgusu 2026-11-12).
+   */
+  passwordLabel?: string;
+  passwordHint?: string;
 }
 
-export function ReauthFields({ value, onChange, disabled }: Props) {
+export function ReauthFields({ value, onChange, disabled, passwordLabel, passwordHint }: Props) {
   const twoFactorEnabled = useAuthStore((s) => s.user?.twoFactorEnabled ?? false);
 
   return (
     <View style={styles.group}>
-      <Text style={styles.label}>{t('reauth.currentPassword')}</Text>
-      <TextInput
+      <Text style={styles.label}>{passwordLabel ?? t('reauth.currentPassword')}</Text>
+      {passwordHint ? <Text style={styles.hint}>{passwordHint}</Text> : null}
+      <SecretTextInput
         value={value.currentPassword}
         onChangeText={(currentPassword) => onChange({ ...value, currentPassword })}
         style={styles.input}
-        secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
         editable={!disabled}
@@ -73,6 +80,7 @@ export function reauthReady(value: ReauthValue, twoFactorEnabled: boolean): bool
 
 const styles = StyleSheet.create({
   group: { gap: 6 },
+  hint: { color: theme.colors.textMuted, fontSize: theme.fontSize.sm, lineHeight: 19 },
   label: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.xs,

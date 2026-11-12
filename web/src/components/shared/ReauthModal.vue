@@ -8,6 +8,9 @@ import KvButton from '@/components/ui/KvButton.vue'
 const props = defineProps<{
   title: string
   hasTwoFactor?: boolean
+  /** Varsayılan "Mevcut Şifre" + genel alt başlık. Yedek sıfırla/kapat "Hesap şifren" + açıklama verir (2026-11-12). */
+  passwordLabel?: string
+  subtitle?: string
   loading?: boolean
   error?: string
 }>()
@@ -32,11 +35,11 @@ function submit() {
 
 <template>
   <KvModal :title="title" @close="emit('cancel')">
-    <p class="text-[13px] mb-4" style="color: var(--kv-text-muted);">{{ t('reauth.subtitle') }}</p>
+    <p class="text-[13px] mb-4" style="color: var(--kv-text-muted);">{{ subtitle ?? t('reauth.subtitle') }}</p>
     <form class="flex flex-col gap-4" @submit.prevent="submit">
       <KvInput
         v-model="currentPassword"
-        :label="t('reauth.currentPassword')"
+        :label="passwordLabel ?? t('reauth.currentPassword')"
         type="password"
         :required="true"
       />

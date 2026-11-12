@@ -1,4 +1,5 @@
-import { StyleSheet, Text, TextInput } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
+import { SecretTextInput } from '@/components/security/SecretTextInput';
 import { theme } from '@/theme';
 
 interface Props {
@@ -10,16 +11,15 @@ interface Props {
   hint?: string;
 }
 
-/** Yedek şifresi alanı: gizli giriş, otomatik düzeltme/büyük harf yok. Değer yalnız ekranın state'inde yaşar. */
+/** Yedek şifresi alanı: gizli giriş (göster/gizle düğmeli), otomatik düzeltme/büyük harf yok. Değer yalnız ekranın state'inde yaşar. */
 export function BackupPasswordInput({ label, value, onChange, disabled, hint }: Props) {
   return (
     <>
       <Text style={styles.label}>{label}</Text>
-      <TextInput
+      <SecretTextInput
         value={value}
         onChangeText={onChange}
         style={[styles.input, !!hint && styles.inputError]}
-        secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}
         editable={!disabled}

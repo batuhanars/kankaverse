@@ -45,7 +45,7 @@ export {
   type Argon2idFn,
   type BackupKdfParams,
 } from './backup'
-export { checkBackupPassword, type BackupPasswordCheck, type BackupPasswordRejection } from './backupPassword'
+export { checkBackupPassword, suggestBackupPassword, type BackupPasswordCheck, type BackupPasswordRejection } from './backupPassword'
 export { fromBase64, toBase64 } from './bytes'
 export { SerialQueue } from './queue'
 // Tek UTF-8 yolu (yerleşik varsa o, yoksa katı saf JS); istemciler TextDecoder'ı doğrudan kullanmaz.

@@ -14,6 +14,7 @@ import {
   type BackupOutcome,
 } from '@/stores/e2eeBackup';
 import { BackupPasswordInput } from '@/components/backup/BackupPasswordInput';
+import { BackupPasswordSuggest } from '@/components/backup/BackupPasswordSuggest';
 import { outcomeMessage } from '@/components/backup/outcomeMessage';
 import { ReauthFields, reauthReady } from '@/components/security/ReauthFields';
 import { SecurityForm } from '@/components/security/SecurityForm';
@@ -51,9 +52,8 @@ export default function BackupPasswordScreen() {
   const needsAck = mode === 'setup' || mode === 'reset';
   const needsReauth = mode === 'reset' || mode === 'disable';
 
-  const check = password
-    ? checkBackupPassword(password, { username: user?.username ?? '', email: user?.email ?? '' })
-    : null;
+  const identity = { username: user?.username ?? '', email: user?.email ?? '' };
+  const check = password ? checkBackupPassword(password, identity) : null;
   const ruleText = check && !check.ok ? t(`e2ee.backup.rules.${check.reason}`) : '';
   const mismatch = repeat !== '' && repeat !== password;
 
@@ -117,6 +117,17 @@ export default function BackupPasswordScreen() {
           disabled={submitting}
         />
       ) : null}
+      {needsNew ? (
+        <BackupPasswordSuggest
+          ctx={identity}
+          current={password}
+          disabled={submitting}
+          onUse={(pw) => {
+            setPassword(pw);
+            setRepeat(pw);
+          }}
+        />
+      ) : null}
       {mode === 'unlock' || needsNew ? (
         <BackupPasswordInput
           label={t(mode === 'change' ? 'e2ee.backup.fields.newPassword' : 'e2ee.backup.fields.password')}
@@ -148,7 +159,15 @@ export default function BackupPasswordScreen() {
         </View>
       ) : null}
 
-      {needsReauth ? <ReauthFields value={reauth} onChange={setReauth} disabled={submitting} /> : null}
+      {needsReauth ? (
+        <ReauthFields
+          value={reauth}
+          onChange={setReauth}
+          disabled={submitting}
+          passwordLabel={t('e2ee.backup.reauth.passwordLabel')}
+          passwordHint={t('e2ee.backup.reauth.hint')}
+        />
+      ) : null}
 
       {isPrompt ? (
         <Pressable onPress={() => router.back()} disabled={submitting} style={styles.later}>
