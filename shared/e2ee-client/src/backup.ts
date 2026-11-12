@@ -172,13 +172,17 @@ export class BackupManager {
 
   // ── Yedek alma ────────────────────────────────────────────────────────────
 
-  /** Zamanlayıcı ve arka plana geçiş çağırır. Hiçbir hata fırlatmaz, sonuç nesnesi döner (fail-quiet, §1.6). */
-  async runBackupIfDue(now: number): Promise<BackupRunResult> {
+  /**
+   * Zamanlayıcı ve arka plana geçiş çağırır. Hiçbir hata fırlatmaz, sonuç nesnesi döner (fail-quiet, §1.6).
+   * `manual`: kullanıcının "Şimdi yedekle" düğmesi. YALNIZ 6 saat aralığını atlar; değişiklik yoksa yine
+   * `not-dirty` döner (sahip bulgusu 2026-11-12: silme sonrası basınca "güncel" deyip eski görüntüyü bırakıyordu).
+   */
+  async runBackupIfDue(now: number, opts: { manual?: boolean } = {}): Promise<BackupRunResult> {
     if (!this.d.enabled) return { status: 'skipped', reason: 'disabled' }
     if (this.running) return { status: 'skipped', reason: 'busy' }
     this.running = true
     try {
-      return await this.runOnce(now)
+      return await this.runOnce(now, opts.manual === true)
     } catch (e) {
       this.d.log(`[e2ee] yedek durdu: ${e instanceof Error ? e.name : typeof e}`)
       return { status: 'failed', code: e2eeErrorCode(e) }
@@ -187,8 +191,8 @@ export class BackupManager {
     }
   }
 
-  private async runOnce(now: number): Promise<BackupRunResult> {
-    const prep = await this.d.run((ctx) => this.prepare(ctx, now))
+  private async runOnce(now: number, manual: boolean): Promise<BackupRunResult> {
+    const prep = await this.d.run((ctx) => this.prepare(ctx, now, manual))
     if ('skipped' in prep) return { status: 'skipped', reason: prep.skipped }
     const { bmk, deviceId, keyVersion } = prep
     try {
@@ -210,12 +214,12 @@ export class BackupManager {
    * Kilit altında: ön koşullar, görüntü kurma ve "yükleme başladı" işareti. Dirty burada TEMİZLENİR, `inFlight`
    * konur: yükleme sırasında gelen mesaj dirty'yi yeniden açar, süreç yarıda ölürse `inFlight` sonraki turu tetikler.
    */
-  private async prepare(ctx: E2eeContext, now: number): Promise<Prepared> {
+  private async prepare(ctx: E2eeContext, now: number, manual: boolean): Promise<Prepared> {
     const key = await ctx.store.loadBackupKey()
     if (!key) return { skipped: 'no-key' }
     const flags = await ctx.store.loadFlags()
     if (!flags.backupDirty && !flags.backupInFlight) return { skipped: 'not-dirty' }
-    if (flags.lastBackupAt !== undefined && now - flags.lastBackupAt < BACKUP_MIN_INTERVAL_MS) {
+    if (!manual && flags.lastBackupAt !== undefined && now - flags.lastBackupAt < BACKUP_MIN_INTERVAL_MS) {
       return { skipped: 'too-soon' }
     }
     const deviceId = (await ctx.getDevice()).deviceId

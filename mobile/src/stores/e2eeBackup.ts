@@ -63,8 +63,8 @@ export async function refreshBackup(): Promise<void> {
   }
 }
 
-async function run(now: number): Promise<BackupRunResult> {
-  const result: BackupRunResult = (await backupEngine()?.runBackupIfDue(now)) ?? {
+async function run(now: number, manual = false): Promise<BackupRunResult> {
+  const result: BackupRunResult = (await backupEngine()?.runBackupIfDue(now, { manual })) ?? {
     status: 'skipped',
     reason: 'disabled',
   };
@@ -182,9 +182,9 @@ export async function disableBackup(reauth: Reauth): Promise<BackupOutcome> {
   }
 }
 
-/** "Şimdi yedekle": zamanlayıcının kullandığı aynı koşullu çalıştırma (6 saat/kirli denetimi motorda). */
+/** "Şimdi yedekle": 6 saat aralığını atlar, değişiklik yoksa yine yüklemez (`manual`, motor kuralı). */
 export function backupNow(): Promise<BackupRunResult> {
-  return run(Date.now());
+  return run(Date.now(), true);
 }
 
 /** 24 saati geçen başarısızlık: son çalıştırma hata ve son başarılı yedek yok ya da 24 saatten eski. */

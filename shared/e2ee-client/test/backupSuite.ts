@@ -223,6 +223,19 @@ export function backupSuite(label: string) {
       expect(await bk(p).runBackupIfDue(T0 + 6 * H)).toMatchObject({ status: 'uploaded', messages: 2 })
     })
 
+    it('elle "Şimdi yedekle" 6 saati atlar ama değişiklik yoksa yüklemez (2026-11-12)', async () => {
+      const p = await configured([rec('m1', 'ok', 'bir'), rec('m2', 'ok', 'iki')])
+      await bk(p).runBackupIfDue(T0)
+      const puts = server.backup.puts
+      // Değişiklik yok: elle de olsa yükleme olmaz.
+      expect(await bk(p).runBackupIfDue(T0 + H, { manual: true })).toEqual({ status: 'skipped', reason: 'not-dirty' })
+      expect(server.backup.puts).toBe(puts)
+      // Silme sonrası: zamanlayıcı bekler, elle basınca hemen yüklenir ve silinen kayıt görüntüden çıkar.
+      await local(p).deleteMessage('m2')
+      expect(await bk(p).runBackupIfDue(T0 + H)).toEqual({ status: 'skipped', reason: 'too-soon' })
+      expect(await bk(p).runBackupIfDue(T0 + H, { manual: true })).toMatchObject({ status: 'uploaded', messages: 1 })
+    })
+
     it('görüntü yalnız ok/unverified kayıtları ve §4.2 alanlarını taşır; kimlik ve sürüm AAD ile bağlı', async () => {
       const p = await configured([
         rec('ok1', 'ok', 'merhaba çğı', { fk: 'FK', sentAt: 123 }),
