@@ -86,6 +86,7 @@ export function ReportSheet() {
           >
             <View style={styles.grabber} />
             <ScrollView
+              style={styles.scroll}
               contentContainerStyle={styles.content}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -131,24 +132,25 @@ export function ReportSheet() {
               />
 
               {error ? <Text style={styles.error}>{error}</Text> : null}
-
-              <View style={styles.actions}>
-                <Pressable disabled={submitting} onPress={dismiss} style={styles.cancelButton}>
-                  <Text style={styles.cancelText}>{t('common.cancel')}</Text>
-                </Pressable>
-                <Pressable
-                  disabled={!reason || submitting}
-                  onPress={submit}
-                  style={[styles.submitButton, (!reason || submitting) && styles.disabled]}
-                >
-                  {submitting ? (
-                    <ActivityIndicator color={theme.colors.textPrimary} />
-                  ) : (
-                    <Text style={styles.submitText}>{t('report.submitButton')}</Text>
-                  )}
-                </Pressable>
-              </View>
             </ScrollView>
+            {/* Butonlar kaydırmanın DIŞINDA: içerik ekrandan uzunsa liste kayar, butonlar hep görünür
+                (sahip bulgusu 2026-11-12, Redmi üç tuşlu gezinme: butonlar çubuğun arkasında kaldı). */}
+            <View style={styles.actions}>
+              <Pressable disabled={submitting} onPress={dismiss} style={styles.cancelButton}>
+                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
+              </Pressable>
+              <Pressable
+                disabled={!reason || submitting}
+                onPress={submit}
+                style={[styles.submitButton, (!reason || submitting) && styles.disabled]}
+              >
+                {submitting ? (
+                  <ActivityIndicator color={theme.colors.textPrimary} />
+                ) : (
+                  <Text style={styles.submitText}>{t('report.submitButton')}</Text>
+                )}
+              </Pressable>
+            </View>
           </Pressable>
         </KeyboardAvoidingView>
       </Pressable>
@@ -158,8 +160,11 @@ export function ReportSheet() {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: theme.colors.bgOverlay, justifyContent: 'flex-end' },
+  // `maxHeight` çocuğu kendiliğinden küçültmez: panel `flexShrink` ile sınıra uyar, içindeki liste kayar.
   kav: { maxHeight: '92%' },
+  scroll: { flexGrow: 0, flexShrink: 1 },
   sheet: {
+    flexShrink: 1,
     backgroundColor: theme.colors.bgSidebar,
     borderTopLeftRadius: theme.radius.lg,
     borderTopRightRadius: theme.radius.lg,
@@ -213,7 +218,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   error: { color: theme.colors.danger, fontSize: theme.fontSize.base },
-  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+    paddingHorizontal: theme.layout.panelGap,
+    paddingTop: 12,
+  },
   cancelButton: { paddingHorizontal: 16, paddingVertical: 12, justifyContent: 'center' },
   cancelText: { color: theme.colors.textSecondary, fontSize: theme.fontSize.lg, fontWeight: '600' },
   submitButton: {
