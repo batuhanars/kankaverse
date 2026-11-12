@@ -92,6 +92,11 @@ export function AttachmentView({
   const [opening, setOpening] = useState(false);
   const [openError, setOpenError] = useState('');
 
+  // Yükleme düşünce adres BİR KEZ tazelenir (web `onImageError` ile aynı kural). Sahip bulgusu
+  // 2026-11-12: gönderenin kendi görseli koyu boş kutu kaldı, alıcılar görüyordu. `onError` yoktu,
+  // düşen yükleme sessiz kalıyor ve hiç yeniden denenmiyordu. Tek deneme: kalıcı hatada döngü olmasın.
+  const [urlAttempt, setUrlAttempt] = useState(0);
+
   useEffect(() => {
     if (!isImage || !isClean) return;
     let cancelled = false;
@@ -106,7 +111,16 @@ export function AttachmentView({
     return () => {
       cancelled = true;
     };
-  }, [attachment.id, isImage, isClean]);
+  }, [attachment.id, isImage, isClean, urlAttempt]);
+
+  function onImageError() {
+    if (urlAttempt > 0) {
+      setImageError(true);
+      return;
+    }
+    setImageUrl(null);
+    setUrlAttempt(1);
+  }
 
   /**
    * Sprint M3c R2 — dosyayı aç.
@@ -201,6 +215,7 @@ export function AttachmentView({
         source={{ uri: imageUrl }}
         style={[styles.image, size ? sizeStyle : ratio ? fitStyle(ratio) : null]}
         resizeMode={size ? 'cover' : 'contain'}
+        onError={onImageError}
         onLoad={(e) => {
           const { width, height } = e.nativeEvent.source;
           if (size || !width || !height) return;
