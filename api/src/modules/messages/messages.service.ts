@@ -57,7 +57,7 @@ type ReplyToDto = {
 } | null;
 
 type ReplyToRaw =
-  | (Pick<Message, 'id' | 'content' | 'deletedAt' | 'webhookId' | 'webhookName'> & {
+  | (Pick<Message, 'id' | 'content' | 'deletedAt' | 'webhookId' | 'webhookName' | 'encrypted'> & {
       author: Pick<User, 'username'>;
       attachments?: ReplyAttachmentDto[];
     })
@@ -77,10 +77,15 @@ type MessageWithAuthor = Message & {
 
 // replyTo snippet: ≤REPLY_SNIPPET_MAX karakter; dosya ekli + boş içerik → "[dosya]" (eski istemciler
 // için korunuyor; yeni istemci `attachment` doluyken türe göre etiket gösterir); silinmişse null
+// E1: şifreli mesajın metnini sunucu bilmez; boş içerik "[dosya]" değil, istemciye "yerel depodan doldur"
+// işaretidir (web/mobil `fillQuote` yalnız boş içerikte depoya bakar).
 function buildReplyToDto(raw: ReplyToRaw): ReplyToDto {
   if (!raw || raw.deletedAt !== null) return null;
-  const snippet =
-    raw.content.trim().length > 0 ? raw.content.slice(0, REPLY_SNIPPET_MAX) : '[dosya]';
+  const snippet = raw.encrypted
+    ? ''
+    : raw.content.trim().length > 0
+      ? raw.content.slice(0, REPLY_SNIPPET_MAX)
+      : '[dosya]';
   // C35 §5.1: webhook mesajına yanıtta oluşturanın adı sızmaz, webhook'un görünen adı gösterilir
   const authorUsername = raw.webhookId ? (raw.webhookName ?? '') : raw.author.username;
   const first = raw.attachments?.[0];
@@ -204,6 +209,7 @@ const REPLY_TO_INCLUDE = {
   select: {
     id: true,
     content: true,
+    encrypted: true,
     deletedAt: true,
     webhookId: true,
     webhookName: true,

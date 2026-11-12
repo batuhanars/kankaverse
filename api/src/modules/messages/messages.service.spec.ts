@@ -1889,6 +1889,30 @@ describe('MessagesService.create — reply doğrulama + replyTo DTO', () => {
     expect(result.replyTo!.content).toBe('[dosya]');
   });
 
+  // E1: şifreli mesaja yanıt → alıntı içeriği boş (istemci yerel depodan doldurur), "[dosya]" değil
+  it('replyTo şifreli mesaj → snippet boş döner, "[dosya]" yedeği uygulanmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(GUILD_CHANNEL);
+    prismaMock.message.findUnique.mockResolvedValueOnce(VALID_REPLY_TARGET);
+
+    const replyToRaw = {
+      id: REPLY_TARGET_ID,
+      content: '', // şifreli mesajda düz içerik sunucuda boş
+      encrypted: true,
+      deletedAt: null,
+      author: { username: 'sifreli-kanka' },
+    };
+    prismaMock.message.create.mockResolvedValue(makeCreatedMsgWithReply(replyToRaw));
+
+    const result = await service.create(USER_ID, GUILD_CHANNEL_ID, {
+      content: 'cevap',
+      replyToId: REPLY_TARGET_ID,
+    });
+
+    expect(result.replyTo).not.toBeNull();
+    expect(result.replyTo!.content).toBe('');
+    expect(result.replyTo!.attachment).toBeNull();
+  });
+
   // ─────────────────────────────────────────────────────────────────────────
   // Yanıtlanan mesaj silinince → replyTo null döner (DTO)
   // ─────────────────────────────────────────────────────────────────────────
