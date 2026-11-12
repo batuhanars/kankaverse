@@ -173,6 +173,27 @@ export const useE2eeStore = defineStore('e2ee', () => {
     }
   }
 
+  /**
+   * DM listesi önizlemesi (2026-11-12 sahip bulgusu): uygulama kapalıyken gelen şifreli son mesaj yerel depoda
+   * yok, liste "Şifreli mesaj" gösteriyordu, sohbete girip çıkınca düzeliyordu. Sohbet açılışıyla AYNI yol
+   * (Welcome'lar → son sayfa → MLS sırasıyla çözme → commit senkronu) arka planda çalışır; düz metin depoya
+   * yazılınca `plainTick` artar ve önizleme depodan okunur. Motor kilidi çözmeleri sıraya koyar.
+   * Mesaj listesi ucu okundu işaretlemez.
+   */
+  async function prefetchPreview(channelId: string): Promise<void> {
+    await ready
+    if (!engine.value) return
+    await openChannel(channelId)
+    const { data } = await messagesApi.list(channelId)
+    const out = await hydrateHistory(
+      channelId,
+      data,
+      async (before) => (await messagesApi.list(channelId, before)).data,
+    )
+    void syncChannel(channelId)
+    if (out.some((m) => m.e2eeStatus === 'ok')) plainTick.value++
+  }
+
   /** Gönderim öncesi: şifreli yük, ya da `null` (şifresiz DM / E2EE kapalı: çağıran düz gönderir). */
   async function prepareSend(channelId: string, text: string): Promise<SentCipher | null> {
     await ready
@@ -256,6 +277,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
     syncChannel,
     plainTick,
     plainText,
+    prefetchPreview,
     resolveSocketPreview,
     hydrate,
     hydrateOne,

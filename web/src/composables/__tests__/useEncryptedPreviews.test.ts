@@ -66,4 +66,30 @@ describe('useEncryptedPreviews', () => {
     await vi.waitFor(() => expect(previews.value.m1).toBe('gercek metin'))
     scope.stop()
   })
+
+  it('depoda yoksa sohbet arka planda bir kez çözülür (uygulama kapalıyken gelen mesaj)', async () => {
+    const store = useE2eeStore()
+    let stored: string | null = null
+    vi.spyOn(store, 'plainText').mockImplementation(() => Promise.resolve(stored))
+    store.engine = {} as never
+    const prefetch = vi.spyOn(store, 'prefetchPreview').mockImplementation(() => {
+      stored = 'kapaliyken gelen'
+      store.plainTick++
+      return Promise.resolve()
+    })
+    const scope = effectScope()
+    const { previews } = scope.run(() =>
+      useEncryptedPreviews(
+        () => [ch('a', { id: 'm1', encrypted: true })],
+        () => null,
+      ),
+    )!
+    await vi.waitFor(() => expect(previews.value.m1).toBe('kapaliyken gelen'))
+    expect(prefetch).toHaveBeenCalledTimes(1)
+    expect(prefetch).toHaveBeenCalledWith('a')
+    store.plainTick++
+    await nextTick()
+    expect(prefetch).toHaveBeenCalledTimes(1)
+    scope.stop()
+  })
 })

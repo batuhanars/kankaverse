@@ -177,6 +177,23 @@ export async function decryptDmLastMessage(
   if (m?.e2eeStatus === 'ok') markDecrypted();
 }
 
+/**
+ * DM listesi önizlemesi (2026-11-12 sahip bulgusu): uygulama kapalıyken gelen şifreli son mesaj yerel depoda
+ * yok, liste "Şifreli mesaj" gösteriyordu ve sohbete girip çıkınca düzeliyordu. Sohbet açılışıyla AYNI yol
+ * (Welcome'lar → son sayfa → MLS sırasıyla çözme → commit senkronu) arka planda çalışır; düz metin depoya
+ * yazılınca önizleme `plainTick` ile yeniden okunur. Motor kilidi çözmeleri sıraya koyar, sohbet ekranıyla
+ * çakışmaz. Mesaj listesi ucu okundu işaretlemez.
+ */
+export async function prefetchDmPreview(channelId: string): Promise<void> {
+  await ready;
+  if (!get().engine) return;
+  await openE2eeChannel(channelId);
+  const raw = await messagesApi.list(channelId);
+  const out = await hydratePage(channelId, raw, (before) => messagesApi.list(channelId, before));
+  void syncE2eeChannel(channelId);
+  if (out.some((m) => m.e2eeStatus === 'ok')) markDecrypted();
+}
+
 /** Sayfa (yeniden eskiye) için çözme; sayfa eskiden yeniye çözülür (MLS sırası, bkz. motor). */
 export async function hydratePage(
   channelId: string,
