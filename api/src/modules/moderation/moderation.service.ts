@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateActionDto, MediaTarget } from './dto/create-action.dto';
 import { REPORT_EVIDENCE_RETENTION_DAYS } from '../e2ee/e2ee.constants';
@@ -39,10 +44,36 @@ export class ModerationModuleService {
         contextSnapshot: true,
         reporterId: true,
         createdAt: true,
-        // içerik SEÇİLMEZ: yalnız sayı ve doğrulanmamış var mı
-        evidence: { select: { verified: true } },
+        // içerik SEÇİLMEZ: yalnız sayı, doğrulanmamış var mı ve hedef mesajın yazarı (aksiyon hedefi)
+        evidence: { select: { verified: true, isTarget: true, authorId: true } },
       },
     });
+
+    // Aksiyon hedefi (2026-11-12 sahip turu): panel `targetId`'yi kullanıcı sanıyordu; mesaj şikâyetinde o
+    // MESAJ kimliği olduğu için hiçbir aksiyon uygulanamıyordu ("Hedef kullanıcı bulunamadı"). Hedef kişi
+    // sunucuda çözülür: USER → targetId; MESSAGE → kanıttaki hedef mesajın yazarı, kanıt yoksa mesajın yazarı
+    // (silinmiş mesaj satırı da yazarını taşır); CHANNEL/GUILD → kişi yok (null).
+    const messageIds = reports
+      .filter(
+        (r) => r.targetType === 'MESSAGE' && !r.evidence.some((e) => e.isTarget && e.authorId),
+      )
+      .map((r) => r.targetId);
+    const authors = messageIds.length
+      ? await this.prisma.message.findMany({
+          where: { id: { in: messageIds } },
+          select: { id: true, authorId: true },
+        })
+      : [];
+    const authorByMessage = new Map(authors.map((m) => [m.id, m.authorId]));
+    const targetUserOf = (r: (typeof reports)[number]): string | null => {
+      if (r.targetType === 'USER') return r.targetId;
+      if (r.targetType !== 'MESSAGE') return null;
+      return (
+        r.evidence.find((e) => e.isTarget && e.authorId)?.authorId ??
+        authorByMessage.get(r.targetId) ??
+        null
+      );
+    };
 
     return reports.map((r) => ({
       id: r.id,
@@ -60,7 +91,56 @@ export class ModerationModuleService {
       createdAt: r.createdAt.toISOString(),
       evidenceCount: r.evidence.length,
       hasUnverified: r.evidence.some((e) => !e.verified),
+      targetUserId: targetUserOf(r),
     }));
+  }
+
+  /**
+   * POST /moderation/reports/:id/dismiss — şikâyeti yaptırımsız kapatır ("ihlal yok", sahip kararı 2026-11-12).
+   * Silme DEĞİL: kayıt kalır (geçmiş + itiraz), durum DISMISSED olur. Kanıt, aksiyonla kapanışla aynı kuralla
+   * 90 gün sonra silinir (E4 §3.4). Yalnız açık (OPEN/TRIAGED) şikâyet kapanır; denetim kaydı aynı işlemde.
+   */
+  async dismissReport(moderatorId: string, reportId: string) {
+    const resolvedAt = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const res = await tx.report.updateMany({
+        where: { id: reportId, status: { in: ['OPEN', 'TRIAGED'] } },
+        data: {
+          status: 'DISMISSED',
+          resolvedById: moderatorId,
+          resolvedAt,
+          evidencePurgeAt: new Date(
+            resolvedAt.getTime() + REPORT_EVIDENCE_RETENTION_DAYS * 24 * 60 * 60 * 1000,
+          ),
+        },
+      });
+      if (res.count === 0) {
+        const exists = await tx.report.findUnique({
+          where: { id: reportId },
+          select: { id: true },
+        });
+        if (!exists) {
+          throw new NotFoundException({
+            message: 'Şikâyet bulunamadı.',
+            error: 'REPORT_NOT_FOUND',
+          });
+        }
+        throw new ConflictException({
+          message: 'Bu şikâyet zaten kapatılmış.',
+          error: 'REPORT_ALREADY_CLOSED',
+        });
+      }
+      await tx.auditLog.create({
+        data: {
+          actorId: moderatorId,
+          action: 'report.dismiss',
+          entityType: 'Report',
+          entityId: reportId,
+          metadata: {},
+        },
+      });
+      return { id: reportId, status: 'DISMISSED' as const };
+    });
   }
 
   /**

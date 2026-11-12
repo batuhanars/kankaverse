@@ -146,6 +146,9 @@
     }
   },
   "admin": {
+    "moderation": {
+      "title": "Moderasyon"
+    },
     "aiAccess": {
       "title": "Yapay zeka erişimi",
       "empty": "Henüz erişim hakkı verilmemiş.",
@@ -2075,6 +2078,15 @@
     "EMERGENCY": "Acil Yardım"
   },
   "moderation": {
+    "dismiss": "Kapat (ihlal yok)",
+    "dismissSuccess": "Şikâyet yaptırımsız kapatıldı.",
+    "dismissError": "Şikâyet kapatılamadı.",
+    "noTargetUser": "Bu şikâyette kişi hedefi yok, kişiye aksiyon uygulanamaz.",
+    "group": {
+      "urgent": "Acil",
+      "high": "Yüksek",
+      "normal": "Normal"
+    },
     "title": "Moderasyon Kuyruğu",
     "backToApp": "Uygulamaya Dön",
     "emTitle": "Acil bağlam (metadata)",

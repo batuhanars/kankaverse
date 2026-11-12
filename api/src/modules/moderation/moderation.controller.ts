@@ -48,6 +48,14 @@ export class ModerationController {
     return this.moderationService.createAction(user.id, dto);
   }
 
+  /** POST /moderation/reports/:id/dismiss — yaptırımsız kapat (ihlal yok); kayıt kalır, kanıt 90 gün sonra silinir */
+  @Post('moderation/reports/:id/dismiss')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Şikâyeti yaptırımsız kapat (DISMISSED) + denetim kaydı' })
+  dismissReport(@CurrentUser() user: { id: string }, @Param('id') id: string) {
+    return this.moderationService.dismissReport(user.id, id);
+  }
+
   /** GET /audit — moderasyon eylem geçmişi (yeni→eski) */
   @Get('audit')
   @ApiOperation({ summary: 'Audit log (moderasyon eylem geçmişi)' })

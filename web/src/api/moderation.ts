@@ -47,6 +47,8 @@ export interface ReportDto {
   // E4 Rev.1: kuyruk kanıt içeriği DÖNMEZ, yalnız sayı ve doğrulanmamış var mı.
   evidenceCount?: number
   hasUnverified?: boolean
+  /** Aksiyonun hedefi olacak kişi (sunucu çözer): USER → hedef, MESSAGE → mesaj yazarı, CHANNEL/GUILD → null. */
+  targetUserId?: string | null
 }
 
 /** E4: ek yalnız referanstır (kopya yok); önizleme/indirme yok. */
@@ -104,6 +106,10 @@ export const moderationApi = {
   },
   createAction(payload: CreateActionPayload): Promise<ApiResponse<null>> {
     return api.post('/moderation/actions', payload)
+  },
+  /** Yaptırımsız kapat ("ihlal yok"): kayıt kalır, kanıt 90 gün sonra silinir. */
+  dismissReport(id: string): Promise<ApiResponse<{ id: string; status: 'DISMISSED' }>> {
+    return api.post(`/moderation/reports/${id}/dismiss`)
   },
   getAudit(): Promise<ApiResponse<AuditLogDto[]>> {
     return api.get('/audit')

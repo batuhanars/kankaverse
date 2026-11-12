@@ -12,7 +12,9 @@ const prismaMock = {
     findMany: jest.fn(),
     findUnique: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
   },
+  $transaction: jest.fn(),
   moderationAction: {
     create: jest.fn(),
     findFirst: jest.fn(),
@@ -33,6 +35,7 @@ const prismaMock = {
   },
   message: {
     findUnique: jest.fn(),
+    findMany: jest.fn(),
     update: jest.fn(),
   },
   guild: {
@@ -235,6 +238,7 @@ describe('ModerationModuleService kuyruk (iceriksiz) + getReport (E4 Rev.1)', ()
 
   beforeEach(() => {
     jest.resetAllMocks();
+    prismaMock.message.findMany.mockResolvedValue([]);
     service = new ModerationModuleService(prismaMock as any);
   });
 
@@ -247,8 +251,9 @@ describe('ModerationModuleService kuyruk (iceriksiz) + getReport (E4 Rev.1)', ()
 
     const result = await service.getQueue();
 
+    // İçerik alanı (content/attachments) SEÇİLMEZ; yalnız doğrulama, hedef bayrağı ve yazar kimliği.
     expect(prismaMock.report.findMany.mock.calls[0][0].select.evidence).toEqual({
-      select: { verified: true },
+      select: { verified: true, isTarget: true, authorId: true },
     });
     expect(result.map((r) => [r.evidenceCount, r.hasUnverified])).toEqual([
       [2, true],
@@ -825,5 +830,91 @@ describe('FriendPermissionService enforcement — BAN', () => {
 
     expect(result.allowed).toBe(false);
     expect(fpPrisma.user.findUnique).toHaveBeenCalled();
+  });
+});
+
+describe('ModerationModuleService aksiyon hedefi + yaptirimsiz kapatma (2026-11-12)', () => {
+  let service: ModerationModuleService;
+  const base = {
+    reason: 'SPAM',
+    description: null,
+    status: 'OPEN',
+    priority: 0,
+    contextSnapshot: {},
+    reporterId: 'r1',
+    createdAt: new Date('2026-11-12T10:00:00Z'),
+  };
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    prismaMock.$transaction.mockImplementation((cb: (tx: unknown) => unknown) => cb(prismaMock));
+    service = new ModerationModuleService(prismaMock as any);
+  });
+
+  it('kuyruk targetUserId: USER → hedef, MESSAGE → kanit yazari ya da mesaj yazari, CHANNEL → null', async () => {
+    prismaMock.report.findMany.mockResolvedValue([
+      { ...base, id: 'u', targetType: 'USER', targetId: 'user-9', evidence: [] },
+      {
+        ...base,
+        id: 'm-ev',
+        targetType: 'MESSAGE',
+        targetId: 'msg-1',
+        evidence: [
+          { verified: true, isTarget: false, authorId: 'baglam-yazari' },
+          { verified: true, isTarget: true, authorId: 'yazar-1' },
+        ],
+      },
+      { ...base, id: 'm-eski', targetType: 'MESSAGE', targetId: 'msg-2', evidence: [] },
+      { ...base, id: 'm-yok', targetType: 'MESSAGE', targetId: 'msg-3', evidence: [] },
+      { ...base, id: 'k', targetType: 'CHANNEL', targetId: 'ch-1', evidence: [] },
+    ]);
+    prismaMock.message.findMany.mockResolvedValue([{ id: 'msg-2', authorId: 'yazar-2' }]);
+
+    const result = await service.getQueue();
+
+    // Kanıtta yazar olan mesaj için ek sorgu yok; yalnız kanıtsız mesajlar sorulur.
+    expect(prismaMock.message.findMany.mock.calls[0][0].where).toEqual({
+      id: { in: ['msg-2', 'msg-3'] },
+    });
+    expect(result.map((r) => [r.id, r.targetUserId])).toEqual([
+      ['u', 'user-9'],
+      ['m-ev', 'yazar-1'],
+      ['m-eski', 'yazar-2'],
+      ['m-yok', null],
+      ['k', null],
+    ]);
+  });
+
+  it('dismiss: yalniz acik sikayet DISMISSED olur, kanit 90 gun sonra silinir, denetim yazilir', async () => {
+    prismaMock.report.updateMany.mockResolvedValue({ count: 1 });
+    const before = Date.now();
+
+    const result = await service.dismissReport('mod-1', 'rep-1');
+
+    expect(result).toEqual({ id: 'rep-1', status: 'DISMISSED' });
+    const call = prismaMock.report.updateMany.mock.calls[0][0];
+    expect(call.where).toEqual({ id: 'rep-1', status: { in: ['OPEN', 'TRIAGED'] } });
+    expect(call.data.status).toBe('DISMISSED');
+    expect(call.data.resolvedById).toBe('mod-1');
+    const days =
+      (call.data.evidencePurgeAt.getTime() - call.data.resolvedAt.getTime()) / 86_400_000;
+    expect(days).toBe(90);
+    expect(call.data.resolvedAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(prismaMock.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      actorId: 'mod-1',
+      action: 'report.dismiss',
+      entityType: 'Report',
+      entityId: 'rep-1',
+    });
+  });
+
+  it('dismiss: kapali sikayet 409, olmayan sikayet 404; ikisinde de denetim yazilmaz', async () => {
+    prismaMock.report.updateMany.mockResolvedValue({ count: 0 });
+    prismaMock.report.findUnique.mockResolvedValueOnce({ id: 'rep-1' });
+    await expect(service.dismissReport('mod-1', 'rep-1')).rejects.toMatchObject({ status: 409 });
+
+    prismaMock.report.findUnique.mockResolvedValueOnce(null);
+    await expect(service.dismissReport('mod-1', 'yok')).rejects.toBeInstanceOf(NotFoundException);
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
   });
 });
