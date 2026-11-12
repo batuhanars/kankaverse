@@ -20,16 +20,20 @@ export type PresenceStatus = 'online' | 'away' | 'dnd' | 'offline';
 interface PresenceState {
   /** userId → durum. Yalnız aktif kullanıcılar tutulur; haritada olmayan = çevrimdışı. */
   statusMap: Record<string, PresenceStatus>;
-  applySnapshot: (states: { userId: string; status: PresenceStatus }[]) => void;
+  applySnapshot: (states: { userId: string; status: PresenceStatus }[], selfId?: string) => void;
   applyUpdate: (userId: string, status: PresenceStatus) => void;
   reset: () => void;
 }
 
-export const usePresenceStore = create<PresenceState>((set) => ({
+export const usePresenceStore = create<PresenceState>((set, get) => ({
   statusMap: {},
 
-  applySnapshot(states) {
+  applySnapshot(states, selfId) {
     const next: Record<string, PresenceStatus> = {};
+    // Snapshot kullanıcının KENDİSİNİ hiç içermez (sunucu `candidatePool` kendini dışarıda bırakır);
+    // kendi durumu ayrı bir `presence:update` ile gelir ve snapshot'tan ÖNCE varabilir. Değiştirme
+    // mantığı onu silerse kişi kendi üye listesinde çevrimdışı görünür (sahip bulgusu 2026-11-12).
+    if (selfId && get().statusMap[selfId]) next[selfId] = get().statusMap[selfId];
     for (const { userId, status } of states) {
       if (status !== 'offline') next[userId] = status;
     }

@@ -243,7 +243,7 @@ function ensureSocket(): Socket {
         gameStoreUrl?: string | null;
       }[];
     }) => {
-      usePresenceStore.getState().applySnapshot(payload.states);
+      usePresenceStore.getState().applySnapshot(payload.states, useAuthStore.getState().user?.id);
       // C31b: oyun satırı aynı snapshot'ın içinde gelir (görünürlük sunucuda).
       useActivityStore.getState().applySnapshot(payload.states);
     },
