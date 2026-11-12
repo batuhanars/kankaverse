@@ -444,6 +444,7 @@
       "processing": "Hazırlanıyor…",
       "errorType": "Desteklenmeyen dosya türü. PNG, JPEG, WebP, GIF veya video seç.",
       "errorImageSize": "Görsel dosyası 15 MB'ı aşamaz.",
+      "errorGifSize": "GIF dosyası 15 MB'ı aşamaz.",
       "errorUpload": "Hareketli görsel hazırlanamadı. Lütfen tekrar dene.",
       "disabled": "Hareketli görsel şu anda kapalı. Yalnızca düz görsel yükleyebilirsin.",
       "errors": {
@@ -1200,6 +1201,7 @@
       "CANNOT_BAN_OWNER": "Ortam sahibi yasaklanamaz.",
       "CANNOT_BAN_SELF": "Kendinizi yasaklayamazsınız.",
       "CANNOT_MODIFY_OWNER": "Ortam sahibinin rolü değiştirilemez.",
+      "NOT_FOUND": "Üye bulunamadı.",
       "NOT_GUILD_MEMBER": "Kullanıcı bu ortamın üyesi değil.",
       "FORBIDDEN": "Bu işlem için yetkiniz yok."
     }

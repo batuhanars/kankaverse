@@ -8,6 +8,20 @@ const { getDefaultConfig } = require('expo/metro-config');
 // kopyalanıyor, proje kendi kökü İÇİNDEN okuyor.
 const config = getDefaultConfig(__dirname);
 
+// vc68 dersi (2026-11-12): `gradlew bundleRelease` npm `pre*` script'lerini çalıştırmaz → bayat
+// sözlükle paket çıktı, ekranda ham anahtarlar göründü. Metro her paketlemede (dev ve release) bu
+// dosyayı yüklediği için senkron + denetim burada. Release paketlemesinde eksik anahtar derlemeyi
+// durdurur; dev'de yalnız uyarır.
+require('./scripts/sync-i18n.js');
+const missingI18n = require('./scripts/check-i18n.js').findMissingKeys();
+if (missingI18n.size > 0) {
+  const list = [...missingI18n].map(([key, file]) => `  ${key} (${file})`).join('\n');
+  const msg = `[i18n] sözlükte olmayan anahtarlar:\n${list}`;
+  const isExport = process.argv.some((a) => a.startsWith('export'));
+  if (isExport) throw new Error(msg);
+  console.warn(msg);
+}
+
 // E1 §6.1/§6.3 — tek çekirdek, iki istemci: `shared/e2ee-core` ve `shared/e2ee-client` kaynağından
 // derlenir, KOPYALANMAZ. Proje kökü dışı olduğu için Metro'ya hem izleme (watchFolders) hem paket
 // adı çözümü (extraNodeModules) açıkça söylenir. Bu paketlerin kendi bağımlılıkları (ts-mls, noble)
