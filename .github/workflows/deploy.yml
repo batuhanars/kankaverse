@@ -119,17 +119,32 @@ jobs:
               exit 1
             fi
           fi
+          # 2026-11-12: sunucudan GitHub'a (140.82.121.x) bağlantılar aralıklı kopuyor; tek kopukluk
+          # deploy'u düşürüyordu. Ağ adımları 5 kez denenir (yarım inen imaj katmanları korunur).
+          retry() {
+            for n in 1 2 3 4 5; do
+              "$@" && return 0
+              echo "::warning::Deneme $n düştü: $*  (15 sn sonra tekrar)"
+              sleep 15
+            done
+            return 1
+          }
+          ghcr_login() { echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin; }
           BEFORE=$(git rev-parse HEAD)
           # Repo private: https remote anonim pull edemiyor. Token'ı geçici Authorization
           # header'ı ile ver (URL'e gömme → ps/reflog sızıntısı yok). actions/checkout deseni.
           # git pull hâlâ gerekli: docker-compose.prod.yml ve Caddyfile repodan okunuyor.
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c http.extraheader="$AUTH_HEADER" pull origin main
+          retry git -c http.extraheader="$AUTH_HEADER" pull origin main
           AFTER=$(git rev-parse HEAD)
           COMPOSE="docker compose --env-file .env.production -f docker-compose.prod.yml"
           # GHCR paketleri private → job token'ıyla giriş, çekince çıkış (token diskte kalmasın).
-          echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
-          $COMPOSE pull api web landing
+          retry ghcr_login
+          if ! retry $COMPOSE pull api web landing; then
+            docker logout ghcr.io || true
+            echo "::error::İmajlar çekilemedi. Mevcut servisler çalışmaya devam ediyor."
+            exit 1
+          fi
           docker logout ghcr.io
           $COMPOSE up -d --no-build
           # Caddyfile bind-mount: up -d caddy'yi yeniden YARATMAZ + `caddy reload` çalışan sürece
