@@ -52,6 +52,9 @@ export function resolvePushTarget(data: Record<string, unknown>): Href | null {
       return '/friends-add';
     case 'FRIEND_ACCEPT':
       return '/friends-list';
+    case 'E2EE_TRANSFER':
+      // E5b §4.5: "Bu sen değilsen hemen şifreni değiştir" bildirimi: oturumlar ekranı (tanımadığın cihazı kapat).
+      return '/security-sessions';
     default:
       // GUILD_INVITE dahil: push data'sında davet kodu yok (`preview` taşınmıyor), hedef
       // kurulamaz — kırık navigasyon vaat etmek yerine yalnız uygulama açılır (§3 kuralı).

@@ -184,14 +184,15 @@ export async function decryptDmLastMessage(
  * yazılınca önizleme `plainTick` ile yeniden okunur. Motor kilidi çözmeleri sıraya koyar, sohbet ekranıyla
  * çakışmaz. Mesaj listesi ucu okundu işaretlemez.
  */
-export async function prefetchDmPreview(channelId: string): Promise<void> {
+export async function prefetchDmPreview(channelId: string): Promise<MessageDto[]> {
   await ready;
-  if (!get().engine) return;
+  if (!get().engine) return [];
   await openE2eeChannel(channelId);
   const raw = await messagesApi.list(channelId);
   const out = await hydratePage(channelId, raw, (before) => messagesApi.list(channelId, before));
   void syncE2eeChannel(channelId);
   if (out.some((m) => m.e2eeStatus === 'ok')) markDecrypted();
+  return out; // E5b Parça C: çağıran son mesajın cihaz öncesi olup olmadığını görür
 }
 
 /** Sayfa (yeniden eskiye) için çözme; sayfa eskiden yeniye çözülür (MLS sırası, bkz. motor). */

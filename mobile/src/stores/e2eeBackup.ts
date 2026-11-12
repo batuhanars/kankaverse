@@ -32,19 +32,21 @@ interface BackupStoreState {
   lastRun: BackupRunResult['status'] | null;
   /** Geri yükleme sonrası artar; açık sohbet mesajlarını yeniden yükler. */
   restoreTick: number;
-  bannerDismissed: boolean;
+  /** E5b §4.4 (E5a Rev.3): "eski mesajlarını getir" bandı; bu cihazda bir kez (bayrak motorun cihaz deposunda). */
+  historyBanner: boolean;
 }
 
 export const useE2eeBackupStore = create<BackupStoreState>(() => ({
   state: null,
   lastRun: null,
   restoreTick: 0,
-  bannerDismissed: false,
+  historyBanner: false,
 }));
 
 const set = useE2eeBackupStore.setState;
 const get = useE2eeBackupStore.getState;
 let scheduler: BackupScheduler | null = null;
+let historyEvaluated = false;
 
 const backupEngine = () => useE2eeStore.getState().engine?.backup ?? null;
 
@@ -95,7 +97,8 @@ export function backupOnBackground(): void {
 export function stopBackup(): void {
   scheduler?.stop();
   scheduler = null;
-  set({ state: null, lastRun: null, bannerDismissed: false });
+  set({ state: null, lastRun: null, historyBanner: false });
+  historyEvaluated = false;
 }
 
 /** Şifreli DM ilk açıldığında: yedek açık + kurulu değil + bu cihazda hiç sorulmadıysa true (bir kez). */
@@ -112,11 +115,31 @@ export async function shouldPromptSetup(): Promise<boolean> {
   }
 }
 
-/** Yedek kurulu, bu cihazda kilitli ve bant bu oturumda kapatılmadıysa. */
-export const selectShowBanner = (s: BackupStoreState) =>
-  !!s.state?.configured && !s.state.unlockedHere && !s.bannerDismissed;
+/**
+ * Bant bu cihazda BİR KEZ (sahip kararı, web `evaluateHistoryBanner` ile aynı): eksik geçmiş varsa (motor
+ * `historyPrompt`), getirmenin bir yolu (yedek kurulu ya da aktarım açık) ve şifreli bir DM varsa gösterilir;
+ * gösterildiği an "soruldu" yazılır, cevap ne olursa olsun tekrar çıkmaz. DM listesi sonradan gelirse yeniden denenir.
+ */
+export async function evaluateHistoryBanner(): Promise<void> {
+  const e = useE2eeStore.getState().engine;
+  if (!e || historyEvaluated) return;
+  if (e.backup && get().state === null) return; // yedek durumu henüz okunmadı
+  const hasEncryptedDm = useDmStore
+    .getState()
+    .channels.some((c) => c.type === 'DM' && c.lastMessage?.encrypted);
+  if (!hasEncryptedDm) return;
+  historyEvaluated = true;
+  if (!get().state?.configured && !e.transfer) return;
+  try {
+    if ((await e.historyPrompt()) !== 'missing') return;
+    await e.markHistoryAsked();
+    set({ historyBanner: true });
+  } catch (err) {
+    console.error('[E2EE] geçmiş bandı değerlendirilemedi', err instanceof Error ? err.name : typeof err);
+  }
+}
 
-export const dismissBackupBanner = () => set({ bannerDismissed: true });
+export const dismissHistoryBanner = () => set({ historyBanner: false });
 
 export async function setupBackup(password: string): Promise<BackupOutcome> {
   try {
@@ -129,18 +152,34 @@ export async function setupBackup(password: string): Promise<BackupOutcome> {
   }
 }
 
-/** Anahtarı açar, erişilebilir 1-1 DM'lere geri yükler, açık sohbeti yeniden yükletir. */
+/**
+ * Anahtarı bu cihazda açar (yeni mesajlar yedeklenir). `restoreHistory` (Rev.3: ayrı seçim) ise eski görüntüler
+ * erişilebilir 1-1 DM'lere birleştirilir ve açık sohbet yeniden yüklenir.
+ */
 export async function unlockAndRestore(
   password: string,
+  restoreHistory = true,
 ): Promise<BackupOutcome & { restored?: number; badSnapshots?: number }> {
   try {
-    const backup = backupEngine()!;
-    await backup.unlockBackup(password);
+    await backupEngine()!.unlockBackup(password);
+    if (!restoreHistory) {
+      await refreshBackup();
+      return { ok: true };
+    }
+    return await restoreOnly();
+  } catch (e) {
+    return toOutcome(e);
+  }
+}
+
+/** Yedek bu cihazda zaten açıksa şifresiz geri yükleme (bant ve ayarlar "Yedekten geri yükle"). */
+export async function restoreOnly(): Promise<BackupOutcome & { restored?: number; badSnapshots?: number }> {
+  try {
     const ids = useDmStore
       .getState()
       .channels.filter((c) => c.type === 'DM')
       .map((c) => c.id);
-    const res = await backup.restoreBackup(ids);
+    const res = await backupEngine()!.restoreBackup(ids);
     await refreshBackup();
     set((s) => ({ restoreTick: s.restoreTick + 1 }));
     useE2eeStore.setState((s) => ({ plainTick: s.plainTick + 1 }));

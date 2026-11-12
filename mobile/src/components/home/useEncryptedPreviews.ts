@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
+import { isBeforeDevice } from '@kankaverse/e2ee-client';
 import { prefetchDmPreview, useE2eeStore } from '@/stores/e2ee';
 import type { DmChannelDto } from '@/api/dm';
 
@@ -33,7 +34,8 @@ export function useEncryptedPreviews(channels: DmChannelDto[]): Record<string, s
   useEffect(() => {
     if (!engine) return;
     const pending = channels.filter(
-      (c) => c.lastMessage?.encrypted && c.lastMessage.id && !byMessageId[c.lastMessage.id],
+      // `in`: '' (cihaz öncesi, gizli) de sonuçlanmış sayılır, yeniden denenmez.
+      (c) => c.lastMessage?.encrypted && c.lastMessage.id && !(c.lastMessage.id in byMessageId),
     );
     if (pending.length === 0) return;
     let cancelled = false;
@@ -51,8 +53,14 @@ export function useEncryptedPreviews(channels: DmChannelDto[]): Record<string, s
       // bu efekt yeniden koşar ve metni depodan okur.
       const toFetch = missing.filter((c) => !prefetched.current.has(c.lastMessage!.id)).slice(0, PREFETCH_LIMIT);
       for (const c of toFetch) {
-        prefetched.current.add(c.lastMessage!.id);
-        await prefetchDmPreview(c.id).catch(() => undefined);
+        const lastId = c.lastMessage!.id;
+        prefetched.current.add(lastId);
+        const out = (await prefetchDmPreview(c.id).catch(() => [])) ?? [];
+        // E5b Parça C: son mesaj cihaz öncesiyse önizleme "Şifreli mesaj" demez, boş kalır ('' = gizli).
+        const last = out.find((m) => m.id === lastId);
+        // `cancelled` şartı YOK: bu tur başta setById ile yeniden tetiklenmiş olabilir, işaret yine yazılmalı
+        // (sohbet bir daha denenmez). Kaldırılmış bileşene yazmak React 18'de zararsız.
+        if (last && isBeforeDevice(last)) setById((prev) => ({ ...prev, [lastId]: '' }));
       }
     })();
     return () => {

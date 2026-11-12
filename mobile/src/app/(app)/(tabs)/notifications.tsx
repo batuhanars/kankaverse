@@ -25,7 +25,8 @@ function relativeTime(iso: string): string {
 
 /** Metin satırının altındaki önizleme; davet kodu ve etkinlik adı gösterilmez, tepkide emoji metinde. */
 function previewLine(n: NotificationDto): string | null {
-  if (!n.preview || n.type === 'GUILD_INVITE' || n.type === 'EVENT_CREATED') return null;
+  // E5b: aktarım bildiriminde cihaz adı zaten ana metinde, alt satır tekrar etmez.
+  if (!n.preview || n.type === 'GUILD_INVITE' || n.type === 'EVENT_CREATED' || n.type === 'E2EE_TRANSFER') return null;
   if (n.type !== 'REACTION') return n.preview;
   return n.preview.split(' ').slice(1).join(' ') || null;
 }
@@ -48,6 +49,11 @@ function notificationText(n: NotificationDto): string {
       return t('notification.aiVideoReady');
     case 'AI_VIDEO_FAILED':
       return t('notification.aiVideoFailed');
+    case 'E2EE_TRANSFER':
+      // E5b §4.5 (web NotificationBell ile aynı anahtarlar): preview = yeni cihazın adı.
+      return n.preview
+        ? t('notification.e2eeTransfer', { device: n.preview })
+        : t('notification.e2eeTransferNoDevice');
     case 'EVENT_CREATED':
       // Sprint R14 §3.2 — `preview` = etkinlik adı (web NotificationBell ile AYNI anahtar)
       return t('notification.eventCreated', { actor, event: n.preview ?? '' });

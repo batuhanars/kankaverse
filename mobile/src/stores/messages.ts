@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { reachedDeviceBoundary, visibleMessages } from '@kankaverse/e2ee-client';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { hydratePage, openE2eeChannel, syncE2eeChannel } from '@/stores/e2ee';
 
@@ -9,6 +10,8 @@ import { hydratePage, openE2eeChannel, syncE2eeChannel } from '@/stores/e2ee';
 interface ChannelMessageState {
   messages: MessageDto[];
   hasMore: boolean;
+  /** E5b Parça C: bu sohbette cihaz öncesi (gizlenen) şifreli mesaj var; listenin başında tek satır bilgi. */
+  hiddenBefore?: boolean;
 }
 
 interface MessagesState {
@@ -62,14 +65,18 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     const raw = await messagesApi.list(channelId);
     const fetched = await hydratePage(channelId, raw, olderLoader(channelId));
     void syncE2eeChannel(channelId); // mesajlar çözüldükten SONRA commit senkronu (sıra önemli)
-    const ascending = [...fetched].reverse();
+    // E5b Parça C: cihaz öncesi, yerelde çözümü olmayan şifreli mesaj HİÇ çizilmez (kural e2ee-client'ta).
+    const visible = visibleMessages(fetched);
+    const ascending = [...visible].reverse();
     set((s) => ({
       byChannel: {
         ...s.byChannel,
         [channelId]: {
           // C29: yerel geçici/başarısız mesajlar sunucu listesinde yok; yenilemede kaybolmasın.
           messages: [...ascending, ...(s.byChannel[channelId]?.messages ?? []).filter((m) => m.localStatus)],
-          hasMore: raw.length === 50,
+          // Sayfanın tamamı cihaz öncesiyse daha eskisi istenmez (sonsuz yükleme olmasın).
+          hasMore: raw.length === 50 && !reachedDeviceBoundary(fetched),
+          hiddenBefore: visible.length !== fetched.length,
         },
       },
       knownUsers: learnAuthors(channelId, fetched, s.knownUsers),
@@ -82,13 +89,19 @@ export const useMessagesStore = create<MessagesState>((set, get) => ({
     if (!oldest) return;
     const raw = await messagesApi.list(channelId, oldest.id);
     const fetched = await hydratePage(channelId, raw, olderLoader(channelId));
-    const ascending = [...fetched].reverse();
+    const visible = visibleMessages(fetched);
+    const ascending = [...visible].reverse();
     set((s) => {
-      const existing = s.byChannel[channelId]?.messages ?? [];
+      const prev = s.byChannel[channelId];
+      const existing = prev?.messages ?? [];
       return {
         byChannel: {
           ...s.byChannel,
-          [channelId]: { messages: [...ascending, ...existing], hasMore: raw.length === 50 },
+          [channelId]: {
+            messages: [...ascending, ...existing],
+            hasMore: raw.length === 50 && !reachedDeviceBoundary(fetched),
+            hiddenBefore: !!prev?.hiddenBefore || visible.length !== fetched.length,
+          },
         },
         knownUsers: learnAuthors(channelId, fetched, s.knownUsers),
       };

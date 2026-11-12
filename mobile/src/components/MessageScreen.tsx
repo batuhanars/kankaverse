@@ -5,6 +5,7 @@ import {
   Keyboard,
   Pressable,
   StyleSheet,
+  Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -280,6 +281,8 @@ export function MessageScreen({
   // E1: kilit, uyarı bandı ve "bu noktadan sonra şifreli" ayracı (şifresiz kanalda hiçbiri görünmez).
   const plainMessages = useMemo(() => items.map((it) => it.message), [items]);
   const hasMoreOlder = useMessagesStore((s) => s.byChannel[channelId]?.hasMore ?? false);
+  // E5b Parça C: cihaz öncesi mesajlar gizlendiyse (daha eskisi yokken) listenin başında tek satır bilgi.
+  const hiddenBefore = useMessagesStore((s) => s.byChannel[channelId]?.hiddenBefore ?? false);
   const e2eeView = useE2eeChannelView(channelId, plainMessages, hasMoreOlder);
   useBackupInChannel(e2eeView.encrypted, fetchMessages); // E5a: kurulum sorusu + geri yükleme sonrası yenileme
   // M6b §8.4 — sesli mesaj otomatik geçişi için kronolojik (eski → yeni) CLEAN ses eki sırası.
@@ -416,7 +419,9 @@ export function MessageScreen({
 
       {loadState === 'loading' && <MessageLoading />}
       {loadState === 'error' && <MessageError message={errorMessage} onRetry={retryLoad} />}
-      {loadState === 'ready' && items.length === 0 && <MessageEmpty />}
+      {loadState === 'ready' && items.length === 0 && (
+        <MessageEmpty message={hiddenBefore ? t('e2ee.backup.history.hiddenNote') : undefined} />
+      )}
 
       {loadState === 'ready' && items.length > 0 && (
         // Liste kabı: "en alta in" düğmesi listenin sağ altına (mesaj kutusunun üstüne) oturur.
@@ -441,7 +446,11 @@ export function MessageScreen({
           // Inverted listede başlık görsel olarak EN ALTTA durur: henüz şifreli mesaj yokken ayraç sonda.
           ListHeaderComponent={e2eeView.dividerAtEnd ? <E2eeDivider /> : null}
           ListFooterComponent={
-            list.loadingOlder ? <ActivityIndicator color={theme.colors.textMuted} style={styles.loadMore} /> : null
+            list.loadingOlder ? (
+              <ActivityIndicator color={theme.colors.textMuted} style={styles.loadMore} />
+            ) : !hasMoreOlder && hiddenBefore ? (
+              <Text style={styles.hiddenNote}>{t('e2ee.backup.history.hiddenNote')}</Text>
+            ) : null
           }
           renderItem={({ item }) => (
             // 🔴 C11 — bu sarmalayıcı `View` ŞART, `<>` fragment DEĞİL. `inverted` listede RN
@@ -580,6 +589,13 @@ export function MessageScreen({
 }
 
 const styles = StyleSheet.create({
+  hiddenNote: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.sm,
+    textAlign: 'center',
+    paddingHorizontal: theme.layout.panelGap,
+    paddingVertical: 10,
+  },
   flex: {
     flex: 1,
     backgroundColor: theme.colors.bgContent,

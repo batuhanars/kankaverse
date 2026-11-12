@@ -8,6 +8,8 @@ import { useShareIntentStore } from '@/stores/shareIntent';
 import { useDmStore } from '@/stores/dm';
 import { initE2ee } from '@/stores/e2ee';
 import { backupOnBackground, startBackup, stopBackup } from '@/stores/e2eeBackup';
+import { TransferIncomingSheet, TransferNewSheet } from '@/components/transfer/TransferSheets';
+import { checkPendingTransfer, closeNewTransfer, closeOldTransfer } from '@/stores/e2eeTransfer';
 import { useFriendsStore } from '@/stores/friends';
 import { useUnreadStore } from '@/stores/unread';
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs';
@@ -55,7 +57,10 @@ export default function AppLayout() {
     useDmStore.getState().setSessionUser(userId);
     // E1: bayrak açıksa cihaz kaydı + KeyPackage + bekleyen Welcome (arka planda; arayüzü bekletmez).
     // E5a §4.3: yedek zamanlayıcısı YALNIZ ön plan oturumunda başlar (bildirim görevinde değil, MIUI kuralı).
-    void initE2ee(userId).then(() => startBackup());
+    // E5b: uygulama kapalıyken açılan aktarım isteği (soket olayı kaçtı) açılışta sorulur.
+    void initE2ee(userId)
+      .then(() => startBackup())
+      .then(() => checkPendingTransfer());
     // Kanka isteklerini oturum başında BİR KEZ çek — sidebar'daki "kanka isteği" satırı (sahip
     // bulgusu 2026-07-30) aksi halde "Kanka Ekle" ekranına girilmeden 0 kalırdı. Sonraki
     // güncellemeler `friend.*` WS olaylarından geliyor, tekrar çekim gerekmiyor.
@@ -92,12 +97,15 @@ export default function AppLayout() {
         return;
       }
       if (!isPushTokenRegistered()) void syncPushToken();
+      void checkPendingTransfer(); // E5b: arka plandayken soket kopmuş olabilir
       void restoreActiveAiVideo();
       void useAppUpdateStore.getState().check();
     });
     return () => {
       sub.remove();
       stopBackup();
+      closeNewTransfer();
+      closeOldTransfer();
       useDmStore.getState().setSessionUser(null);
       useFriendsStore.getState().reset();
       useUnreadStore.getState().reset();
@@ -135,6 +143,9 @@ export default function AppLayout() {
     </Stack>
     <AiVideoViewerHost />
     <ReportSheet />
+    {/* E5b: yeni cihaz "eski cihazımdan aktar" + eski cihazda gelen istek (global) */}
+    <TransferNewSheet />
+    <TransferIncomingSheet />
     <AppToast />
     </>
   );

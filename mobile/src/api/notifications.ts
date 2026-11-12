@@ -19,6 +19,7 @@ export const NotificationType = {
   // C49 — yapay zeka video arka planda bitti / üretilemedi (`preview` = istem, `aiVideoId` dolu)
   AI_VIDEO_READY: 'AI_VIDEO_READY',
   AI_VIDEO_FAILED: 'AI_VIDEO_FAILED',
+  E2EE_TRANSFER: 'E2EE_TRANSFER', // E5b: şifreli geçmiş yeni cihaza aktarıldı (güvenlik bildirimi)
 } as const;
 // eslint-disable-next-line @typescript-eslint/no-redeclare -- enum-like const+type deseni, bkz. api/channels.ts
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];

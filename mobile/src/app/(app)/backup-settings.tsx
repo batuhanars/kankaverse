@@ -5,9 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   backupNow,
   refreshBackup,
+  restoreOnly,
   selectIsStale,
   useE2eeBackupStore,
 } from '@/stores/e2eeBackup';
+import { useE2eeStore } from '@/stores/e2ee';
+import { startNewTransfer } from '@/stores/e2eeTransfer';
 import { useToastStore } from '@/stores/toast';
 import { formatDateTime } from '@/utils/formatDateTime';
 import { t } from '@/i18n';
@@ -25,6 +28,22 @@ export default function BackupSettingsScreen() {
   const info = useE2eeBackupStore((s) => s.state);
   const stale = useE2eeBackupStore(selectIsStale);
   const [nowLoading, setNowLoading] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const transferAvailable = useE2eeStore((s) => !!s.engine?.transfer);
+
+  /** Rev.3 sessiz kapı: yedek bu cihazda açıkken geçmişi şifresiz geri yükle. */
+  async function onRestore() {
+    setRestoring(true);
+    const r = await restoreOnly();
+    setRestoring(false);
+    const toast = useToastStore.getState().show;
+    if (!r.ok) {
+      toast(r.message ?? t('common.error'));
+      return;
+    }
+    const n = r.restored ?? 0;
+    toast(t(`e2ee.backup.restore.${r.badSnapshots ? 'partial' : n > 0 ? 'done' : 'none'}`, { n }));
+  }
 
   useEffect(() => {
     void refreshBackup();
@@ -68,6 +87,12 @@ export default function BackupSettingsScreen() {
         <View style={styles.group}>
           {status === 'none' ? <Row label={t('e2ee.backup.actions.setup')} onPress={() => open('setup')} /> : null}
           {status === 'locked' ? <Row label={t('e2ee.backup.actions.unlock')} onPress={() => open('unlock')} /> : null}
+          {status === 'unlocked' ? (
+            <Row label={t('e2ee.backup.history.fromBackup')} onPress={onRestore} loading={restoring} />
+          ) : null}
+          {transferAvailable ? (
+            <Row label={t('e2ee.backup.history.fromDevice')} onPress={() => void startNewTransfer()} />
+          ) : null}
           {status === 'unlocked' ? (
             <Row label={t('e2ee.backup.actions.now')} onPress={onBackupNow} loading={nowLoading} />
           ) : null}

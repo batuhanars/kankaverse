@@ -33,7 +33,7 @@ const MODES: Mode[] = ['setup', 'change', 'reset', 'unlock', 'disable'];
  */
 export default function BackupPasswordScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ mode?: string; prompt?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; prompt?: string; history?: string }>();
   const mode: Mode = MODES.includes(params.mode as Mode) ? (params.mode as Mode) : 'setup';
   const isPrompt = params.prompt === '1';
 
@@ -44,6 +44,8 @@ export default function BackupPasswordScreen() {
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [acked, setAcked] = useState(false);
+  // E5a Rev.3: yedeği açmak ile geçmişi geri yüklemek ayrı seçim (banttan gelince açık, ayarlardan kapalı).
+  const [restoreHistory, setRestoreHistory] = useState(params.history === '1');
   const [reauth, setReauth] = useState<ReauthValue>({ currentPassword: '' });
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -68,7 +70,7 @@ export default function BackupPasswordScreen() {
     if (mode === 'setup') return setupBackup(password);
     if (mode === 'change') return changeBackupPassword(oldPassword, password);
     if (mode === 'reset') return resetBackup(password, reauth);
-    if (mode === 'unlock') return unlockAndRestore(password);
+    if (mode === 'unlock') return unlockAndRestore(password, restoreHistory);
     return disableBackup(reauth);
   }
 
@@ -89,7 +91,11 @@ export default function BackupPasswordScreen() {
     setReauth({ currentPassword: '' });
     const n = r.restored ?? 0;
     const doneKey =
-      mode === 'unlock' ? `restore.${r.badSnapshots ? 'partial' : n > 0 ? 'done' : 'none'}` : `${mode}.done`;
+      mode === 'unlock'
+        ? restoreHistory
+          ? `restore.${r.badSnapshots ? 'partial' : n > 0 ? 'done' : 'none'}`
+          : 'unlock.done'
+        : `${mode}.done`;
     useToastStore.getState().show(t(`e2ee.backup.${doneKey}`, { n }));
     router.back();
   }
@@ -145,6 +151,18 @@ export default function BackupPasswordScreen() {
           disabled={submitting}
           hint={mismatch ? t('e2ee.backup.rules.mismatch') : ''}
         />
+      ) : null}
+
+      {mode === 'unlock' ? (
+        <View style={styles.ackRow}>
+          <Switch
+            value={restoreHistory}
+            onValueChange={setRestoreHistory}
+            disabled={submitting}
+            trackColor={{ true: theme.colors.accent500, false: theme.colors.borderStrong }}
+          />
+          <Text style={styles.ackText}>{t('e2ee.backup.history.restoreToo')}</Text>
+        </View>
       ) : null}
 
       {needsAck ? (
