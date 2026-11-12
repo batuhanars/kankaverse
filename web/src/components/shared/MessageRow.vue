@@ -34,7 +34,7 @@ import type { MessageDto } from '@/types'
 // MessageActionsMenu instance ref — menuOpen'ı okumak için
 const actionsMenuRef = ref<InstanceType<typeof MessageActionsMenu> | null>(null)
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   message: MessageDto
   isMine: boolean
   isGroupStart: boolean
@@ -53,9 +53,10 @@ const props = defineProps<{
   receipt?: 'sent' | 'seen' | null
   // Faz 3: MANAGE_MESSAGES — başkasının mesajını silebilir mi?
   canManageMessages?: boolean
-  // C57: false → Yanıtla gizlenir (salt okunur kanal). Verilmezse true.
+  // C57: false → Yanıtla gizlenir (salt okunur kanal). Verilmezse true: Vue `boolean` prop'u verilmeyince
+  // `false`a çevirir, bu yüzden varsayılan açıkça yazılır (DM bu prop'u geçmiyor, Yanıtla gizleniyordu).
   canReply?: boolean
-}>()
+}>(), { canReply: true })
 
 const emit = defineEmits<{
   reply: [message: MessageDto]
