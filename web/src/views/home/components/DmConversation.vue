@@ -363,6 +363,8 @@ const messages = computed(() => messagesStore.messagesForChannel(props.channel.i
 // M6b §8.4: sesli mesaj sırası (biten ses → sıradaki)
 useAudioQueue(() => props.channel.id, messages)
 const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channel.id] ?? false)
+// E5b Parça C: cihaz öncesi mesajlar gizlendiyse (daha eskisi yokken) listenin başında tek satır.
+const hiddenBefore = computed(() => messagesStore.hiddenBeforeDevice[props.channel.id] ?? false)
 const e2eeView = useE2eeChannelView(() => props.channel.id, messages, hasMore)
 
 // E5a §4.4-1: şifreli DM açıldığında (bu cihazda ilk kez) yedek kurulum sorusu; tek seferlik bayrak store'da.
@@ -1012,7 +1014,15 @@ const dayLabels = computed<(string | null)[]>(() =>
           </button>
         </div>
         <p
-          v-if="!messages.length"
+          v-if="!hasMore && hiddenBefore"
+          class="text-center text-[13px] px-4"
+          :class="messages.length ? 'py-2' : 'py-8'"
+          style="color: var(--kv-text-muted);"
+        >
+          {{ t('e2ee.backup.history.hiddenNote') }}
+        </p>
+        <p
+          v-else-if="!messages.length"
           class="text-center text-[14px] py-8"
           style="color: var(--kv-text-muted);"
         >

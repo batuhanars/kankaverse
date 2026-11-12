@@ -75,7 +75,7 @@ describe('useEncryptedPreviews', () => {
     const prefetch = vi.spyOn(store, 'prefetchPreview').mockImplementation(() => {
       stored = 'kapaliyken gelen'
       store.plainTick++
-      return Promise.resolve()
+      return Promise.resolve([])
     })
     const scope = effectScope()
     const { previews } = scope.run(() =>
@@ -90,6 +90,24 @@ describe('useEncryptedPreviews', () => {
     store.plainTick++
     await nextTick()
     expect(prefetch).toHaveBeenCalledTimes(1)
+    scope.stop()
+  })
+
+  it('E5b Parça C: son mesaj cihaz öncesiyse önizleme boş işaretlenir ("Şifreli mesaj" yazılmaz)', async () => {
+    const store = useE2eeStore()
+    vi.spyOn(store, 'plainText').mockResolvedValue(null)
+    store.engine = {} as never
+    vi.spyOn(store, 'prefetchPreview').mockResolvedValue([
+      { id: 'm1', encrypted: true, e2eeStatus: 'undecryptable' } as never,
+    ])
+    const scope = effectScope()
+    const { previews } = scope.run(() =>
+      useEncryptedPreviews(
+        () => [ch('a', { id: 'm1', encrypted: true })],
+        () => null,
+      ),
+    )!
+    await vi.waitFor(() => expect(previews.value.m1).toBe(''))
     scope.stop()
   })
 })

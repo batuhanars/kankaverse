@@ -34,11 +34,15 @@ import FriendAddModal from '@/views/home/components/FriendAddModal.vue'
 import IncomingCallModal from '@/components/shared/IncomingCallModal.vue'
 import UserSettingsView from '@/views/settings/UserSettingsView.vue'
 import BackupSetupPrompt from '@/components/shared/BackupSetupPrompt.vue'
+import TransferIncomingModal from '@/components/shared/TransferIncomingModal.vue'
+import TransferNewModal from '@/components/shared/TransferNewModal.vue'
+import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const e2eeStore = useE2eeStore()
+const transferStore = useE2eeTransferStore()
 const guildsStore = useGuildsStore()
 const channelsStore = useChannelsStore()
 const dmStore = useDmStore()
@@ -230,6 +234,9 @@ onUnmounted(() => {
     <IncomingCallModal />
     <!-- E5a §4.4-1: şifreli DM ilk açıldığında bir kez sorulan yedek kurulumu -->
     <BackupSetupPrompt />
+    <!-- E5b: yeni cihaz "eski cihazımdan aktar" + eski cihazda gelen istek (global) -->
+    <TransferNewModal v-if="transferStore.n.open" />
+    <TransferIncomingModal />
   </div>
 </template>
 

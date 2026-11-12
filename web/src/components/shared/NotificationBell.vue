@@ -89,6 +89,11 @@ function notificationText(n: NotificationDto): string {
       return t('notification.aiVideoReady')
     case 'AI_VIDEO_FAILED':
       return t('notification.aiVideoFailed')
+    case 'E2EE_TRANSFER':
+      // E5b §4.5: preview = yeni cihazın adı. Metnin tamamı burada; alt satır tekrar etmez.
+      return n.preview
+        ? t('notification.e2eeTransfer', { device: n.preview })
+        : t('notification.e2eeTransferNoDevice')
     default:
       return actor
   }
@@ -96,6 +101,7 @@ function notificationText(n: NotificationDto): string {
 
 // Satırın alt metni: REACTION'da önizleme emojiyi taşır (metne gitti), kalanı gösterilir
 function notificationPreview(n: NotificationDto): string {
+  if (n.type === 'E2EE_TRANSFER') return '' // cihaz adı zaten ana metinde
   return n.type === 'REACTION' ? reactionPreviewText(n.preview) : (n.preview ?? '')
 }
 

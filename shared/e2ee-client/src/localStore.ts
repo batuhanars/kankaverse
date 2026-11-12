@@ -42,6 +42,11 @@ export interface Flags {
   backupDirty?: boolean
   /** E5a: yükleme başladı, bitmedi. Süreç yarıda ölürse (MIUI dondurma) bir sonraki açılışta baştan denenir. */
   backupInFlight?: boolean
+  /**
+   * E5b §4.4 (E5a Rev.3): "eski mesajlarını getir" bandı bu cihazda soruldu. Cihaz bölümünde durur: çıkışta ve
+   * oturum zinciri değişince (yeni cihaz) silinir, yeni cihazda bant bir kez daha sorulur.
+   */
+  historyAsked?: boolean
 }
 
 /** Bu cihazda açılmış yedek ana anahtarı (BMK). Vault zaten şifreli; ek sarma yok. */

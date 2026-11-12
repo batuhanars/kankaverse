@@ -7,6 +7,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useE2eeBackupStore, type BackupOutcome } from '@/stores/e2eeBackup'
+import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
 import { useToastStore } from '@/stores/toast'
 import { useBackupUnlock } from '@/composables/useBackupUnlock'
 import { formatDateTime } from '@/utils/formatDateTime'
@@ -22,6 +23,21 @@ const auth = useAuthStore()
 const backup = useE2eeBackupStore()
 const toast = useToastStore()
 const unlock = useBackupUnlock()
+const transfer = useE2eeTransferStore()
+
+/** Rev.3 sessiz kapı: yedek bu cihazda açıkken geçmişi şifresiz geri yükle. */
+const restoring = ref(false)
+async function restoreHistory() {
+  restoring.value = true
+  const r = await backup.restoreOnly()
+  restoring.value = false
+  if (!r.ok) {
+    toast.error(outcomeMessage(r, t))
+    return
+  }
+  const n = r.restored ?? 0
+  toast.success(t(`e2ee.backup.restore.${r.badSnapshots ? 'partial' : n > 0 ? 'done' : 'none'}`, { n }))
+}
 
 type Dialog = 'setup' | 'change' | 'reset' | 'reset-reauth' | 'disable' | 'disable-reauth' | null
 const dialog = ref<Dialog>(null)
@@ -117,7 +133,9 @@ async function backupNow() {
 
       <div class="flex flex-wrap gap-2 px-5 py-4">
         <KvButton v-if="statusKey === 'none'" size="sm" @click="dialog = 'setup'">{{ t('e2ee.backup.actions.setup') }}</KvButton>
-        <KvButton v-if="statusKey === 'locked'" size="sm" @click="unlock.open.value = true">{{ t('e2ee.backup.actions.unlock') }}</KvButton>
+        <KvButton v-if="statusKey === 'locked'" size="sm" @click="unlock.show(false)">{{ t('e2ee.backup.actions.unlock') }}</KvButton>
+        <KvButton v-if="statusKey === 'unlocked'" size="sm" variant="ghost" :loading="restoring" @click="restoreHistory">{{ t('e2ee.backup.history.fromBackup') }}</KvButton>
+        <KvButton v-if="transfer.available" size="sm" variant="ghost" @click="transfer.startNew()">{{ t('e2ee.backup.history.fromDevice') }}</KvButton>
         <KvButton v-if="statusKey === 'unlocked'" size="sm" variant="ghost" :loading="nowLoading" @click="backupNow">{{ t('e2ee.backup.actions.now') }}</KvButton>
         <KvButton v-if="statusKey === 'unlocked'" size="sm" variant="ghost" @click="dialog = 'change'">{{ t('e2ee.backup.actions.change') }}</KvButton>
         <KvButton v-if="statusKey !== 'none'" size="sm" variant="ghost" @click="dialog = 'reset'">{{ t('e2ee.backup.actions.reset') }}</KvButton>
@@ -184,6 +202,7 @@ async function backupNow() {
     v-if="unlock.open.value"
     :loading="unlock.loading.value"
     :error="unlock.error.value"
+    :restore-default="unlock.restoreDefault.value"
     @submit="unlock.submit"
     @cancel="unlock.close"
   />

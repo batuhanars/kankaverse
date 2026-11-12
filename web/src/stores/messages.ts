@@ -1,12 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { messagesApi } from '@/api/messages'
+import { reachedDeviceBoundary, visibleMessages } from '@kankaverse/e2ee-client'
 import { useE2eeStore } from '@/stores/e2ee'
 import type { MessageDto } from '@/types'
 
 export const useMessagesStore = defineStore('messages', () => {
   const messagesByChannel = ref<Record<string, MessageDto[]>>({})
   const hasMoreByChannel = ref<Record<string, boolean>>({})
+  /** E5b Parça C: bu sohbette cihaz öncesi (gizlenen) şifreli mesaj var; listenin başında tek satır bilgi. */
+  const hiddenBeforeDevice = ref<Record<string, boolean>>({})
 
   const messagesForChannel = (channelId: string) => messagesByChannel.value[channelId] ?? []
 
@@ -18,7 +21,10 @@ export const useMessagesStore = defineStore('messages', () => {
       res.data, // desc sırada gelir, UI için ters çevir
       async (olderThan) => (await messagesApi.list(channelId, olderThan)).data,
     )
-    const reversed = [...fetched].reverse()
+    // E5b Parça C: cihaz öncesi, yerelde çözümü olmayan şifreli mesaj HİÇ çizilmez (kural e2ee-client'ta).
+    const visible = visibleMessages(fetched)
+    if (visible.length !== fetched.length) hiddenBeforeDevice.value[channelId] = true
+    const reversed = [...visible].reverse()
 
     if (!before) {
       // C29: yerel geçici/başarısız mesajlar sunucu listesinde yok; yenilemede kaybolmasın.
@@ -31,7 +37,8 @@ export const useMessagesStore = defineStore('messages', () => {
         ...(messagesByChannel.value[channelId] ?? []),
       ]
     }
-    hasMoreByChannel.value[channelId] = res.data.length === 50
+    // Sayfanın tamamı cihaz öncesiyse daha eskisi istenmez (sonsuz "daha fazla yükle" olmasın).
+    hasMoreByChannel.value[channelId] = res.data.length === 50 && !reachedDeviceBoundary(fetched)
   }
 
   function appendMessage(message: MessageDto) {
@@ -147,6 +154,7 @@ export const useMessagesStore = defineStore('messages', () => {
   return {
     messagesByChannel,
     hasMoreByChannel,
+    hiddenBeforeDevice,
     messagesForChannel,
     fetchMessages,
     appendMessage,

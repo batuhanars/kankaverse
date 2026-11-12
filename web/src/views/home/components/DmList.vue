@@ -144,10 +144,12 @@ function formatLastMessage(ch: DmChannelDto, content: string): string {
   return truncate(formatMentionsPlain(content, lastMsgResolver(ch), t('mention.unknown')))
 }
 
-// Şifreli son mesaj: depoda düz metin varsa o, yoksa sabit "Şifreli mesaj" (E3 §4.1)
+// Şifreli son mesaj: depoda düz metin varsa o, yoksa sabit "Şifreli mesaj" (E3 §4.1).
+// E5b Parça C: '' = cihaz öncesi mesaj, önizleme boş kalır ("Şifreli mesaj" da yazılmaz).
 function previewText(ch: DmChannelDto, last: { id: string; content: string; encrypted?: boolean }): string {
   if (!last.encrypted) return formatLastMessage(ch, last.content)
   const plain = previews.value[last.id]
+  if (plain === '') return ''
   return plain ? formatLastMessage(ch, plain) : t('e2ee.preview')
 }
 

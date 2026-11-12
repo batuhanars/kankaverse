@@ -575,6 +575,7 @@ export const NotificationType = {
   // Sprint C49 — yapay zeka video bitti / üretilemedi
   AI_VIDEO_READY: 'AI_VIDEO_READY',
   AI_VIDEO_FAILED: 'AI_VIDEO_FAILED',
+  E2EE_TRANSFER: 'E2EE_TRANSFER', // E5b: şifreli geçmiş yeni cihaza aktarıldı (güvenlik bildirimi)
 } as const
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType]
 

@@ -147,6 +147,25 @@ export function transferSuite(label: string) {
       expect(tr(N).hasSession(second.id)).toBe(true)
     })
 
+    it('geçmiş bandı: boş depo ya da cihaz öncesi kayıt "missing"; tam geçmiş "none" ve bir daha bakılmaz; işaret kalıcı', async () => {
+      const empty = await login('A')
+      expect(await empty.engine.historyPrompt()).toBe('missing')
+      await empty.engine.markHistoryAsked()
+      expect(await empty.engine.historyPrompt()).toBe('asked')
+
+      const partial = await login('A')
+      await putRec(partial, rec('m1', 'ok', 'x'))
+      await putRec(partial, rec('m2', 'undecryptable', ''))
+      expect(await partial.engine.historyPrompt()).toBe('missing')
+
+      const full = await login('A')
+      await putRec(full, rec('m1', 'ok', 'x'))
+      await putRec(full, rec('m3', 'failed', '')) // katılım sonrası çözülemeyen: eksik geçmiş sayılmaz
+      expect(await full.engine.historyPrompt()).toBe('none')
+      await putRec(full, rec('m2', 'undecryptable', ''))
+      expect(await full.engine.historyPrompt()).toBe('asked') // "none" işaretledi, bir daha taranmaz
+    })
+
     it('bayrak kapalıyken motorda aktarım yok', async () => {
       server.transfer.enabled = false
       const p = await login('A')

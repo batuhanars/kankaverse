@@ -38,7 +38,9 @@ export const useE2eeBackupStore = defineStore('e2eeBackup', () => {
   /** Geri yükleme sonrası artar; açık sohbet mesajlarını yeniden yükler. */
   const restoreTick = ref(0)
   const setupPromptOpen = ref(false)
-  const bannerDismissed = ref(false)
+  /** E5b §4.4 (E5a Rev.3): "eski mesajlarını getir" bandı; bu cihazda bir kez (bayrak motorun cihaz deposunda). */
+  const historyBanner = ref(false)
+  let historyEvaluated = false
   const engine = shallowRef<E2eeEngine | null>(null)
   let scheduler: BackupScheduler | null = null
   let onVisibility: (() => void) | null = null
@@ -94,7 +96,8 @@ export const useE2eeBackupStore = defineStore('e2eeBackup', () => {
     state.value = null
     lastRun.value = null
     setupPromptOpen.value = false
-    bannerDismissed.value = false
+    historyBanner.value = false
+    historyEvaluated = false
   }
 
   /** Şifreli DM ilk açıldığında çağrılır: yedek açık + kurulu değil + bu cihazda hiç sorulmadıysa BİR KEZ sorar. */
@@ -111,9 +114,32 @@ export const useE2eeBackupStore = defineStore('e2eeBackup', () => {
     setupPromptOpen.value = true
   }
 
-  /** Yedek kurulu, bu cihazda kilitli ve bant bu oturumda kapatılmadıysa. */
-  const showBanner = () =>
-    !!state.value?.configured && !state.value.unlockedHere && !bannerDismissed.value
+  /**
+   * Bant bu cihazda BİR KEZ (sahip kararı): eksik geçmiş varsa (motor `historyPrompt`) ve getirmenin bir yolu
+   * (yedek kurulu ya da aktarım açık) ve şifreli bir DM varsa gösterilir; gösterildiği an "soruldu" yazılır,
+   * cevap ne olursa olsun tekrar çıkmaz (key-dropped dahil). DM listesi sonradan gelirse yeniden değerlendirilir.
+   */
+  async function evaluateHistoryBanner(): Promise<void> {
+    const e = engine.value
+    if (!e || historyEvaluated) return
+    if (e.backup && state.value === null) return // yedek durumu henüz okunmadı
+    const hasEncryptedDm = useDmStore().channels.some(
+      (c) => c.type === 'DM' && c.lastMessage?.encrypted,
+    )
+    if (!hasEncryptedDm) return
+    historyEvaluated = true
+    if (!state.value?.configured && !e.transfer) return
+    try {
+      if ((await e.historyPrompt()) !== 'missing') return
+      await e.markHistoryAsked()
+      historyBanner.value = true
+    } catch (err) {
+      console.error(
+        '[e2ee] geçmiş bandı değerlendirilemedi',
+        err instanceof Error ? err.name : typeof err,
+      )
+    }
+  }
 
   async function setup(password: string): Promise<BackupOutcome> {
     try {
@@ -126,17 +152,35 @@ export const useE2eeBackupStore = defineStore('e2eeBackup', () => {
     }
   }
 
-  /** Anahtarı açar, erişilebilir 1-1 DM'lere geri yükler, açık sohbeti yeniden yükletir. */
+  /**
+   * Anahtarı bu cihazda açar (yeni mesajlar yedeklenir). `restoreHistory` (Rev.3: ayrı seçim) ise eski görüntüler
+   * erişilebilir 1-1 DM'lere birleştirilir ve açık sohbet yeniden yüklenir.
+   */
   async function unlockAndRestore(
     password: string,
+    restoreHistory = true,
   ): Promise<BackupOutcome & { restored?: number; badSnapshots?: number }> {
     try {
-      const backup = engine.value!.backup!
-      await backup.unlockBackup(password)
+      await engine.value!.backup!.unlockBackup(password)
+      if (!restoreHistory) {
+        await refresh()
+        return { ok: true }
+      }
+      return await restoreOnly()
+    } catch (e) {
+      return toOutcome(e)
+    }
+  }
+
+  /** Yedek bu cihazda zaten açıksa şifresiz geri yükleme (bant "Yedekten geri yükle"). */
+  async function restoreOnly(): Promise<
+    BackupOutcome & { restored?: number; badSnapshots?: number }
+  > {
+    try {
       const ids = useDmStore()
         .channels.filter((c) => c.type === 'DM')
         .map((c) => c.id)
-      const res = await backup.restoreBackup(ids)
+      const res = await engine.value!.backup!.restoreBackup(ids)
       await refresh()
       restoreTick.value++
       useE2eeStore().plainTick++
@@ -198,14 +242,15 @@ export const useE2eeBackupStore = defineStore('e2eeBackup', () => {
     state,
     restoreTick,
     setupPromptOpen,
-    bannerDismissed,
+    historyBanner,
+    evaluateHistoryBanner,
     start,
     stop,
     refresh,
     maybePromptSetup,
-    showBanner,
     setup,
     unlockAndRestore,
+    restoreOnly,
     change,
     reset,
     disable,

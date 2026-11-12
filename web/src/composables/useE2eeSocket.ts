@@ -1,5 +1,6 @@
 import type { Socket } from 'socket.io-client'
 import { useE2eeStore } from '@/stores/e2ee'
+import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
 
 /**
  * E1 §2.7 — şifreleme soket olayları. Hepsi motorun sıralı kuyruğundan geçer; olay sırası korunur
@@ -23,4 +24,14 @@ export function bindE2eeSocket(socket: Socket): void {
   }
   socket.on('e2ee:commit', sync)
   socket.on('e2ee:devices-changed', sync)
+
+  // E5b aktarım: olaylar yalnız kimlik taşır, malzeme HTTP ile çekilir. Kaçan olayı yoklama yakalar.
+  const transfer = useE2eeTransferStore()
+  socket.on('e2ee:transfer-requested', () => void transfer.checkPending())
+  socket.on('e2ee:transfer-accepted', ({ id }: { id: string }) => void transfer.onAccepted(id))
+  socket.on('e2ee:transfer-revealed', ({ id }: { id: string }) => void transfer.onRevealed(id))
+  socket.on('e2ee:transfer-ready', ({ id }: { id: string }) => void transfer.onReady(id))
+  socket.on('e2ee:transfer-closed', ({ id, status }: { id: string; status: string }) =>
+    transfer.onClosed(id, status),
+  )
 }

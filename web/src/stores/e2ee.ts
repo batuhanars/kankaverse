@@ -4,6 +4,7 @@ import { e2eeApi } from '@/api/e2ee'
 import { messagesApi } from '@/api/messages'
 import { useDmStore } from '@/stores/dm'
 import { useE2eeBackupStore } from '@/stores/e2eeBackup'
+import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
 import type {
   ChannelInfo,
   E2eeEngine,
@@ -49,6 +50,8 @@ export const useE2eeStore = defineStore('e2ee', () => {
         await engine.value?.onWelcome()
         // E5a §4.3: yedek bayrağı açıksa zamanlayıcı başlar (bayrak yoksa `start` hiçbir şey yapmaz).
         if (engine.value) void useE2eeBackupStore().start(engine.value)
+        // E5b: uygulama kapalıyken açılan aktarım isteği (soket olayı kaçtı) açılışta sorulur.
+        if (engine.value?.transfer) void useE2eeTransferStore().checkPending()
       } catch (e) {
         console.error('[e2ee] başlatılamadı', e)
       }
@@ -180,9 +183,9 @@ export const useE2eeStore = defineStore('e2ee', () => {
    * yazılınca `plainTick` artar ve önizleme depodan okunur. Motor kilidi çözmeleri sıraya koyar.
    * Mesaj listesi ucu okundu işaretlemez.
    */
-  async function prefetchPreview(channelId: string): Promise<void> {
+  async function prefetchPreview(channelId: string): Promise<MessageDto[]> {
     await ready
-    if (!engine.value) return
+    if (!engine.value) return []
     await openChannel(channelId)
     const { data } = await messagesApi.list(channelId)
     const out = await hydrateHistory(
@@ -192,6 +195,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
     )
     void syncChannel(channelId)
     if (out.some((m) => m.e2eeStatus === 'ok')) plainTick.value++
+    return out // E5b Parça C: çağıran son mesajın cihaz öncesi olup olmadığını görür
   }
 
   /** Gönderim öncesi: şifreli yük, ya da `null` (şifresiz DM / E2EE kapalı: çağıran düz gönderir). */

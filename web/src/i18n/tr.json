@@ -1506,6 +1506,44 @@
       "deviceRemoved": "Bu cihaz bu sohbetten çıkarıldı."
     },
     "backup": {
+      "history": {
+        "banner": "Eski mesajlarını bu cihaza getirmek ister misin?",
+        "fromDevice": "Eski cihazımdan aktar",
+        "fromBackup": "Yedekten geri yükle",
+        "no": "Hayır",
+        "restoreToo": "Eski mesajları da geri yükle",
+        "hiddenNote": "Bu cihazdan önceki mesajlar burada görünmez."
+      },
+      "transfer": {
+        "title": "Eski cihazdan aktar",
+        "waiting": "Diğer cihazında Kankaverse uygulamasını aç. Aktarım isteği orada görünecek.",
+        "expiresIn": "İstek {min} dakika içinde geçersiz olur.",
+        "codeLabel": "Doğrulama kodu",
+        "codeNew": "Bu kodu diğer cihazındaki kodla karşılaştır. Aynıysa diğer cihazında onayla.",
+        "receiving": "Mesajlar aktarılıyor",
+        "done": "{n} mesaj aktarıldı.",
+        "expired": "İstek zaman aşımına uğradı. Yeniden başlat.",
+        "cancelled": "Aktarım iptal edildi.",
+        "failed": "Aktarım tamamlanamadı. Yeniden dene.",
+        "tooLarge": "Geçmiş çok büyük, yedekten geri yükle.",
+        "restart": "Yeniden başlat",
+        "close": "Kapat",
+        "incoming": {
+          "title": "Yeni cihaz isteği",
+          "body": "Yeni bir cihaz mesaj geçmişini istiyor: {name}, {time}. Bu sen misin?",
+          "unknownDevice": "bilinmeyen cihaz",
+          "continue": "Devam et",
+          "notMe": "Ben değilim",
+          "waitingCode": "Yeni cihaz kodu hazırlıyor",
+          "codeOld": "Yeni cihazdaki kod bununla aynı mı?",
+          "same": "Kodlar aynı, aktar",
+          "different": "Farklı, iptal et",
+          "sending": "Aktarım bitene kadar uygulamayı kapatma.",
+          "sent": "Geçmiş yeni cihaza gönderildi.",
+          "rejected": "İstek reddedildi. Hesabına başkası girmiş olabilir: şifreni değiştir ve Oturumlar'dan tanımadığın cihazı kapat.",
+          "sessions": "Oturumlar"
+        }
+      },
       "title": "Sohbet yedeği",
       "intro": "Şifreli mesajlarının yedeği yalnız senin belirlediğin yedek şifresiyle açılır. Yeni bir cihazda eski mesajlarını geri yükleyebilirsin.",
       "status": {
@@ -1564,8 +1602,9 @@
       },
       "unlock": {
         "title": "Yedeği bu cihazda aç",
-        "body": "Yedek şifreni gir. Açılınca eski mesajların bu cihaza geri yüklenir.",
-        "submit": "Aç ve geri yükle"
+        "body": "Yedek şifreni gir. Açılınca bu cihazın mesajları da yedeklenir.",
+        "submit": "Yedeği aç",
+        "done": "Yedek bu cihazda açıldı."
       },
       "change": {
         "title": "Yedek şifresini değiştir",
@@ -1660,6 +1699,9 @@
     "aiVideoReady": "Videon hazır",
     "aiVideoFailed": "Videon üretilemedi, kredin düşülmedi",
     "aiVideoTitle": "Yapay zeka video",
+    "e2eeTransfer": "Şifreli mesaj geçmişin yeni bir cihaza aktarıldı: {device}. Bu sen değilsen hemen şifreni değiştir.",
+    "e2eeTransferNoDevice": "Şifreli mesaj geçmişin yeni bir cihaza aktarıldı. Bu sen değilsen hemen şifreni değiştir.",
+    "securityTitle": "Güvenlik",
     "markAllRead": "Tümünü okundu işaretle",
     "loadMore": "Yükleniyor…",
     "now": "az önce",

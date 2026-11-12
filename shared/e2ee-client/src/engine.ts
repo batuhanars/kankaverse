@@ -394,6 +394,30 @@ export class E2eeEngine {
     }
   }
 
+  /**
+   * E5b §4.4: geçmiş bandı. `asked` = bu cihazda zaten soruldu; `missing` = bu cihazda eksik geçmiş var
+   * (hiç kayıt yok ya da cihaz öncesi `undecryptable` kayıt var); `none` = eksik yok (bir daha bakılmasın diye
+   * soruldu işaretlenir). Yalnız depo okur; ilk `undecryptable`te durur.
+   */
+  async historyPrompt(): Promise<'asked' | 'missing' | 'none'> {
+    return this.run(async (ctx) => {
+      if ((await ctx.store.loadFlags()).historyAsked) return 'asked'
+      const ids = await ctx.store.messageIds()
+      if (ids.length === 0) return 'missing'
+      for (const id of ids) {
+        const rec = await ctx.store.loadMessage(id).catch(() => null)
+        if (rec?.status === 'undecryptable') return 'missing'
+      }
+      await ctx.store.patchFlags({ historyAsked: true })
+      return 'none'
+    })
+  }
+
+  /** Bant gösterildi: bu cihazda bir daha sorulmaz (cevap ne olursa olsun, sahip kararı). */
+  markHistoryAsked(): Promise<void> {
+    return this.run((ctx) => ctx.store.patchFlags({ historyAsked: true }))
+  }
+
   /** Yanıt alıntısının düz metni depodan; yoksa null (arayüz "Şifreli mesaj" der). */
   async quoteText(messageId: string): Promise<string | null> {
     const rec = await this.run((ctx) => ctx.store.loadMessage(messageId))

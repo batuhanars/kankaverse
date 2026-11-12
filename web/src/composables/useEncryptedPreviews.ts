@@ -1,4 +1,5 @@
 import { ref, watch } from 'vue'
+import { isBeforeDevice } from '@kankaverse/e2ee-client'
 import { useE2eeStore } from '@/stores/e2ee'
 import type { DmChannelDto } from '@/types'
 
@@ -50,8 +51,12 @@ export function useEncryptedPreviews(channels: () => DmChannelDto[], trigger: ()
       .filter((ch) => !prefetched.has(ch.lastMessage!.id))
       .slice(0, PREFETCH_LIMIT)
     for (const ch of toFetch) {
-      prefetched.add(ch.lastMessage!.id)
-      await e2ee.prefetchPreview(ch.id).catch(() => undefined)
+      const lastId = ch.lastMessage!.id
+      prefetched.add(lastId)
+      const out = (await e2ee.prefetchPreview(ch.id).catch(() => [])) ?? []
+      // E5b Parça C: son mesaj cihaz öncesiyse önizleme "Şifreli mesaj" demez, boş kalır ('' = gizli).
+      const last = out.find((m) => m.id === lastId)
+      if (last && isBeforeDevice(last)) previews.value[lastId] = ''
     }
   }
 

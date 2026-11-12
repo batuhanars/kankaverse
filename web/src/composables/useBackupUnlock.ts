@@ -10,6 +10,8 @@ export function useBackupUnlock() {
   const backup = useE2eeBackupStore()
   const toast = useToastStore()
   const open = ref(false)
+  /** Banttan gelince işaretli, ayarlardan gelince işaretsiz (Rev.3). */
+  const restoreDefault = ref(true)
   const loading = ref(false)
   const error = ref('')
 
@@ -18,20 +20,29 @@ export function useBackupUnlock() {
     error.value = ''
   }
 
-  async function submit(password: string) {
+  function show(withHistory: boolean) {
+    restoreDefault.value = withHistory
+    open.value = true
+  }
+
+  async function submit(password: string, restoreHistory = true) {
     loading.value = true
     error.value = ''
-    const r = await backup.unlockAndRestore(password)
+    const r = await backup.unlockAndRestore(password, restoreHistory)
     loading.value = false
     if (!r.ok) {
       error.value = outcomeMessage(r, t)
       return
     }
     close()
+    if (!restoreHistory) {
+      toast.success(t('e2ee.backup.unlock.done'))
+      return
+    }
     const n = r.restored ?? 0
     const key = r.badSnapshots ? 'partial' : n > 0 ? 'done' : 'none'
     toast.success(t(`e2ee.backup.restore.${key}`, { n }))
   }
 
-  return { open, loading, error, close, submit }
+  return { open, restoreDefault, loading, error, close, show, submit }
 }
