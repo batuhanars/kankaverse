@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * MessageContextMenu: mesaja sağ tık menüsü (Kopyala · Düzenle · Sil). ⋯ menüsünün hızlı yolu;
+ * MessageContextMenu: mesaja sağ tık menüsü (Kopyala · Düzenle · Sil · Şikâyet et). ⋯ menüsünün hızlı yolu;
  * hangi öğenin görüneceğine aynı kurallarla MessageRow karar verir. Tepki yok: hover çubuğunda zaten görünür.
  */
 import { useI18n } from 'vue-i18n'
@@ -13,16 +13,18 @@ defineProps<{
   canCopy: boolean
   canEdit: boolean
   canDelete: boolean
+  canReport: boolean
 }>()
 
-const emit = defineEmits<{ close: []; copy: []; edit: []; delete: [] }>()
+const emit = defineEmits<{ close: []; copy: []; edit: []; delete: []; report: [] }>()
 
 const { t } = useI18n()
 
-function pick(action: 'copy' | 'edit' | 'delete') {
+function pick(action: 'copy' | 'edit' | 'delete' | 'report') {
   // Önce eylem: çağıran seçim bilgisini menü kapanmadan okur.
   if (action === 'copy') emit('copy')
   else if (action === 'edit') emit('edit')
+  else if (action === 'report') emit('report')
   else emit('delete')
   emit('close')
 }
@@ -41,6 +43,10 @@ function pick(action: 'copy' | 'edit' | 'delete') {
     <button v-if="canDelete" class="kv-ctx__item kv-ctx__item--danger" role="menuitem" @click="pick('delete')">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
       <span>{{ t('message.delete') }}</span>
+    </button>
+    <button v-if="canReport" class="kv-ctx__item kv-ctx__item--danger" role="menuitem" @click="pick('report')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+      <span>{{ t('report.reportMessage') }}</span>
     </button>
   </ContextMenuShell>
 </template>

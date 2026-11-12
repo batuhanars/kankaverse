@@ -103,6 +103,8 @@ const showReceipt = computed(() => !!props.receipt && !isLocal.value)
 const canCopy = computed(() => !!props.message.content)
 const canEdit = computed(() => props.isMine && !!props.message.content)
 const canDelete = computed(() => props.isMine || !!props.canManageMessages)
+// Şikâyet ⋯ menüsüyle aynı kural: yalnız başkasının mesajı (sahip bulgusu 2026-11-12: sağ tıkta aranıyordu).
+const canReport = computed(() => !props.isMine)
 const ctxMenu = ref<{ x: number; y: number; selection: string } | null>(null)
 
 /** Satır içinde seçili metin; menüye tıklayınca seçim kaybolabildiği için açılışta okunur. */
@@ -114,7 +116,7 @@ function selectionIn(row: HTMLElement): string {
 
 function onRowContext(e: MouseEvent) {
   // Düzenleme kutusunda ve eylemi olmayan satırda tarayıcının/masaüstünün kendi menüsü kalır.
-  if (props.isEditing || isLocal.value || (!canCopy.value && !canDelete.value)) return
+  if (props.isEditing || isLocal.value || (!canCopy.value && !canDelete.value && !canReport.value)) return
   e.preventDefault()
   // Belgedeki kapatıcılara ulaşmasın: aynı satırda yeniden sağ tık menüyü kapatmak yerine taşır.
   e.stopPropagation()
@@ -238,10 +240,12 @@ const renderedContent = computed<string>(() => {
       :can-copy="canCopy"
       :can-edit="canEdit"
       :can-delete="canDelete"
+      :can-report="canReport"
       @close="ctxMenu = null"
       @copy="copyText(ctxMenu?.selection)"
       @edit="emit('edit', message)"
       @delete="emit('delete', message.id)"
+      @report="emit('report', message.id)"
     />
 
     <!-- Hover araç çubuğu: -top-3 right-4, yalnız düzenleme modunda gizli.
