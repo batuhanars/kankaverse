@@ -1566,7 +1566,7 @@
       },
       "disable": {
         "title": "Yedeği kapat",
-        "warning": "Yedeğin ve sunucudaki tüm kopyaları kalıcı olarak silinir. Mesajların bu cihazda kalır ama yeni bir cihazda geri yüklenemez.",
+        "warning": "Yedek tüm cihazlarından silinir, geri alınamaz. Mesajların bu cihazda kalır ama yeni bir cihazda geri yüklenemez.",
         "submit": "Yedeği kapat",
         "done": "Yedek kapatıldı."
       },

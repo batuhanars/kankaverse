@@ -148,6 +148,17 @@ Tümü i18n (`e2ee.backup.*`), web `{'@'}` kaçışı. Em dash yok. Tarih/saat T
 **Bulgu 2:** istemci KDF parametresinde yalnız taban denetliyordu; kötü niyetli sunucu dev bellek dayatıp uygulamayı çökertebilir.
 - **Üst sınır** `BACKUP_KDF_MAX = { m: 262144 (256 MiB), t: 16, p: 1 }` e2ee-core `assertParams`'ta (aşılırsa `BackupParamsError`); API'nin üst sınırı aynı değere iner (`m ≤ 262144`).
 
+### §4.8 Rev.3 (2026-11-12, sahip kararı): geri yükleme bir kez sorulur, "hayır" kalıcıdır
+**Gerekçe (sahip):** geçmişini yeni cihaza taşımak istemeyen kullanıcı vardır; ona ne kalıcı bant ne de "şifreli mesaj" satırları gösterilir.
+- §4.4-3 bandı **soru** olur: "Eski mesajlarını bu cihaza geri yüklemek ister misin?" · [Geri yükle] [Hayır]. Bugünkü "Kapat" (yalnız oturumluk) kalkar.
+- **Bant bir kez görünür (sahip, aynı gün):** [Geri yükle], [Hayır] ya da hiç dokunmadan geçmek; üçünde de o cihazda bir daha çıkmaz. "Soruldu" kaydı cihaz + kullanıcı başına kalıcı (cihaz deposu; çıkışta silinir), bant göründüğü oturum bitince yazılır (ilk anda kaybolmaz, sonraki açılışta çıkmaz). Sessiz kapı: Hesap güvenliği → Sohbet yedeği ekranı (E5a'da var); "Bu cihazda yedeği aç" satırı durur (akış 2).
+- **Yedek ile geçmiş ayrılır:** yedek şifresini girmek (BMK) bu cihazın yeni mesajlarını yedeklemeyi açar; eski görüntüleri indirip birleştirmek ayrı bir seçimdir. Ayarlardaki açma ekranında "Eski mesajları da geri yükle" seçeneği (bant [Geri yükle] ile geldiyse işaretli, ayarlardan geldiyse işaretsiz). Böylece "geçmiş istemiyorum ama yedeğim sürsün" mümkün.
+- **[Hayır] sonrası bu cihaz yedeklenmez** (BMK yok). Ayarlardaki durum satırı bunu açıkça söyler; bant tekrar çıkmaz (sahip kararı: ısrar yok).
+- Key-dropped (başka cihazda şifre sıfırlandı): bant yeniden ÇIKMAZ (ısrar yok); Sohbet yedeği ekranındaki durum satırı "Bu cihaz yedeklenmiyor, şifre başka cihazda değişti" der ve açma satırı oradadır.
+- E1 §Görünüm Rev. ile birlikte okunur: "bu cihazdan önce" mesajları sohbette hiç görünmez (aşağıda PLAN kararı); geri yüklenmedikçe sohbet boş başlar.
+- **Sohbeti temizle boşluğu (PM bulgusu, aynı gün):** "Sohbeti temizle" yalnız çağıranın `clearedAt`'ini yazar; şifreli DM'de temizlenen mesajların yerel düz kayıtları kalır ve yedek görüntüsüne girer. Düzeltme: `POST /e2ee/messages/exists` "var" sayarken çağıranın `clearedAt`'inden önceki mesajları da dışlar (silinmiş gibi). Görüntü kurulumu ve geri yükleme bu ucu zaten kullanır → temizlenen mesaj sonraki yedekten düşer, geri yüklemede gelmez. api değişikliği → R7.
+- **Uygulama:** E5b sözleşmesiyle aynı turda (istemci akışı + metin + yukarıdaki api süzgeci; kripto değişmez). Herkese açılıştan önce şart.
+
 ## §5 Kullanıcıya görünen uyarı (kurulum ekranı, sahip onayı)
 "Yedeğin bu şifreyle kilitlenir. Şifre senin cihazından çıkmaz, biz de bilmeyiz. Unutursan yedeğini ne sen ne de biz açabiliriz. Kolay tahmin edilebilir bir şifre seçme."
 
