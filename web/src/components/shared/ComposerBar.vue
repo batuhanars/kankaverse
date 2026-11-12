@@ -4,7 +4,7 @@
  * Kenarlıklı satır kabı, ataç, @bahsetme listesi, textarea, ✨, GIF ve emoji düğmeleri.
  * Gönderme/yazıyor/bahsetme mantığı, yanıt şeridi ve gizli dosya input'ları ebeveyninde kalır.
  */
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { useMentionAutocomplete } from '@/composables/useMentionAutocomplete'
 import EmojiPicker from '@/components/shared/EmojiPicker.vue'
@@ -12,7 +12,7 @@ import EmojiFaceIcon from '@/components/shared/EmojiFaceIcon.vue'
 import GifIcon from '@/components/shared/GifIcon.vue'
 import AiVideoButton from '@/components/shared/AiVideoButton.vue'
 
-defineProps<{
+const props = defineProps<{
   placeholder: string
   mention: ReturnType<typeof useMentionAutocomplete>
   // Yanıt şeridi açıkken yalnız alt köşeler yuvarlak (üstte şerit var)
@@ -34,6 +34,16 @@ const content = defineModel<string>({ required: true })
 const { t } = useI18n()
 
 const textarea = ref<HTMLTextAreaElement | null>(null)
+// Bahsetme listesi kaydırılabilir (sahip revizesi 2026-11-12: 8'den sonrası hiç görünmüyordu);
+// klavyeyle seçilen satır görünür alana kaydırılır.
+const mentionListEl = ref<HTMLElement | null>(null)
+watch(
+  () => props.mention.activeIndex.value,
+  (i) => {
+    const row = mentionListEl.value?.children[i] as HTMLElement | undefined
+    row?.scrollIntoView({ block: 'nearest' })
+  },
+)
 const showEmojiPicker = ref(false)
 // Compose emoji picker tetikleyici butonu (Teleport konumlandırması için)
 const emojiTriggerEl = ref<HTMLElement | null>(null)
@@ -89,7 +99,8 @@ defineExpose({ textarea })
     <div class="relative flex-1 min-w-0">
       <div
         v-if="mention.showPopover.value"
-        class="absolute bottom-full left-0 mb-1 z-50 min-w-[200px] max-w-[320px] overflow-hidden rounded-[var(--kv-radius-md)] border"
+        ref="mentionListEl"
+        class="absolute bottom-full left-0 mb-1 z-50 min-w-[200px] max-w-[320px] max-h-[280px] overflow-y-auto rounded-[var(--kv-radius-md)] border"
         style="background-color: var(--kv-bg-elevated); border-color: var(--kv-border-subtle);"
         @mousedown.prevent
       >

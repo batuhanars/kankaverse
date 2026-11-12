@@ -21,6 +21,9 @@ import MessageActionsMenu from './MessageActionsMenu.vue'
 import MessageContextMenu from './MessageContextMenu.vue'
 import MessageEmbeds from './MessageEmbeds.vue'
 import ReplyQuote from './ReplyQuote.vue'
+import UserCardPopover from './UserCardPopover.vue'
+import { useGuildsStore } from '@/stores/guilds'
+import { useDmStore } from '@/stores/dm'
 import { formatMentionsPlain } from '@/utils/mentions'
 import { renderMessageHtml } from '@/utils/markdown'
 import { hoverAvatarSrc } from '@/utils/animatedMedia'
@@ -94,6 +97,22 @@ onUnmounted(() => clearActive(overlayKey.value))
 // C35: gelen webhook mesajı: BOT rozeti + varsayılan bot simgesi; yazar bir kullanıcı değil (kart açılmaz)
 const isWebhook = computed(() => !!props.message.webhook)
 
+// Sahip revizesi 2026-11-12: avatara ya da ada tıklayınca kullanıcı kartı (Bahset, mesaj gönder, kanka ekle,
+// ⋯ profili gör / ID kopyala / şikâyet). Üye panelindeki kartın aynısı; ortam kanalında rol bağlamıyla.
+const guildsStore = useGuildsStore()
+const dmStore = useDmStore()
+const card = ref<{ x: number; y: number } | null>(null)
+// DM'de ortam bağlamı verilmez (başka ortamın rolleri karta sızmasın).
+const cardGuildId = computed(() =>
+  dmStore.channels.some((c) => c.id === props.message.channelId)
+    ? undefined
+    : (guildsStore.activeGuildId ?? undefined),
+)
+function openCard(e: MouseEvent) {
+  if (isWebhook.value || props.message.localStatus) return
+  card.value = { x: e.clientX, y: e.clientY }
+}
+
 // C29 — geçici (iyimser) mesaj: menü/tepki/düzenle/sil/sabitle/yanıtla/ilet KAPALI, yalnız Tekrar dene / Sil.
 const isLocal = computed(() => !!props.message.localStatus)
 // C34: tik yalnız gönderilmiş (yerel/bekleyen olmayan) mesajda; sunucu bilgi vermediyse (`receipt` null) hiç çizilmez.
@@ -116,7 +135,7 @@ function selectionIn(row: HTMLElement): string {
 
 function onRowContext(e: MouseEvent) {
   // Düzenleme kutusunda ve eylemi olmayan satırda tarayıcının/masaüstünün kendi menüsü kalır.
-  if (props.isEditing || isLocal.value || (!canCopy.value && !canDelete.value && !canReport.value)) return
+  if (props.isEditing || isLocal.value || (props.canReply === false && !canCopy.value && !canDelete.value && !canReport.value)) return
   e.preventDefault()
   // Belgedeki kapatıcılara ulaşmasın: aynı satırda yeniden sağ tık menüyü kapatmak yerine taşır.
   e.stopPropagation()
@@ -237,6 +256,7 @@ const renderedContent = computed<string>(() => {
       :x="ctxMenu.x"
       :y="ctxMenu.y"
       :message-id="message.id"
+      :can-reply="canReply !== false"
       :can-copy="canCopy"
       :can-edit="canEdit"
       :can-delete="canDelete"
@@ -246,6 +266,7 @@ const renderedContent = computed<string>(() => {
       @edit="emit('edit', message)"
       @delete="emit('delete', message.id)"
       @report="emit('report', message.id)"
+      @reply="emit('reply', message)"
     />
 
     <!-- Hover araç çubuğu: -top-3 right-4, yalnız düzenleme modunda gizli.
@@ -290,7 +311,9 @@ const renderedContent = computed<string>(() => {
         <!-- Grup başı: 40px daire avatar -->
         <div
           class="w-10 h-10 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[15px] font-semibold text-white"
+          :class="isWebhook ? '' : 'cursor-pointer'"
           style="background-color: var(--kv-accent-500);"
+          @click="openCard"
         >
           <svg
             v-if="isWebhook"
@@ -339,7 +362,9 @@ const renderedContent = computed<string>(() => {
       <div v-if="isGroupStart" class="flex items-baseline gap-2 mb-0.5">
         <span
           class="text-[16px] font-semibold leading-snug"
+          :class="isWebhook ? '' : 'cursor-pointer hover:underline'"
           style="color: var(--kv-text-primary);"
+          @click="openCard"
         >
           {{ message.author.username }}<span v-if="message.author.roleEmoji" class="ml-1 font-normal">{{ message.author.roleEmoji }}</span>
         </span>
@@ -485,5 +510,13 @@ const renderedContent = computed<string>(() => {
         </button>
       </div>
     </div>
+    <UserCardPopover
+      v-if="card"
+      :user-id="message.author.id"
+      :x="card.x"
+      :y="card.y"
+      :guild-id="cardGuildId"
+      @close="card = null"
+    />
   </div>
 </template>

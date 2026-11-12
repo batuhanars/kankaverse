@@ -47,7 +47,9 @@ function findMentionQuery(
   }
 }
 
-const MAX_SUGGESTIONS = 8
+// Liste kaydırılabilir; üst sınır yalnız çok kalabalık ortamda çizim yükü için (sahip revizesi 2026-11-12:
+// 8 sınırı yüzünden "@" yazınca ortamdaki diğer üyeler hiç görünmüyordu).
+const MAX_SUGGESTIONS = 50
 
 /**
  * C54 — bahsetme adının bittiği yer: ardından harf/rakam/_ GELMEMELİ (kullanıcı adı kümesi

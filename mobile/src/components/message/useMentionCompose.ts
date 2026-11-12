@@ -26,7 +26,9 @@ export interface MentionCandidate {
 /** `@everyone` önerisi için sabit sentinel id (gerçek bir kullanıcı id'si değil). */
 export const EVERYONE_ID = '@everyone';
 
-const MAX_SUGGESTIONS = 8;
+// Liste kaydırılabilir; üst sınır yalnız çok kalabalık ortamda çizim yükü için (sahip revizesi 2026-11-12:
+// 8 sınırı yüzünden "@" yazınca ortamdaki diğer üyeler hiç görünmüyordu).
+const MAX_SUGGESTIONS = 50;
 
 /** İmlecin solundaki `@kelime` bloğu — web `findMentionQuery` ile aynı kural. */
 function findMentionQuery(text: string, cursorPos: number): { query: string; start: number } | null {
