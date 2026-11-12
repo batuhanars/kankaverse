@@ -53,6 +53,7 @@ export class E2eeController {
       franking: this.flag.franking,
       // E5a: yedek bayrağı ayrıca uygunluk ister; kapalıyken istemci yedek arayüzünü göstermez.
       backup: this.flag.isEligible(user.id) && this.flag.backup,
+      transfer: this.flag.isEligible(user.id) && this.flag.transfer,
     };
   }
 

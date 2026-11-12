@@ -5,7 +5,10 @@ import { MessagesExistDto } from './dto/e2ee.dto';
 import { E2eeExistsService } from './e2ee-exists.service';
 
 function setup() {
-  const prisma = { message: { findMany: jest.fn() } };
+  const prisma = {
+    message: { findMany: jest.fn() },
+    channelMember: { findFirst: jest.fn().mockResolvedValue({ clearedAt: null }) },
+  };
   const membership = {
     requireChannelAccess: jest.fn().mockResolvedValue({ id: 'ch', type: 'DM' }),
   };
@@ -40,6 +43,30 @@ describe('E2eeExistsService (E5a Rev.2 §4.7)', () => {
     });
     const where = prisma.message.findMany.mock.calls[0][0].where;
     expect(where).toMatchObject({ channelId: 'ch', deletedAt: null });
+  });
+
+  it('E5b §3.3: clearedAt varsa öncesi "yok" sayılır (temizlenen mesaj yedeğe/aktarıma girmez)', async () => {
+    const { prisma, svc } = setup();
+    const clearedAt = new Date('2026-11-12T10:00:00Z');
+    prisma.channelMember.findFirst.mockResolvedValue({ clearedAt });
+    prisma.message.findMany.mockResolvedValue([]);
+    await svc.existing('u1', 'ch', ['m1']);
+    expect(prisma.channelMember.findFirst).toHaveBeenCalledWith({
+      where: { channelId: 'ch', userId: 'u1' },
+      select: { clearedAt: true },
+    });
+    expect(prisma.message.findMany.mock.calls[0][0].where).toMatchObject({
+      channelId: 'ch',
+      deletedAt: null,
+      createdAt: { gt: clearedAt },
+    });
+  });
+
+  it('clearedAt yoksa tarih koşulu eklenmez (eski davranış)', async () => {
+    const { prisma, svc } = setup();
+    prisma.message.findMany.mockResolvedValue([]);
+    await svc.existing('u1', 'ch', ['m1']);
+    expect(prisma.message.findMany.mock.calls[0][0].where).not.toHaveProperty('createdAt');
   });
 
   it('tekrarlı kimlikler tekilleştirilir', async () => {

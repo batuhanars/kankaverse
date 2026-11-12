@@ -88,6 +88,7 @@ model E2eeTransfer {
 | `POST /e2ee/transfer/:id/done` | N | → `DONE`, nesne silinir. **Tüm cihazlara** soket `e2ee.transfer.completed` + push (§4.5). |
 | `POST /e2ee/transfer/:id/cancel` | N, O | Herhangi bir ara durumdan → `CANCELLED`, nesne silinir, karşı tarafa soket. |
 
+- **Rev.1 (2026-11-12, R7-2 uygulaması):** çağıranın cihazı gövdeden (`deviceId`) ALINMAZ, oturum zincirinden (`tokenFamily` → etkin `E2eeDevice`, E1 `requireActiveDevice` kuralı) çözülür: bir cihaz kendini başka cihaz gibi gösteremez. Bu yüzden `POST /e2ee/transfer` gövdesi yalnız `{ commit }`, `accept` yalnız `{ pub }`, `pending` sorgusuz. Rol ihlali 403 `E2EE_TRANSFER_ROLE`; başkasının isteği 404 (varlık sızdırılmaz). Bekleyen (`PENDING`) isteği kabul etmemiş diğer cihaz da iptal edebilir ("Ben değilim").
 - Durum makinesi dışı her geçiş 409 `E2EE_TRANSFER_STATE`. Süresi geçmiş istek her uçta 410 `E2EE_TRANSFER_EXPIRED`.
 - **Temizlik işi** (mevcut zamanlanmış iş deseninde, dakikada bir): `expiresAt < now` ve bitmemiş istekler → `EXPIRED`, nesne silinir. `DONE/CANCELLED/EXPIRED` satırları 7 gün sonra silinir (iz için kısa süre).
 - **Bucket:** özel bucket, önek `e2ee-transfer/{userId}/{transferId}`. Public/CDN yok.

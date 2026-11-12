@@ -176,6 +176,7 @@ export default () => {
     e2eeFranking: process.env.E2EE_FRANKING === 'true',
     // E5a — şifreli DM yedeği (yedek şifresi, sunucuda yalnız şifreli görüntü). Varsayılan KAPALI; izin listesi E1 ile aynı.
     e2eeBackup: process.env.E2EE_BACKUP === 'true',
+    e2eeTransfer: process.env.E2EE_TRANSFER === 'true',
     e2eeUserIds: (process.env.E2EE_USER_IDS ?? '')
       .split(',')
       .map((id) => id.trim())

@@ -20,9 +20,20 @@ export class E2eeExistsService {
     ids: string[],
   ): Promise<{ existing: string[] }> {
     await this.membership.requireChannelAccess(userId, channelId);
+    // E5b §3.3 (E5a §4.8 PM bulgusu): "Sohbeti temizle" çağıranın clearedAt'ini yazar, mesaj kalır. Temizlenen
+    // şifreli mesajın yerel düz kaydı yedeğe/aktarıma girmesin diye clearedAt'ten önceki mesajlar SİLİNMİŞ sayılır.
+    const member = await this.prisma.channelMember.findFirst({
+      where: { channelId, userId },
+      select: { clearedAt: true },
+    });
     // Yalnız bu kanalın ve silinmemiş mesajları: başka kanalın kimliği dönmez (varlık sızdırılmaz).
     const rows = await this.prisma.message.findMany({
-      where: { id: { in: [...new Set(ids)] }, channelId, deletedAt: null },
+      where: {
+        id: { in: [...new Set(ids)] },
+        channelId,
+        deletedAt: null,
+        ...(member?.clearedAt && { createdAt: { gt: member.clearedAt } }),
+      },
       select: { id: true },
     });
     return { existing: rows.map((r) => r.id) };

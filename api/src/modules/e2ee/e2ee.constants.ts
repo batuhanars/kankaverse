@@ -58,3 +58,19 @@ export const E2EE_BACKUP_WRAPPED_B64_RE = /^[A-Za-z0-9+/]{80}$/;
 export const E2EE_EXISTS_MAX_IDS = 500;
 export const E2EE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 export const E2EE_BACKUP_SHA256_RE = /^[0-9a-f]{64}$/;
+
+// ── E5b cihazdan cihaza aktarım ────────────────────────────────────────────
+/** İstek ömrü: açılıştan 10 dk sonra her uçta 410 (kurul k.1). */
+export const E2EE_TRANSFER_TTL_MS = 10 * 60 * 1000;
+/** Bitmiş (DONE/CANCELLED/EXPIRED) satırlar bu kadar sonra silinir (kısa iz). */
+export const E2EE_TRANSFER_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+/** Yük üst sınırı: E5a görüntüsüyle aynı. */
+export const E2EE_TRANSFER_MAX_BYTES = E2EE_BACKUP_MAX_BYTES;
+export const E2EE_TRANSFER_PRESIGN_SECONDS = 300;
+/** 32 baytlık değer (taahhüt, X25519 açık anahtar, taahhüt rastgeleliği) base64. */
+export const E2EE_B64_32_RE = /^[A-Za-z0-9+/]{43}=$/;
+export const E2EE_EVENT_TRANSFER_REQUESTED = 'e2ee:transfer-requested';
+export const E2EE_EVENT_TRANSFER_ACCEPTED = 'e2ee:transfer-accepted';
+export const E2EE_EVENT_TRANSFER_REVEALED = 'e2ee:transfer-revealed';
+export const E2EE_EVENT_TRANSFER_READY = 'e2ee:transfer-ready';
+export const E2EE_EVENT_TRANSFER_CLOSED = 'e2ee:transfer-closed';

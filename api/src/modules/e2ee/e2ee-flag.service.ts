@@ -23,6 +23,11 @@ export class E2eeFlagService {
     return this.config.get<boolean>('e2eeBackup') === true;
   }
 
+  /** E5b: cihazdan cihaza geçmiş aktarımı uçları açık mı (uygunluk ayrıca isEligible ile). Varsayılan false. */
+  get transfer(): boolean {
+    return this.config.get<boolean>('e2eeTransfer') === true;
+  }
+
   isEligible(userId: string): boolean {
     if (!this.enabled) return false;
     const allow = this.config.get<string[]>('e2eeUserIds') ?? [];

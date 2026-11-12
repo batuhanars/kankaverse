@@ -124,13 +124,22 @@ export class PurgeJob {
       backupKeys = snaps.map((x) => x.objectKey);
       await tx.e2eeBackupSnapshot.deleteMany({ where: { userId } });
       await tx.e2eeBackup.deleteMany({ where: { userId } });
+      // E5b: açık/bitmiş aktarımlar ve (varsa) şifreli yük nesneleri. User ilişkisi yok, açıkça silinir.
+      const transfers = await tx.e2eeTransfer.findMany({
+        where: { userId, objectKey: { not: null } },
+        select: { objectKey: true },
+      });
+      backupKeys.push(...transfers.map((x) => x.objectKey as string));
+      await tx.e2eeTransfer.deleteMany({ where: { userId } });
     });
     // Nesne silme en iyi çaba (yetim risk kabul edildi); hata imhayı başarısız saymaz, anahtar loglanır.
     for (const key of backupKeys) {
       try {
         await this.storage.delete(key);
       } catch (err) {
-        this.logger.error(`E2EE yedek nesnesi silinemedi (yetim kalabilir): ${key}: ${(err as Error).message}`);
+        this.logger.error(
+          `E2EE yedek nesnesi silinemedi (yetim kalabilir): ${key}: ${(err as Error).message}`,
+        );
       }
     }
   }

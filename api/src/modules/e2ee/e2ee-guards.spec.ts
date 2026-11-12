@@ -70,7 +70,12 @@ describe('GET /e2ee/status', () => {
       null as never,
       null as never,
     );
-    expect(c.status({ id: 'u1' } as never)).toEqual({ enabled: false, franking: false, backup: false });
+    expect(c.status({ id: 'u1' } as never)).toEqual({
+      enabled: false,
+      franking: false,
+      backup: false,
+      transfer: false,
+    });
   });
 
   it('E4: franking bayrağı E2EE_FRANKING ile açılır, varsayılan false', () => {
@@ -85,11 +90,13 @@ describe('GET /e2ee/status', () => {
       enabled: true,
       franking: false,
       backup: false,
+      transfer: false,
     });
     expect(make({ e2eeFranking: true }).status({ id: 'u1' } as never)).toEqual({
       enabled: true,
       franking: true,
       backup: false,
+      transfer: false,
     });
   });
 
@@ -103,6 +110,19 @@ describe('GET /e2ee/status', () => {
       );
     expect(make({ e2eeBackup: true }).status({ id: 'u1' } as never).backup).toBe(true);
     expect(make({ e2eeBackup: true }).status({ id: 'u2' } as never).backup).toBe(false);
+  });
+
+  it('E5b: transfer bayrağı E2EE_TRANSFER ile açılır, varsayılan false, uygunluk ister', () => {
+    const make = (cfg: Record<string, unknown>) =>
+      new E2eeController(
+        new E2eeFlagService(config({ e2eeEnabled: true, e2eeUserIds: ['u1'], ...cfg })),
+        null as never,
+        null as never,
+        null as never,
+      );
+    expect(make({}).status({ id: 'u1' } as never).transfer).toBe(false);
+    expect(make({ e2eeTransfer: true }).status({ id: 'u1' } as never).transfer).toBe(true);
+    expect(make({ e2eeTransfer: true }).status({ id: 'u2' } as never).transfer).toBe(false);
   });
 });
 

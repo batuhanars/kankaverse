@@ -89,6 +89,7 @@ enum NotificationType {
   REACTION // C46 — mesajına tepki bırakıldı (ortam: çan kaydı + push; DM: yalnız push)
   AI_VIDEO_READY // C49 — yapay zeka video arka planda tamamlandı
   AI_VIDEO_FAILED // C49 — yapay zeka video arka planda başarısız oldu (kredi düşülmedi)
+  E2EE_TRANSFER // E5b — şifreli mesaj geçmişi yeni bir cihaza aktarıldı (güvenlik bildirimi, kapatılamaz)
 }
 
 enum NotificationLevel {
@@ -1043,4 +1044,38 @@ model E2eeBackupSnapshot {
 
   @@unique([userId, deviceId])
   @@index([userId])
+}
+
+/// E5b: cihazdan cihaza geçmiş aktarımı. Sunucu yalnız taahhüdü, geçici açık anahtarları ve şifreli yükü taşır;
+/// düz metin, ortak sır, kod görmez. 10 dk ömür; bitmiş satırlar 7 gün sonra silinir. User ilişkisi yok
+/// (hesap silme anonimleştirir; purge açıkça siler, görüntü tablosuyla aynı).
+enum E2eeTransferStatus {
+  PENDING
+  ACCEPTED
+  REVEALED
+  UPLOADED
+  DONE
+  CANCELLED
+  EXPIRED
+}
+
+model E2eeTransfer {
+  id          String             @id @default(cuid())
+  userId      String
+  newDeviceId String // isteği açan yeni cihaz (N)
+  oldDeviceId String? // kabul eden eski cihaz (O)
+  commit      Bytes // SHA256 taahhüdü (32)
+  newPub      Bytes? // N'nin geçici X25519 açık anahtarı, reveal'da
+  newNonce    Bytes? // taahhüt rastgeleliği (32), reveal'da
+  oldPub      Bytes? // O'nun geçici açık anahtarı, accept'te
+  objectKey   String? // e2ee-transfer/{userId}/{id}
+  size        Int?
+  sha256      String?
+  status      E2eeTransferStatus @default(PENDING)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  expiresAt   DateTime
+
+  @@index([userId, status])
+  @@index([expiresAt])
 }

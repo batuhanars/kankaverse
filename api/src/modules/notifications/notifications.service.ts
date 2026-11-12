@@ -570,6 +570,12 @@ export class NotificationsService {
           ? `Videon üretilemedi, kredin düşülmedi: ${dto.preview}`
           : 'Videon üretilemedi, kredin düşülmedi.';
         break;
+      case 'E2EE_TRANSFER':
+        // E5b §4.5: güvenlik bildirimi, içerik yok. preview = yeni cihazın adı (ör. "Chrome, Windows").
+        body = dto.preview
+          ? `Şifreli mesaj geçmişin yeni bir cihaza aktarıldı: ${dto.preview}. Bu sen değilsen hemen şifreni değiştir.`
+          : 'Şifreli mesaj geçmişin yeni bir cihaza aktarıldı. Bu sen değilsen hemen şifreni değiştir.';
+        break;
       default:
         body = actor;
     }
@@ -577,7 +583,7 @@ export class NotificationsService {
 
     return {
       // C49: aktörü olmayan yapay zeka video bildiriminde 'Biri' yazılmaz.
-      title: isAiVideo ? 'Yapay zeka video' : actor,
+      title: isAiVideo ? 'Yapay zeka video' : dto.type === 'E2EE_TRANSFER' ? 'Güvenlik' : actor,
       body,
       data: {
         type: dto.type,
