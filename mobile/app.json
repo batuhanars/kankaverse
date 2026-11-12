@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 71,
+      "versionCode": 72,
       "permissions": [
         "android.permission.BLUETOOTH_CONNECT"
       ]
