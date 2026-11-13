@@ -228,6 +228,8 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
 | D102 | **Çıkarılan grup üyesi `voice:` odasında kalıyor** — ses katılım/presence olayları bağlantı kopana dek ona gider (içerik değil, üst veri) | api | E2 adım 1 dev bulgusu / 2026-11-13 | düşük | açık, E8'de |
 | D103 | **`E2eeFormerMember` temizliği yok** — eski üye satırları süresiz birikir (kanal silinse de) | api | E2 adım 1 / 2026-11-13 | düşük | açık |
 | D104 | **Şifreli DM'de bahsetme listesi düz üst veri (GEÇİCİ)** — E2 Rev.2: `mentionUserIds` sunucuya düz gidiyor ki zil/push çalışsın. Hedef WhatsApp modeli: liste şifreli içerikte, bildirim kararı cihazda | api + web + mobile | sahip kararı / 2026-11-13 | düşük | açık, E3 Rev.2 ile |
+| D105 | **Gruptan çıkarılan üyenin listesi canlı güncellenmiyor** — üye çıkarma/ayrılmada çıkarılana olay yok; grup sohbeti sayfa yenilenene dek listede kalır (içerik gelmez, oda çıkarması var). E2 öncesinden kalma | api + web + mobile | E2 cihaz turu / 2026-11-13 | düşük | açık |
+| D106 | **Grup değişikliğinden sonra telefondaki bildirim 'Yeni mesaj'a düşüyor** — çevrimdışı çözme yeni epoch'u bilmiyor (arka planda ağ yasak, MIUI); uygulama bir kez açılınca düzelir. Grup üyeliği/cihaz değiştikçe görünür. Masaüstü açıkken etkilenmez | mobile | E2 cihaz turu / 2026-11-13 | düşük-orta | açık, E3 Rev.2 ile birlikte düşünülür |
 
 ---
 

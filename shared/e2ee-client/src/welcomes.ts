@@ -31,6 +31,7 @@ async function joinOne(ctx: E2eeContext, device: Device, row: E2eeWelcomeRow): P
   await ctx.store.saveGroup(row.channelId, group)
   await ctx.store.saveJoinedAt(row.channelId, Date.now())
   await observeLeaves(ctx, row.channelId, group, devices) // E2 §3.3: bu andan sonraki eklemeler "yeni cihaz"
+  if (local && !local.isActive) ctx.warn(row.channelId, null) // çıkarılmıştık, geri eklendik: "çıkarıldı" bandı kalkar
   return true
 }
 

@@ -38,8 +38,9 @@ export const useE2eeStore = defineStore('e2ee', () => {
   const plainTick = ref(0)
   let ready: Promise<void> = Promise.resolve()
 
-  const setWarning = (channelId: string, kind: WarningKind) => {
-    warnings.value[channelId] = kind
+  const setWarning = (channelId: string, kind: WarningKind | null) => {
+    if (kind === null) delete warnings.value[channelId]
+    else warnings.value[channelId] = kind
   }
 
   /** Girişten sonra bir kez: durum → cihaz kaydı → KeyPackage → bekleyen Welcome'lar. */

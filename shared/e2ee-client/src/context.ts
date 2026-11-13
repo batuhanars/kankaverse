@@ -10,7 +10,7 @@ export interface E2eeContext {
   store: LocalStore
   /** Bu işlemde diskten tazelenen cihaz (bayat durum olmasın). */
   getDevice(): Promise<Device>
-  warn(channelId: string, kind: WarningKind): void
+  warn(channelId: string, kind: WarningKind | null): void
   yieldToUi?: () => Promise<void>
   metric?: (name: string, ms: number, count: number) => void
 }

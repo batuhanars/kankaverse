@@ -50,6 +50,16 @@ export function groupSuite(label: string) {
       expect((await show(C1, [m1]))[0]).toMatchObject({ content: '', e2eeStatus: 'undecryptable' })
     })
 
+    it('listede olmayan üyeli grupta claim 422: grup kurulmaz, düz yola düşer', async () => {
+      server.makeGroup(CH, ['A', 'B', 'C'], EARLY)
+      server.notEligible.add('C')
+      const A1 = await login('A')
+      await login('B')
+      await login('C')
+      expect(await as(A1, (e) => e.encrypt(CH, 'düz'))).toBeNull()
+      expect(server.groups.has(CH)).toBe(false)
+    })
+
     it('yalnız gönderen cihazlıysa şifresiz kalır; gönderen dahil iki üye cihazlıysa kurulur', async () => {
       server.makeGroup(CH, ['A', 'B', 'C'], EARLY)
       const A1 = await login('A')
@@ -109,6 +119,49 @@ export function groupSuite(label: string) {
       const m2 = await send(B1, 'm2', 'C artık yok')
       expect(await text(A1, m2)).toBe('C artık yok')
       for (const gone of [C1, C2]) expect((await show(gone, [m2]))[0].content).toBe('')
+    })
+
+    // Çıkarılıp geri eklenen üyenin cihazı: yerel grup PASİF (isActive=false) kalır; yok gibi davranıp Welcome işlemeli.
+    async function removedThenReAdded() {
+      const { A1, B1, C1 } = await trio()
+      server.removeMember(CH, 'C', LEFT)
+      await sync(A1, B1)
+      await sync(C1) // C1 çıkarıldığını işler: yerel grup pasif
+      expect(C1.warnings).toContainEqual([CH, 'removed'])
+      server.addMember(CH, 'C', later())
+      await sync(A1) // C1 yeniden eklenir (yeni Welcome)
+      await sync(B1)
+      return { A1, B1, C1 }
+    }
+
+    it('geri eklenen üye (a) kanal açılışında yeniden katılır, sonraki mesajı çözer ve gönderebilir', async () => {
+      const { A1, B1, C1 } = await removedThenReAdded()
+      await as(C1, (e) => e.open(CH))
+      const m = await send(A1, 'm5', 'C döndü')
+      expect(await text(C1, m)).toBe('C döndü')
+      const sent = await send(C1, 'm6', 'döndüm')
+      expect(await text(B1, sent)).toBe('döndüm')
+    })
+
+    it('geri eklenen üye (b) doğrudan gönderimde yeniden katılır', async () => {
+      const { B1, C1 } = await removedThenReAdded()
+      const sent = await send(C1, 'm6', 'döndüm')
+      expect(await text(B1, sent)).toBe('döndüm')
+    })
+
+    it('geri eklenen üye (c) Welcome olayıyla yeniden katılır', async () => {
+      const { A1, C1 } = await removedThenReAdded()
+      expect(await as(C1, (e) => e.onWelcome())).toEqual([CH])
+      const m = await send(A1, 'm5', 'C döndü')
+      expect(await text(C1, m)).toBe('C döndü')
+    })
+
+    it('yeniden katılınca "çıkarıldı" uyarısı kalkar (null); aradaki (katılım öncesi) mesaj "çözülemedi" değil cihaz öncesi', async () => {
+      const { A1, C1 } = await removedThenReAdded()
+      const gap = await send(A1, 'mg', 'C henüz MLS dışında', new Date(Date.now() + 60_000).toISOString())
+      expect((await show(C1, [gap]))[0]).toMatchObject({ content: '', e2eeStatus: 'undecryptable' }) // hâlâ pasif
+      await as(C1, (e) => e.open(CH))
+      expect(C1.warnings[C1.warnings.length - 1]).toEqual([CH, null])
     })
 
     it('gönderim kapısı: çıkarma commit kabul edilemezken mesaj ŞİFRELENMEZ; kabul edilince gider', async () => {
@@ -233,6 +286,79 @@ export function groupSuite(label: string) {
       await login('D') // D3: D zaten üyeydi, yaprağı vardı
       await sync(A1, B1)
       expect(await notices(B1)).toMatchObject([{ userId: 'D', count: 1 }])
+    })
+
+    it('sonradan eklenen üyenin 1 cihazı eklenir, SONRA ikinci cihazı: ekleyen ve eklemeyen cihazda tek satır', async () => {
+      const { A1, B1, C1 } = await trio()
+      const D1 = await login('D')
+      server.addMember(CH, 'D', later())
+      await sync(A1) // D1 yalnız ilk cihaz: satır yok
+      await as(D1, (e) => e.onWelcome())
+      await sync(B1, C1, D1)
+      expect(await notices(A1)).toEqual([])
+      expect(await notices(B1)).toEqual([])
+
+      await login('D') // D2: ikinci cihaz
+      await sync(A1) // A1 commit'i gönderir (ekleyen)
+      await sync(B1, C1) // eklemeyen cihazlar
+      for (const p of [A1, B1, C1]) expect(await notices(p)).toMatchObject([{ userId: 'D', count: 1 }])
+      expect(await notices(D1)).toEqual([])
+    })
+
+    it('sonradan eklenen üyenin ikinci cihazını KENDİ ilk cihazı ekler: diğer üyelerde tek satır', async () => {
+      const { A1, B1, C1 } = await trio()
+      const D1 = await login('D')
+      server.addMember(CH, 'D', later())
+      await sync(A1)
+      await as(D1, (e) => e.onWelcome())
+      await sync(B1, C1)
+      await login('D')
+      await sync(D1) // D1 kendi hesabının yeni cihazını ekler
+      await sync(A1, B1, C1)
+      for (const p of [A1, B1, C1]) expect(await notices(p)).toMatchObject([{ userId: 'D', count: 1 }])
+    })
+
+    it('YENİ ÜYE İKİNCİ CİHAZ: ilk mesaj çözülürken (hydrate yolu) yakalanan commit de tek satır üretir', async () => {
+      const { A1, B1, C1 } = await trio()
+      const D1 = await login('D')
+      server.addMember(CH, 'D', later())
+      await sync(A1)
+      await as(D1, (e) => e.onWelcome())
+      await sync(B1, C1)
+      const D2 = await login('D')
+      await sync(D1)
+      await as(D2, (e) => e.onWelcome())
+      const m = await send(D2, 'm9', 'D ikinci cihazdan')
+      for (const p of [A1, B1, C1]) {
+        expect(await text(p, m)).toBe('D ikinci cihazdan')
+        expect(await notices(p)).toMatchObject([{ userId: 'D', count: 1 }])
+      }
+    })
+
+    it('sonradan eklenen CİHAZSIZ üye: ilk cihazı satır üretmez, ikinci cihazı üretir', async () => {
+      const { A1, B1, C1 } = await trio()
+      server.addMember(CH, 'D', later())
+      await sync(A1, B1, C1) // D cihazsız: yaprak yok
+      const D1 = await login('D')
+      await sync(A1)
+      await as(D1, (e) => e.onWelcome())
+      await sync(B1, C1)
+      expect(await notices(B1)).toEqual([])
+      await login('D')
+      await sync(A1)
+      await sync(B1, C1)
+      for (const p of [A1, B1, C1]) expect(await notices(p)).toMatchObject([{ userId: 'D', count: 1 }])
+    })
+
+    it('çıkarılıp yeniden eklenen üyenin yaprağı ağaçta KALDIYSA (çıkarma işlenmeden döndü): yeni cihazı satır üretir', async () => {
+      const { A1, B1, C1 } = await trio()
+      server.removeMember(CH, 'C', LEFT)
+      server.addMember(CH, 'C', later()) // kimse çıkarmayı işlemedi: C1 yaprağı hâlâ ağaçta
+      await login('C')
+      await sync(A1)
+      await sync(B1)
+      for (const p of [A1, B1]) expect(await notices(p)).toMatchObject([{ userId: 'C', count: 1 }])
+      void C1
     })
 
     it('tek cihazlı üye çıkış yapıp yeniden girer: yeni cihaz satır üretir (yaprağı daha önce vardı)', async () => {

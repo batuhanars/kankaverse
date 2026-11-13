@@ -49,7 +49,14 @@ export async function createChannelGroup(
   const device = await ctx.getDevice()
   const devices = devicesOf(state)
   const { active } = devices
-  const { data: claimed } = await ctx.api.claim(channelId, claimTargets(state, device.deviceId))
+  let claimed
+  try {
+    claimed = (await ctx.api.claim(channelId, claimTargets(state, device.deviceId))).data
+  } catch (e) {
+    // İzin listesi dönemi: listede olmayan üye varsa sunucu claim'de 422 atar; grup kurulmaz, düz yola düşülür.
+    if (e2eeErrorCode(e) === 'E2EE_NOT_ELIGIBLE') return 'ineligible'
+    throw e
+  }
   if (
     !otherMembersCovered(
       state,

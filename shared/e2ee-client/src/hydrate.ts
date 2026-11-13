@@ -165,7 +165,8 @@ export class Hydrator {
   }
 
   private failureStatus(m: WireMessage): StoredMessage['status'] {
-    const sentAfterJoin = this.joinedAt !== null && Date.parse(m.createdAt) >= this.joinedAt
+    // Pasif grup (bu cihaz çıkarılmış, henüz yeniden katılmadı): grubun içinde olmadığımız bir dönem, 'failed' değil cihaz öncesi.
+    const sentAfterJoin = this.joinedAt !== null && Date.parse(m.createdAt) >= this.joinedAt && this.group?.isActive === true
     return sentAfterJoin ? 'failed' : 'undecryptable'
   }
 

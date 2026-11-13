@@ -26,8 +26,11 @@ const set = useE2eeStore.setState;
 const get = useE2eeStore.getState;
 let ready: Promise<void> = Promise.resolve();
 
-const setWarning = (channelId: string, kind: WarningKind) =>
-  set((s) => ({ warnings: { ...s.warnings, [channelId]: kind } }));
+const setWarning = (channelId: string, kind: WarningKind | null) =>
+  set((s) => {
+    const { [channelId]: _gone, ...rest } = s.warnings;
+    return { warnings: kind === null ? rest : { ...s.warnings, [channelId]: kind } };
+  });
 
 /**
  * E3 Rev.5: bir mesajın düz metni depoya yazıldı (soket çözmesi VEYA push yolundaki çevrimdışı çözme); liste

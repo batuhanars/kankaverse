@@ -50,7 +50,20 @@ export async function observeLeaves(
 ): Promise<void> {
   const leaves = group.memberDeviceIds()
   const seen = await ctx.store.loadSeen(channelId)
+  let changed = false
+  const markSeen = (ids: Iterable<string>) => {
+    for (const id of ids) {
+      const owner = devices.owners.get(id)
+      if (owner === undefined || seen[owner] === joinKey(devices, owner)) continue
+      seen[owner] = joinKey(devices, owner)
+      changed = true
+    }
+  }
   if (before) {
+    // Commit'ten ÖNCE ağaçta yaprağı olan üye "yeni üye" olamaz: yaprağı zaten görüyorduk. Yoksa çıkarılıp yeniden
+    // eklenen ama eski yaprağı ağaçta kalmış üyenin (çıkarma işlenmeden döndü) yeni cihazı, eski katılım zamanıyla
+    // kayıtlı `seen` yüzünden "yeni üye" sayılıp satırsız kalırdı.
+    markSeen(before)
     const ownOwner = devices.owners.get(group.ownDeviceId)
     const added = leaves.filter((id) => !before.has(id))
     const notices = [...noticeOwners(devices, seen, added, ownOwner)].map(
@@ -58,13 +71,7 @@ export async function observeLeaves(
     )
     if (notices.length > 0) await appendNotices(ctx, channelId, notices)
   }
-  let changed = false
-  for (const id of leaves) {
-    const owner = devices.owners.get(id)
-    if (owner === undefined || seen[owner] === joinKey(devices, owner)) continue
-    seen[owner] = joinKey(devices, owner)
-    changed = true
-  }
+  markSeen(leaves)
   if (changed) await ctx.store.saveSeen(channelId, seen)
 }
 

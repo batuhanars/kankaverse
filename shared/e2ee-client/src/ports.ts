@@ -219,7 +219,8 @@ export interface Vault {
 export type WithLock = <T>(name: string, task: () => Promise<T>) => Promise<T>
 
 export type WarningKind = 'unknown-device' | 'removed' | 'device-broken'
-export type WarningHandler = (channelId: string, kind: WarningKind) => void
+/** `null` = o kanalın uyarısı kalktı (örn. çıkarılan cihaz geri eklenip yeniden katıldı). */
+export type WarningHandler = (channelId: string, kind: WarningKind | null) => void
 
 /** Motoru kuran platform bağımlılıkları. */
 export interface EngineDeps {

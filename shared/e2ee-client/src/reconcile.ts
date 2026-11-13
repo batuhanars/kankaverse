@@ -56,7 +56,14 @@ async function addStep(
   view: ChannelView,
   ids: string[],
 ) {
-  const { data } = await ctx.api.claim(channelId, ids.slice(0, MAX_ADD_PER_COMMIT))
+  let data
+  try {
+    data = (await ctx.api.claim(channelId, ids.slice(0, MAX_ADD_PER_COMMIT))).data
+  } catch (e) {
+    // Uygun olmayan üye (422): eklenemez; mesajlaşmayı kilitlemesin diye 'stuck' gibi bırakılır.
+    if (e2eeErrorCode(e) === 'E2EE_NOT_ELIGIBLE') return 'stuck' as const
+    throw e
+  }
   // Paketi kalmamış cihaz listede yok: eklenemez, o cihaz açılınca kendi yeni paketini yükleyip tekrar dener.
   if (data.length === 0) return 'stuck' as const
   const kps = data.map((c) => fromB64(c.keyPackage))

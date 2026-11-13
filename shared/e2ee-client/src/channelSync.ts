@@ -57,7 +57,8 @@ export async function openChannel(ctx: E2eeContext, channelId: string): Promise<
   const info = { encrypted: state.encrypted, createdAt: state.createdAt }
   await dropStaleGroup(ctx, channelId, state) // geri alma sonrası bayat grup (§6.4)
   if (!state.encrypted) return info
-  if (!(await ctx.store.loadGroup(channelId))) await processWelcomes(ctx)
+  const local = await ctx.store.loadGroup(channelId)
+  if (!local || !local.isActive) await processWelcomes(ctx) // pasif grup = yok (geri eklenmiş olabiliriz)
   return info
 }
 
@@ -74,7 +75,8 @@ export async function groupForSend(ctx: E2eeContext, channelId: string): Promise
     if (outcome === 'exists') await processWelcomes(ctx)
   }
   let group = await ctx.store.loadGroup(channelId)
-  if (!group) {
+  if (!group || !group.isActive) {
+    // Pasif yerel grup (çıkarılmıştık) "yok" sayılır: geri eklendiysek bekleyen Welcome ile yeniden katılırız.
     await processWelcomes(ctx)
     group = await ctx.store.loadGroup(channelId)
   }

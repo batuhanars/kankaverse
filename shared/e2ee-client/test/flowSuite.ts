@@ -29,7 +29,7 @@ export interface Profile {
   vault: MemoryVault
   family: string
   engine: E2eeEngine
-  warnings: [string, WarningKind][]
+  warnings: [string, WarningKind | null][]
   deviceId: () => string
 }
 
@@ -38,7 +38,7 @@ export let server: FakeServer
 export let provider: CryptoProvider
 let n = 0
 
-type WarnFn = (channelId: string, kind: WarningKind) => void
+type WarnFn = (channelId: string, kind: WarningKind | null) => void
 
 export const as = <T>(p: Profile, fn: (e: E2eeEngine) => Promise<T>): Promise<T> => fn(p.engine)
 
@@ -56,7 +56,7 @@ export const restart = (userId: string, family: string, vault: MemoryVault, warn
 export async function login(userId: string): Promise<Profile> {
   const vault = new MemoryVault()
   const family = `fam${++n}`
-  const warnings: [string, WarningKind][] = []
+  const warnings: [string, WarningKind | null][] = []
   const engine = (await restart(userId, family, vault, (c, k) => warnings.push([c, k])))!
   return {
     userId,
@@ -172,7 +172,7 @@ export function flowSuite(label: string, p: CryptoProvider) {
       // Sunucu aynı oturum zinciri için başka kimlik bildiriyor (yerel durum bu oturuma ait değil).
       server.devices.get(A1.deviceId())!.id = 'baska'
       server.devices.set('baska', server.devices.get(A1.deviceId())!)
-      const warnings: [string, WarningKind][] = []
+      const warnings: [string, WarningKind | null][] = []
       await expect(
         restart('A', A1.family, A1.vault, (c, k) => warnings.push([c, k])),
       ).rejects.toThrow()

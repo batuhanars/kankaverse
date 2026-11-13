@@ -72,6 +72,9 @@ export class FakeServer {
   }
 
   /** Kanalı grup yapar: üyelerin katılım zamanı bildirilir (E2 §2.3). */
+  /** İzin listesi dönemi: listede olmayan kullanıcılar (claim 422 E2EE_NOT_ELIGIBLE). */
+  notEligible = new Set<string>()
+
   makeGroup(channelId: string, userIds: string[], at: string) {
     this.members.set(channelId, [...userIds])
     this.joined.set(channelId, new Map(userIds.map((u) => [u, at])))
@@ -143,6 +146,7 @@ export class FakeServer {
       claim: (channelId: string, ids: string[]) => {
         active()
         if (ids.length > 20) throw fail(400, 'VALIDATION_ERROR') // E2EE_CLAIM_MAX_DEVICES
+        if ((this.members.get(channelId) ?? []).some((u) => this.notEligible.has(u))) throw fail(422, 'E2EE_NOT_ELIGIBLE')
         const out = ids.flatMap((id) => {
           const d = this.devices.get(id)
           if (!d || d.revokedAt || !this.members.get(channelId)?.includes(d.userId)) return []
