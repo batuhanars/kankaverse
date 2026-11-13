@@ -37,15 +37,19 @@ export async function decryptOfflineForPush(
   try {
     const engine = await pickLocalEngine();
     if (engine) {
-      result = await engine.decryptOffline({
-        id: messageId,
-        channelId: conversationId,
-        createdAt: e.createdAt,
-        encrypted: true,
-        ciphertext: e.ciphertext,
-        senderDeviceId: e.senderDeviceId,
-        frankingTag: e.frankingTag,
-      });
+      // C66: commit varsa önce bugünkü ağsız yol, çözülemezse commit'ler yalnız bellekte uygulanır (depo yazımı yok).
+      result = await engine.previewWithCommits(
+        {
+          id: messageId,
+          channelId: conversationId,
+          createdAt: e.createdAt,
+          encrypted: true,
+          ciphertext: e.ciphertext,
+          senderDeviceId: e.senderDeviceId,
+          frankingTag: e.frankingTag,
+        },
+        e.commits ?? [],
+      );
     }
   } catch {
     // hata türü bile loglanmaz: sonuç unavailable, bildirim genel metinle kalır

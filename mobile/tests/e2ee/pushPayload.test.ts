@@ -15,6 +15,17 @@ describe('parseE2eePayload', () => {
     expect(parseE2eePayload(ok)).not.toHaveProperty('frankingTag');
     expect(parseE2eePayload({ ...ok, frankingTag: 7 })).not.toHaveProperty('frankingTag');
   });
+  it('commits (C66): geçerli diziyi taşır; geçersiz biçim, 2den fazla ya da boş alanı koymaz', () => {
+    const c = [{ epoch: 3, commit: 'QUJD' }, { epoch: 4, commit: 'REVG' }];
+    expect(parseE2eePayload({ ...ok, commits: c })).toEqual({ ...ok, commits: c });
+    expect(parseE2eePayload(JSON.stringify({ ...ok, commits: c }))?.commits).toEqual(c);
+    expect(parseE2eePayload(ok)).not.toHaveProperty('commits');
+    expect(parseE2eePayload({ ...ok, commits: [...c, c[0]] })).not.toHaveProperty('commits');
+    expect(parseE2eePayload({ ...ok, commits: [{ epoch: '3', commit: 'x' }] })).not.toHaveProperty('commits');
+    expect(parseE2eePayload({ ...ok, commits: [{ epoch: 3, commit: '' }] })).not.toHaveProperty('commits');
+    expect(parseE2eePayload({ ...ok, commits: 'x' })).not.toHaveProperty('commits');
+    expect(parseE2eePayload({ ...ok, commits: [] })).not.toHaveProperty('commits');
+  });
   it('eksik, boş ve bozuk girdide null döner', () => {
     expect(parseE2eePayload(undefined)).toBeNull();
     expect(parseE2eePayload('{bozuk')).toBeNull();
