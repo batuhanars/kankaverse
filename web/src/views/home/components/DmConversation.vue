@@ -633,9 +633,12 @@ function isMine(msg: MessageDto): boolean {
  * Yalnız iki durum: 'sent' (gönderildi) ve 'seen' (okundu). Ortam kanalında tik yok (bu bileşen DM'e özel).
  */
 function messageReceipt(msg: MessageDto): 'sent' | 'seen' | null {
-  // C67: çift tik (okundu) kalktı; "kim nereye kadar gördü" mesajın altındaki avatarlarla (SeenAvatars) gösterilir.
-  // Kendi mesajımda tek tik (gönderildi) kalır.
-  return isMine(msg) ? 'sent' : null
+  if (!isMine(msg)) return null
+  // C67 (sahip kararı): grupta çift tik YOK (okuyanlar avatarla gösterilir), kendi mesajımda tek tik kalır.
+  if (props.channel.type !== 'DM') return 'sent'
+  // 1-1 DM: C12 davranışı. Kapı kapalıysa tek tik; açıksa `createdAt <= otherReadAt` → çift tik.
+  if (!dmStore.showsReceipts(props.channel.id)) return 'sent'
+  return dmStore.isSeen(props.channel.id, msg.createdAt) ? 'seen' : 'sent'
 }
 
 // C67 — görüldü avatarları. Okuyucu = kanalın güncel üyesi (grupta `members`, 1-1'de `otherUser`); kim görünür
@@ -655,7 +658,7 @@ const seenReaderPool = computed<Map<string, { username: string; avatarUrl: strin
 /** mesaj kimliği → o mesajın altındaki okuyucular (eskiden yeniye: en yeni okuyan sağda). */
 const seenByMessage = computed<Map<string, SeenReader[]>>(() => {
   const out = new Map<string, SeenReader[]>()
-  if (isDeparted.value) return out
+  if (isDeparted.value || props.channel.type !== 'GROUP_DM') return out // C67: avatar yalnız grup DM'de
   const myId = authStore.user?.id
   const sent = messages.value.filter((m) => !m.localStatus)
   const entries = [...(props.channel.seenBy ?? [])].sort((a, b) => (a.readAt < b.readAt ? -1 : a.readAt > b.readAt ? 1 : 0))

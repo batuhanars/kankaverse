@@ -75,7 +75,7 @@ export function maybeFireDmToast(
   const channel = dm.channels.find((c) => c.id === payload.channelId)
   // Şifreli DM'de sunucu içerik taşımaz: çözülmüş metin varsa o, yoksa genel "🔒 Şifreli mesaj".
   const content = payload.lastMessage.encrypted
-    ? (decryptedText ?? t('e2ee.preview'))
+    ? (decryptedText ?? (payload.lastMessage.content?.trim() || t('e2ee.preview')))
     : payload.lastMessage.content || t('notification.someone')
 
   let title: string

@@ -42,7 +42,10 @@ export function useEncryptedPreviews(channels: () => DmChannelDto[], trigger: ()
         .map(async (ch) => {
           const id = ch.lastMessage!.id
           const text = await e2ee.plainText(id)
-          if (text) previews.value[id] = text
+          // Çözülen gövde boşsa (yalnız görsel/video vb.) sunucunun yedek metni ("📷 Görsel") gösterilir.
+          const fallback = ch.lastMessage!.content?.trim()
+          if (text?.trim()) previews.value[id] = text
+          else if (text !== null && fallback) previews.value[id] = fallback
           else missing.push(ch)
         }),
     )
@@ -58,6 +61,10 @@ export function useEncryptedPreviews(channels: () => DmChannelDto[], trigger: ()
       // E5b Parça C: son mesaj cihaz öncesiyse önizleme "Şifreli mesaj" demez, boş kalır ('' = gizli).
       const last = out.find((m) => m.id === lastId)
       if (last && isBeforeDevice(last)) previews.value[lastId] = ''
+      else if (last?.e2eeStatus === 'ok' && !last.content?.trim()) {
+        const fallback = ch.lastMessage!.content?.trim()
+        if (fallback) previews.value[lastId] = fallback
+      }
     }
   }
 

@@ -119,6 +119,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
     const r = m.replyTo
     if (!r || r.editedAfterLeave || r.content !== '' || r.attachment || !engine.value) return m
     const text = await engine.value.quoteText(r.id)
+    if (text !== null && !text.trim()) return m // çözülen gövde boş (yalnız ek): sunucunun yedek metni kalır
     return { ...m, replyTo: text === null ? { ...r, e2eeUnknown: true } : { ...r, content: text } }
   }
 
