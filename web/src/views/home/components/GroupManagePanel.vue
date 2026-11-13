@@ -218,7 +218,7 @@ async function removeMember() {
         @mouseenter="hoveredMemberId = member.id; ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
         @mouseleave="hoveredMemberId = null; ($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
         @click="openCard(member.id, $event)"
-        @contextmenu.prevent="openMenu(member, $event)"
+        @contextmenu.prevent.stop="openMenu(member, $event)"
       >
         <div
           class="w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[14px] font-semibold text-white"
