@@ -125,7 +125,8 @@ async function fillQuote(m: MessageDto): Promise<MessageDto> {
   const engine = get().engine;
   if (!r || r.content !== '' || r.attachment || r.editedAfterLeave || !engine) return m;
   const text = await engine.quoteText(r.id);
-  return { ...m, replyTo: text === null ? { ...r, e2eeUnknown: true } : { ...r, content: text } };
+  // C68: yalnız ek içeren mesajın çözülmüş gövdesi boş; boş alıntı yerine genel alıntı metni.
+  return { ...m, replyTo: !text?.trim() ? { ...r, e2eeUnknown: true } : { ...r, content: text } };
 }
 
 /** C62: ayrıldıktan sonra düzenlenen mesajın içeriği sunucuda boşaltıldı; motorun etiketi ya da yerel depodan

@@ -190,7 +190,8 @@ async function decryptForUpgrade(m: MessageData): Promise<string | null> {
   if (!m.e2ee || !m.messageId) return null;
   try {
     const r = await decryptOfflineForPush(m.messageId, m.conversationId, m.e2ee);
-    return r.kind === 'text' ? r.body.slice(0, MAX_TEXT) : null;
+    // C68: boş gövde (yalnız ek) = sunucunun yedek metni kalır, bildirim metni değiştirilmez.
+    return r.kind === 'text' && r.body.trim() ? r.body.slice(0, MAX_TEXT) : null;
   } catch {
     return null; // sessiz: bildirim genel metinle görünür
   }
@@ -247,7 +248,7 @@ async function presentOnce(m: MessageData, meAvatarUrl: string | null, hidePrevi
         console.log(`[E2EE] push-once ${Date.now() - t0}ms gizli`);
         return;
       }
-      if (r.kind === 'text') decrypted = r.body.slice(0, MAX_TEXT);
+      if (r.kind === 'text' && r.body.trim()) decrypted = r.body.slice(0, MAX_TEXT);
     } catch {
       // sessiz: genel metinle çizilir
     }

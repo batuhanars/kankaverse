@@ -216,22 +216,30 @@ export default function DmScreen() {
   // 🔴 Kaynak `storeChannel` (zaten reaktif abonelik) — `useDmStore.getState()` DEĞİL: anlık
   // okuma yapan bir sürüm yazılmıştı ve `dm:read` gelince ekran yeniden çizilmediği için tik
   // hiç güncellenmezdi. Store yeni kanal nesnesi ürettiği için buradaki bağımlılık tetikleniyor.
-  // C67: çift tik kalktı. Kendi mesajımda tek tik "gönderildi" kalır; okuyucular `seenReaders` ile avatar olarak çizilir.
+  // C67 revize: çift tik yalnız 1-1 DM'de (C12 aynen): `receiptsEnabled` ve `createdAt <= otherReadAt` ise okundu,
+  // değilse tek tik "gönderildi". Grup DM'de çift tik yok (okuyucular avatarla gösterilir). Kaynak `storeChannel`
+  // (reaktif abonelik): `dm:read` gelince yeni kanal nesnesi üretilir, tik yeniden çizilir.
+  const receiptsEnabled = storeChannel?.type === 'DM' && storeChannel.receiptsEnabled === true;
+  const otherReadAt = storeChannel?.type === 'DM' ? (storeChannel.otherReadAt ?? null) : null;
+
   const receiptFor = useCallback(
-    (m: MessageDto): 'sent' | null => {
+    (m: MessageDto): 'sent' | 'seen' | null => {
       if (!myUserId || m.author.id !== myUserId) return null;
       // C29 iyimser gönderim: henüz sunucuya ulaşmamış mesajda tik yok (soluk görünüm yeterli).
       if (m.id.startsWith('pending:')) return null;
-      return 'sent';
+      // Gizlilik kapısı kapalıysa gösterge gizlenmez, tek tik kalır; okuma bilgisi sızmaz (otherReadAt sunucudan null).
+      if (!receiptsEnabled || !otherReadAt) return 'sent';
+      return m.createdAt <= otherReadAt ? 'seen' : 'sent';
     },
-    [myUserId],
+    [myUserId, receiptsEnabled, otherReadAt],
   );
 
   // C67 §3: ad/avatar kanal üyelerinden (grup) ya da karşı taraftan (1-1). Kimin görüneceği sunucu kararı (`seenBy`).
   const seenBy = storeChannel?.seenBy;
   const seenReaders = useMemo<SeenReader[]>(() => {
-    if (!storeChannel || !seenBy || departed) return [];
-    const people = storeChannel.type === 'DM' ? [storeChannel.otherUser] : storeChannel.members;
+    // C67 revize: avatarlar yalnız grup DM'de; 1-1'de boş.
+    if (!storeChannel || storeChannel.type !== 'GROUP_DM' || !seenBy || departed) return [];
+    const people = storeChannel.members;
     const out: SeenReader[] = [];
     for (const r of seenBy) {
       const p = people.find((x) => x.id === r.userId);

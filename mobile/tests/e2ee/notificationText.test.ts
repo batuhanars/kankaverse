@@ -5,6 +5,10 @@ const GENERIC = 'Yeni şifreli mesaj';
 const HIDDEN = 'Yeni mesaj';
 
 describe('notificationText (D94)', () => {
+  it('C68: çözülen metin boşsa (yalnız ek) sunucu yedek metni gösterilir', () => {
+    expect(notificationText('📷 Görsel', '', false, HIDDEN)).toBe('📷 Görsel');
+    expect(notificationText('📷 Görsel', '  ', false, HIDDEN)).toBe('📷 Görsel');
+  });
   it('ayar açık: çözüldüyse gerçek metin', () => {
     expect(notificationText(GENERIC, 'selam', false, HIDDEN)).toBe('selam');
   });

@@ -195,7 +195,9 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
                 ? t('mobile.dm.editedAfterLeave')
                 : item.lastMessage?.encrypted
                   ? // E3 §4.1: yerel depoda düz metin varsa o, yoksa genel önizleme (çözme yapılmaz)
-                    (encryptedPreviews[item.lastMessage.id] ?? t('e2ee.preview'))
+                    // C68: yalnız ek içeren mesajda çözülen gövde boş; sunucunun yedek metni ("📷 Görsel") gösterilir.
+                    (encryptedPreviews[item.lastMessage.id] ??
+                      (item.lastMessage.content?.trim() ? item.lastMessage.content : t('e2ee.preview')))
                   : item.lastMessage
                   ? formatMentionsPlain(item.lastMessage.content, resolver(item), t('mention.unknown'))
                   : '';
