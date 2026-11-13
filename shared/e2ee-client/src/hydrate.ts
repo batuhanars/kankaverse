@@ -54,7 +54,7 @@ export class Hydrator {
    * kontrolü yok. Çözülemeyen mesaj `unavailable` döner ve ASLA kalıcı başarısızlık yazılmaz (eksik
    * commit olabilir; karar çevrimiçi yolun).
    */
-  private offline: boolean
+  private offline: boolean // kanal durumu 403 dönerse (eski üye) çalışma anında true olur, bkz. onlineState
 
   constructor(ctx: E2eeContext, channelId: string, own: OwnPlain, offline = false) {
     this.ctx = ctx
@@ -65,13 +65,29 @@ export class Hydrator {
 
   private async init() {
     if (this.group !== undefined) return
-    const state = this.offline ? null : (await this.ctx.api.channelState(this.channelId)).data
+    const state = this.offline ? null : await this.onlineState()
     if (state) await dropStaleGroup(this.ctx, this.channelId, state) // bayat grupla çözme denenmez (§6.4)
     this.group = await this.step('group-load', () => this.ctx.store.loadGroup(this.channelId))
     this.joinedAt = await this.ctx.store.loadJoinedAt(this.channelId)
     this.ownDeviceId = (await this.step('device-load', () => this.ctx.getDevice())).deviceId
     const snapshot = state ?? (await this.step('view-load', () => this.ctx.store.loadView(this.channelId)))
     this.view = snapshot ? { devices: devicesOf(snapshot) } : undefined
+  }
+
+  /**
+   * Kanal durumu. C62 (sahip bulgusu 2026-11-13): gruptan ayrılmış/çıkarılmış eski üyeye sunucu 403 döner; bu hata
+   * yukarı çıkarsa TÜM sayfa (yerelde çözülmüş kayıtlar dahil) "çözülemedi" sayılıp gizleniyordu. 403'te ağsız yola
+   * düşülür: önbellekteki görünüm, commit senkronu yok, kalıcı başarısızlık yazımı yok. İstemcinin kanalı "eski"
+   * bilmesine gerek kalmaz (sayfa yenilemede liste yüklenmeden önce de doğru çalışır). Diğer hatalar aynen çıkar.
+   */
+  private async onlineState() {
+    try {
+      return (await this.ctx.api.channelState(this.channelId)).data
+    } catch (e) {
+      if ((e as { response?: { status?: number } }).response?.status !== 403) throw e
+      this.offline = true
+      return null
+    }
   }
 
   /** Çevrimdışı (bildirim) yolunda adım süresi ölçümü (E3 Rev.3 k.5): yalnız ad + süre, içerik yok. */

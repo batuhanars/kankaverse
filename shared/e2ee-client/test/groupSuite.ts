@@ -187,6 +187,19 @@ export function groupSuite(label: string) {
       expect(out[1].content).toBe('C hiç açmadı')
     })
 
+    // Sayfa yenilemede istemci kanalın "eski" olduğunu henüz bilmeyebilir (liste yüklenmeden mesaj çekilir): motor
+    // 403'ü görünce kendisi yerel yola düşmeli; aksi hâlde yerelde çözülmüş kayıtlar da kaybolurdu.
+    it('eski üye (seçeneksiz): kanal durumu 403 iken yerel kayıtlar yine görünür, hata çıkmaz', async () => {
+      const { A1, C1 } = await trio()
+      const seen = await send(A1, 'm2', 'C görmüştü')
+      expect(await text(C1, seen)).toBe('C görmüştü')
+      const unseen = await send(A1, 'm3', 'C hiç açmadı')
+      server.removeMember(CH, 'C', LEFT)
+      server.failChannelState = true
+      const out = await show(C1, [seen, unseen])
+      expect(out.map((m) => m.content)).toEqual(['C görmüştü', 'C hiç açmadı'])
+    })
+
     it('yeniden katılınca "çıkarıldı" uyarısı kalkar (null); aradaki (katılım öncesi) mesaj "çözülemedi" değil cihaz öncesi', async () => {
       const { A1, C1 } = await removedThenReAdded()
       const gap = await send(A1, 'mg', 'C henüz MLS dışında', new Date(Date.now() + 60_000).toISOString())
