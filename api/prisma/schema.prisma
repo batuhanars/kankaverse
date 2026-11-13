@@ -1016,15 +1016,29 @@ model E2eeDevice {
   id           String           @id @default(cuid())
   userId       String
   user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenFamily  String           @unique // refresh rotasyonunda sabit; zincir bitince cihaz iptal (§2.6)
+  tokenFamily  String?          @unique // refresh rotasyonunda sabit; zincir bitince cihaz iptal (§2.6). C69: çıkışta null (park)
   platform     String // 'web' | 'android'
   signatureKey Bytes // MLS leaf imza açık anahtarı (Ed25519, 32 bayt)
   createdAt    DateTime         @default(now())
   lastSeenAt   DateTime         @default(now())
   revokedAt    DateTime?
+  parkedAt     DateTime? // C69: çıkışla park edildi (iptal DEĞİL); yeniden bağlanınca null, 30 gün sonra işle iptal
   keyPackages  E2eeKeyPackage[]
 
   @@index([userId])
+  @@index([parkedAt])
+}
+
+/// C69: park edilmiş cihazı yeniden bağlama meydan okuması. Tek kullanımlık, kısa ömürlü; sır değil (imzalanacak rastgele değer).
+model E2eeRebindNonce {
+  id        String   @id @default(cuid())
+  userId    String
+  nonce     Bytes    @unique // 32 bayt rastgele
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model E2eeKeyPackage {

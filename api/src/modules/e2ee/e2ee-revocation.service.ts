@@ -53,6 +53,19 @@ export class E2eeRevocationService {
     return deviceRevokeOps(this.prisma, await this.resolveWhere(scope));
   }
 
+  /**
+   * C69: ÇIKIŞ - zincirin cihazı iptal edilmez, park edilir (tokenFamily=null, parkedAt=now). Oturum
+   * işlemiyle AYNI transaction'a eklenir. İptal edilmiş cihaza dokunmaz. Yayın gerekmez (cihaz grupta kalır).
+   */
+  parkOps(family: string): Prisma.PrismaPromise<unknown>[] {
+    return [
+      this.prisma.e2eeDevice.updateMany({
+        where: { tokenFamily: family, revokedAt: null },
+        data: { tokenFamily: null, parkedAt: new Date() },
+      }),
+    ];
+  }
+
   /** Transaction commit'inden SONRA: etkilenen kullanıcıların DM odalarına `e2ee:devices-changed`. */
   async announce(scope: RevokeScope): Promise<void> {
     try {
@@ -75,7 +88,11 @@ export class E2eeRevocationService {
     }
     if (scope.userId) {
       const except = scope.exceptSessionId ? await this.familyOf(scope.exceptSessionId) : null;
-      return { userId: scope.userId, ...(except ? { tokenFamily: { not: except } } : {}) };
+      // C69: park cihazın tokenFamily'si NULL; SQL `<>` NULL'u dışlar -> açıkça dahil et (parola değişimi park'ı da iptal eder).
+      return {
+        userId: scope.userId,
+        ...(except ? { OR: [{ tokenFamily: null }, { tokenFamily: { not: except } }] } : {}),
+      };
     }
     return { tokenFamily: { in: families } };
   }

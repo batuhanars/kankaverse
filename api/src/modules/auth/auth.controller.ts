@@ -21,6 +21,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { Login2faDto } from './dto/login-2fa.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { LogoutDto } from './dto/logout.dto';
 import { resolveDeviceName } from '../../common/utils/device-name.util';
 import { normalizeClientType } from './utils/client-type.util';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -200,8 +201,12 @@ export class AuthController {
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Oturumu kapat' })
-  async logout(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
-    await this.authService.logout(user.sessionId);
+  async logout(
+    @CurrentUser() user: AuthUser,
+    @Res({ passthrough: true }) res: Response,
+    @Body() dto?: LogoutDto,
+  ) {
+    await this.authService.logout(user.sessionId, dto?.keepE2eeDevice === true);
     res.clearCookie(REFRESH_COOKIE, { path: '/' });
     return null;
   }

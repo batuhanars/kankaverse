@@ -561,15 +561,20 @@ export class AuthService implements OnModuleInit {
     return { accessToken: issued.accessToken, refreshToken: issued.refreshToken };
   }
 
-  async logout(sessionId: string) {
+  async logout(sessionId: string, keepE2eeDevice = false) {
     const family = await this.familyOf(sessionId);
-    await this.revokeWithDevices(
-      { sessionId },
-      this.prisma.session.updateMany({
-        where: family ? { tokenFamily: family, revokedAt: null } : { id: sessionId },
-        data: { revokedAt: new Date() },
-      }),
-    );
+    const sessionOp = this.prisma.session.updateMany({
+      where: family ? { tokenFamily: family, revokedAt: null } : { id: sessionId },
+      data: { revokedAt: new Date() },
+    });
+    // R7 / C69: YALNIZ istemci açıkça `keepE2eeDevice=true` derse (yerel depoyu silmeyen mobil/masaüstü) cihaz
+    // park edilir (oturum + park AYNI transaction). Varsayılan (tarayıcı, eski istemciler) bugünkü davranış:
+    // cihaz iptal + KeyPackage silme + yayın. Diğer iptal noktaları her zaman iptal eder.
+    if (keepE2eeDevice && family) {
+      await this.prisma.$transaction([sessionOp, ...this.e2ee.parkOps(family)]);
+      return;
+    }
+    await this.revokeWithDevices({ sessionId }, sessionOp);
   }
 
   /**

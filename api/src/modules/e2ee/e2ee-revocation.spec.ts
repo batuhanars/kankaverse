@@ -45,9 +45,22 @@ describe('E2eeRevocationService (§2.6, R7)', () => {
     await svc.revokeOps({ userId: 'u1', exceptSessionId: 's-now' });
     expect(prisma.e2eeDevice.updateMany.mock.calls[0][0].where).toEqual({
       userId: 'u1',
-      tokenFamily: { not: 'keep' },
+      // C69: park cihaz (tokenFamily NULL) açıkça dahil: SQL `<>` NULL'u dışlardı
+      OR: [{ tokenFamily: null }, { tokenFamily: { not: 'keep' } }],
       revokedAt: null,
     });
+  });
+
+  it('C69 parkOps: yalnız o zincirin iptal edilmemiş cihazını park eder (tokenFamily=null, parkedAt=now), KeyPackage silmez', () => {
+    const { prisma, svc } = setup();
+    const ops = svc.parkOps('fam-1');
+    expect(ops).toEqual(['UPD']);
+    const call = prisma.e2eeDevice.updateMany.mock.calls[0][0];
+    expect(call.where).toEqual({ tokenFamily: 'fam-1', revokedAt: null });
+    expect(call.data.tokenFamily).toBeNull();
+    expect(call.data.parkedAt).toBeInstanceOf(Date);
+    expect(call.data.revokedAt).toBeUndefined();
+    expect(prisma.e2eeKeyPackage.deleteMany).not.toHaveBeenCalled();
   });
 
   it('userId kapsamı (istisnasız: parola sıfırlama, hesap silme): kullanıcının hepsi', async () => {

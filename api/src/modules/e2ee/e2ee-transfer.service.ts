@@ -393,11 +393,14 @@ export class E2eeTransferService {
       select: { platform: true, tokenFamily: true, createdAt: true },
     });
     if (!device) return { platform: null, name: null, createdAt: null };
-    const session = await this.prisma.session.findFirst({
-      where: { tokenFamily: device.tokenFamily },
-      orderBy: { createdAt: 'desc' },
-      select: { device: true },
-    });
+    // C69: park cihazın zinciri yok (tokenFamily null) -> oturum adı yok.
+    const session = device.tokenFamily
+      ? await this.prisma.session.findFirst({
+          where: { tokenFamily: device.tokenFamily },
+          orderBy: { createdAt: 'desc' },
+          select: { device: true },
+        })
+      : null;
     return {
       platform: device.platform,
       name: session?.device ?? null,

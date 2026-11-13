@@ -11,6 +11,9 @@ import { E2eeGroupsService } from './e2ee-groups.service';
 import { E2eeMembershipService } from './e2ee-membership.service';
 import { E2eeMessageService } from './e2ee-message.service';
 import { E2eeNotifyService } from './e2ee-notify.service';
+import { E2eeParkedJob } from './e2ee-parked.job';
+import { E2eeParkedService } from './e2ee-parked.service';
+import { E2eeRebindService } from './e2ee-rebind.service';
 import { E2eeRevocationService } from './e2ee-revocation.service';
 import { E2eeController } from './e2ee.controller';
 import { UserThrottlerGuard } from './user-throttler.guard';
@@ -33,6 +36,9 @@ import { UserThrottlerGuard } from './user-throttler.guard';
     E2eeMembershipService,
     E2eeExistsService,
     E2eeRevocationService,
+    E2eeRebindService,
+    E2eeParkedService,
+    E2eeParkedJob,
   ],
   exports: [E2eeMessageService, E2eeRevocationService, E2eeMembershipService],
 })

@@ -136,3 +136,17 @@ export class PostCommitDto {
   @Type(() => WelcomeItemDto)
   welcomes?: WelcomeItemDto[];
 }
+
+/** C69: park cihazı yeni oturum zincirine bağla. İmza: Ed25519(nonce || userId || deviceId). */
+export class RebindDto {
+  @ApiProperty({ description: 'Park edilmiş cihazın kimliği' })
+  @IsString()
+  @Matches(E2EE_ID_RE, { message: 'Geçersiz cihaz kimliği.' })
+  deviceId: string;
+
+  @ApiProperty({ description: 'Ed25519 imzası (64 bayt), base64' })
+  @IsString()
+  @IsBase64(undefined, B64)
+  @MaxLength(128)
+  signature: string;
+}

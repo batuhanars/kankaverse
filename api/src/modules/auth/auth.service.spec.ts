@@ -58,7 +58,11 @@ function makePrismaMock() {
 }
 
 // E1: cihaz iptali bağımlılığı (davranış testleri e2ee-revocation.spec.ts ve aşağıdaki E1 bloğunda)
-const e2eeMock = { revokeOps: jest.fn().mockResolvedValue([]), announce: jest.fn() };
+const e2eeMock = {
+  revokeOps: jest.fn().mockResolvedValue([]),
+  announce: jest.fn(),
+  parkOps: jest.fn().mockReturnValue([]), // C69: çıkış cihazı park eder
+};
 
 function makeService(prismaMock: ReturnType<typeof makePrismaMock>) {
   const jwtService = new JwtService();
@@ -335,13 +339,40 @@ describe('AuthService — E1 E2EE cihaz iptali', () => {
     expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ families: ['fam-1'] });
   });
 
-  it('çıkış → oturumun zinciri için cihaz iptali + yayın', async () => {
+  it('çıkış (gövde yok / keepE2eeDevice yok) → BUGÜNKÜ davranış: cihaz iptal + yayın, park yok', async () => {
     const { prismaMock, service } = setup();
-    prismaMock.session.update.mockReturnValue('SES_UPD');
+    prismaMock.session.findUnique.mockResolvedValue({ tokenFamily: 'fam-1' });
+    prismaMock.session.updateMany.mockReturnValue('SES_UPD');
     await service.logout('s1');
     expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ sessionId: 's1' });
-    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
     expect(e2eeMock.announce).toHaveBeenCalledWith({ sessionId: 's1' });
+    expect(e2eeMock.parkOps).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('çıkış keepE2eeDevice=false → iptal, park yok', async () => {
+    const { prismaMock, service } = setup();
+    prismaMock.session.findUnique.mockResolvedValue({ tokenFamily: 'fam-1' });
+    await service.logout('s1', false);
+    expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ sessionId: 's1' });
+    expect(e2eeMock.parkOps).not.toHaveBeenCalled();
+  });
+
+  it('C69: çıkış keepE2eeDevice=true → cihaz İPTAL EDİLMEZ, park (oturum + park tek transaction)', async () => {
+    const { prismaMock, service } = setup();
+    prismaMock.session.findUnique.mockResolvedValue({ tokenFamily: 'fam-1' });
+    prismaMock.session.updateMany.mockReturnValue('SES_UPD');
+    e2eeMock.parkOps.mockReturnValue(['PARK_OP']);
+    await service.logout('s1', true);
+    expect(e2eeMock.parkOps).toHaveBeenCalledWith('fam-1');
+    expect(e2eeMock.revokeOps).not.toHaveBeenCalled();
+    expect(e2eeMock.announce).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.$transaction.mock.calls[0][0]).toEqual(['SES_UPD', 'PARK_OP']);
+    expect(prismaMock.session.updateMany.mock.calls[0][0].where).toEqual({
+      tokenFamily: 'fam-1',
+      revokedAt: null,
+    });
   });
 
   it('oturumlarımdan kapatma → o oturumun ailesi', async () => {
@@ -388,6 +419,23 @@ describe('AuthService — E1 E2EE cihaz iptali', () => {
     await service.deleteAccount('u1', { currentPassword: 'sifre-12345' } as never);
     expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ userId: 'u1' });
     expect(e2eeMock.announce).toHaveBeenCalledWith({ userId: 'u1' });
+  });
+
+  it('C69: parola sıfırlama → kullanıcı kapsamlı iptal (park cihazları da; istisna yok)', async () => {
+    const { prismaMock, service } = setup();
+    (prismaMock as any).authToken = {
+      findFirst: jest.fn().mockResolvedValue({
+        id: 't1',
+        userId: 'u1',
+        type: 'PASSWORD_RESET',
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 60_000),
+      }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    };
+    prismaMock.session.updateMany.mockReturnValue('SES_UPD');
+    await service.resetPassword({ token: 'x'.repeat(40), newPassword: 'yeni-sifre-456' } as never);
+    expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ userId: 'u1' });
   });
 });
 
@@ -514,5 +562,17 @@ describe('AuthService.refresh — D108 yarış / grace', () => {
     await service.logout(child.id);
     expect(rows.filter((r) => r.revokedAt === null)).toHaveLength(0);
     expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ sessionId: child.id });
+    expect(e2eeMock.parkOps).not.toHaveBeenCalled();
+  });
+
+  it('çıkış keepE2eeDevice=true: aile yine bütünüyle kapanır (D108), park', async () => {
+    const { service, raw, rows } = await setup();
+    await service.refresh(raw, '1.1.1.1', true);
+    await service.refresh(raw, '1.1.1.1', true);
+    const child = rows.find((r) => r.id !== 's1')!;
+    await service.logout(child.id, true);
+    expect(rows.filter((r) => r.revokedAt === null)).toHaveLength(0);
+    expect(e2eeMock.parkOps).toHaveBeenCalledWith('fam-1');
+    expect(e2eeMock.revokeOps).not.toHaveBeenCalled();
   });
 });

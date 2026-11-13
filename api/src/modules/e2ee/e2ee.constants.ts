@@ -82,3 +82,12 @@ export const E2EE_EVENT_TRANSFER_ACCEPTED = 'e2ee:transfer-accepted';
 export const E2EE_EVENT_TRANSFER_REVEALED = 'e2ee:transfer-revealed';
 export const E2EE_EVENT_TRANSFER_READY = 'e2ee:transfer-ready';
 export const E2EE_EVENT_TRANSFER_CLOSED = 'e2ee:transfer-closed';
+
+// ── C69 çıkışta cihaz park ─────────────────────────────────────────────────
+/** Park edilmiş (çıkış yapılmış) cihaz bu kadar gün sonra iptal edilir. TEK yer. */
+export const E2EE_PARKED_RETENTION_DAYS = 30;
+/** Yeniden bağlama meydan okuması ömrü ve uzunluğu. */
+export const E2EE_REBIND_NONCE_TTL_MS = 2 * 60 * 1000;
+export const E2EE_REBIND_NONCE_BYTES = 32;
+/** Ed25519 imzası 64 bayt. */
+export const E2EE_SIGNATURE_BYTES = 64;

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -20,11 +21,14 @@ import { E2eeExistsService } from './e2ee-exists.service';
 import { E2eeEnabledGuard } from './e2ee-enabled.guard';
 import { E2eeFlagService } from './e2ee-flag.service';
 import { E2eeGroupsService } from './e2ee-groups.service';
+import { E2eeParkedService } from './e2ee-parked.service';
+import { E2eeRebindService } from './e2ee-rebind.service';
 import {
   ClaimKeyPackagesDto,
   CreateGroupDto,
   MessagesExistDto,
   PostCommitDto,
+  RebindDto,
   RegisterDeviceDto,
   UploadKeyPackagesDto,
 } from './dto/e2ee.dto';
@@ -41,6 +45,8 @@ export class E2eeController {
     private claims: E2eeClaimService,
     private groups: E2eeGroupsService,
     private exists: E2eeExistsService,
+    private rebinder: E2eeRebindService,
+    private parked: E2eeParkedService,
   ) {}
 
   @Get('status')
@@ -63,6 +69,41 @@ export class E2eeController {
   @ApiOperation({ summary: 'Bu oturum zinciri için şifreleme cihazı kaydet (idempotent)' })
   register(@CurrentUser() user: RequestUser, @Body() dto: RegisterDeviceDto) {
     return this.devices.register(user, dto);
+  }
+
+  @Post('devices/rebind/challenge')
+  @UseGuards(E2eeEnabledGuard, UserThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'C69: park cihazı yeniden bağlamak için tek kullanımlık nonce (2 dk)' })
+  rebindChallenge(@CurrentUser() user: RequestUser) {
+    return this.rebinder.challenge(user.id);
+  }
+
+  @Post('devices/rebind')
+  @UseGuards(E2eeEnabledGuard, UserThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'C69: park cihazı bu oturum zincirine bağla (Ed25519 imzası: nonce || userId || deviceId)',
+  })
+  rebind(@CurrentUser() user: RequestUser, @Body() dto: RebindDto) {
+    return this.rebinder.rebind(user, dto);
+  }
+
+  @Get('devices/parked')
+  @UseGuards(E2eeEnabledGuard)
+  @ApiOperation({ summary: 'C69: çıkış yapılmış (park) cihazlarım (Oturumlarım)' })
+  parkedDevices(@CurrentUser() user: RequestUser) {
+    return this.parked.list(user.id);
+  }
+
+  @Delete('devices/parked/:id')
+  @UseGuards(E2eeEnabledGuard)
+  @ApiOperation({ summary: 'C69: kendi park cihazımı kaldır (iptal)' })
+  removeParked(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.parked.revoke(user.id, id);
   }
 
   @Get('devices/me')
