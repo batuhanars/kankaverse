@@ -18,7 +18,7 @@ import { isStaleGroup } from './staleGroup'
 async function joinOne(ctx: E2eeContext, device: Device, row: E2eeWelcomeRow): Promise<boolean> {
   const { data } = await ctx.api.channelState(row.channelId)
   const local = await ctx.store.loadGroup(row.channelId)
-  if (local && local.isActive && !isStaleGroup(local, data)) return false
+  const activeLocal = local && local.isActive && !isStaleGroup(local, data) ? local : null
   const devices = devicesOf(data)
   const { registered } = devices // iptaller ve eski üyeler dahil: ağaçta geçmişten kalan yaprak olabilir
   const group = await guardUntrusted(ctx, row.channelId, () =>
@@ -26,6 +26,10 @@ async function joinOne(ctx: E2eeContext, device: Device, row: E2eeWelcomeRow): P
   )
   // Sunucunun güncel grubuna ait olmayan Welcome (eski grubun artığı) işlenmez, yerel durum bozulmaz.
   if (data.groupId && toB64(group.groupId) !== data.groupId) return false
+  // Yerel grup aktif görünüyorsa Welcome yalnız DAHA YENİ epoch'a aitse işlenir: cihaz çıkarıldı ama çıkarma
+  // commit'ini hiç işlemedi (soket odasından düştü) ve geri eklendi (sahip bulgusu 2026-11-13). Aynı ya da
+  // eski epoch'taki Welcome bayattır; atılır.
+  if (activeLocal && group.epoch <= activeLocal.epoch) return false
   // Katılma KeyPackage'ı tüketir: önce cihaz, sonra grup diske (yarıda kalırsa Welcome yeniden gelir).
   await ctx.store.saveDevice(device)
   await ctx.store.saveGroup(row.channelId, group)

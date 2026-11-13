@@ -156,6 +156,22 @@ export function groupSuite(label: string) {
       expect(await text(C1, m)).toBe('C döndü')
     })
 
+    // Sahip bulgusu 2026-11-13: çıkarılan cihaz soket odasından düştüğü için çıkarma commit'ini HİÇ işlemeden
+    // geri eklenir; yerel grup hâlâ "aktif" (eski epoch). Welcome bayat sanılıp atılırsa cihaz kalıcı kilitlenir.
+    it('geri eklenen üye (d) çıkarılmayı İŞLEMEDEN Welcome alır: yine katılır, sonraki mesajı çözer', async () => {
+      const { A1, B1, C1 } = await trio()
+      server.removeMember(CH, 'C', LEFT)
+      await sync(A1, B1) // C1 çıkarılır ama C1 bunu işlemez (odadan düştü)
+      server.addMember(CH, 'C', later())
+      await sync(A1) // C1 yeniden eklenir (yeni Welcome)
+      await sync(B1)
+      expect(await as(C1, (e) => e.onWelcome())).toEqual([CH])
+      const m = await send(A1, 'm5', 'C döndü')
+      expect(await text(C1, m)).toBe('C döndü')
+      const sent = await send(C1, 'm6', 'döndüm')
+      expect(await text(B1, sent)).toBe('döndüm')
+    })
+
     it('yeniden katılınca "çıkarıldı" uyarısı kalkar (null); aradaki (katılım öncesi) mesaj "çözülemedi" değil cihaz öncesi', async () => {
       const { A1, C1 } = await removedThenReAdded()
       const gap = await send(A1, 'mg', 'C henüz MLS dışında', new Date(Date.now() + 60_000).toISOString())
