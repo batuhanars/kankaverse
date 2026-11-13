@@ -17,8 +17,37 @@ const props = defineProps<{
   sentLabel: string
   /** C49 R2: DM'lere ek olarak ortam metin kanallarını da listeler (varsayılan kapalı, iletme etkilenmez). */
   withGuildChannels?: boolean
+  /** C68: seçim modu (opt-in). Verilmezse satıra dokunmak bugünkü gibi `pick` emit eder. */
+  selectable?: boolean
+  selectedIds?: Set<string>
+  /** Seçim üst sınırı; aşılırsa `limit` emit edilir, seçim eklenmez. */
+  max?: number
 }>()
-const emit = defineEmits<{ pick: [channel: DmChannelDto]; pickChannel: [channelId: string] }>()
+const emit = defineEmits<{
+  pick: [channel: DmChannelDto]
+  pickChannel: [channelId: string]
+  'update:selectedIds': [ids: Set<string>]
+  limit: []
+}>()
+
+function onRowClick(c: DmChannelDto) {
+  if (!props.selectable) {
+    emit('pick', c)
+    return
+  }
+  if (props.sentIds?.has(c.id)) return
+  const next = new Set(props.selectedIds ?? [])
+  if (next.has(c.id)) {
+    next.delete(c.id)
+  } else {
+    if (props.max !== undefined && next.size >= props.max) {
+      emit('limit')
+      return
+    }
+    next.add(c.id)
+  }
+  emit('update:selectedIds', next)
+}
 
 const { t } = useI18n()
 const dmStore = useDmStore()
@@ -97,8 +126,9 @@ onMounted(() => {
         v-for="c in filtered"
         :key="c.id"
         class="flex items-center gap-2.5 px-2 py-2 rounded-[var(--kv-radius-md)] text-left transition-colors hover:bg-[var(--kv-accent-subtle)]"
-        :disabled="props.disabled || props.sendingId === c.id"
-        @click="emit('pick', c)"
+        :disabled="props.disabled || props.sendingId === c.id || (props.selectable && props.sentIds?.has(c.id))"
+        :aria-pressed="props.selectable ? props.selectedIds?.has(c.id) ?? false : undefined"
+        @click="onRowClick(c)"
       >
         <div
           class="w-8 h-8 rounded-full shrink-0 overflow-hidden flex items-center justify-center text-[12px] font-semibold text-white"
@@ -114,6 +144,16 @@ onMounted(() => {
           style="color: var(--kv-online, #3DB46E);"
         >{{ props.sentLabel }}</span>
         <span v-else-if="props.sendingId === c.id" class="shrink-0 text-[12px]" style="color: var(--kv-text-muted);">…</span>
+        <span
+          v-else-if="props.selectable"
+          class="shrink-0 w-5 h-5 rounded-full border flex items-center justify-center"
+          :style="props.selectedIds?.has(c.id)
+            ? 'background-color: var(--kv-accent-500); border-color: var(--kv-accent-500); color: #fff;'
+            : 'border-color: var(--kv-border-strong);'"
+          aria-hidden="true"
+        >
+          <svg v-if="props.selectedIds?.has(c.id)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+        </span>
       </button>
 
       <template v-for="g in filteredGroups" :key="g.guildId">

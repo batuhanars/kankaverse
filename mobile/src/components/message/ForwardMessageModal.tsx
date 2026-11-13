@@ -11,13 +11,16 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { usePathname, useRouter } from 'expo-router';
 import type { MessageDto } from '@/api/messages';
 import { sendMessage } from '@/stores/e2ee';
 import { attachmentsApi } from '@/api/attachments';
 import { extractErrorMessage } from '@/api/errors';
 import { useAttachmentThumb } from './replyPreview';
 import { useDmStore } from '@/stores/dm';
+import { showToast } from '@/stores/toast';
 import { channelTitle } from '@/utils/channelTitle';
+import { dmRouteParams } from '@/utils/dmRoute';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -37,6 +40,9 @@ import { theme } from '@/theme';
  * T&S: engelli/izinsiz DM'e iletmeyi sunucu reddeder (`canDm`); istemci kapıyı taklit etmez,
  * sunucunun Türkçe mesajını satırın altında gösterir.
  */
+/** C68 §1: tek seferde en fazla bu kadar hedef (toplu yayma sinirı). */
+const MAX_TARGETS = 5;
+
 interface Props {
   message: MessageDto;
   onClose: () => void;
@@ -47,7 +53,10 @@ export function ForwardMessageModal({ message, onClose }: Props) {
   const channels = useDmStore((s) => s.channels);
 
   const [query, setQuery] = useState('');
-  const [sendingId, setSendingId] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [sending, setSending] = useState(false);
   const [sentIds, setSentIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -66,26 +75,68 @@ export function ForwardMessageModal({ message, onClose }: Props) {
     return channels.filter((c) => channelTitle(c).toLocaleLowerCase('tr').includes(q));
   }, [channels, query]);
 
-  async function forwardTo(channelId: string) {
-    if (sendingId || sentIds.includes(channelId) || !hasContent) return;
-    setSendingId(channelId);
-    setErrorMessage('');
-    try {
-      // Her hedef kendi kopyalarini alir (ek tek mesaja baglanir). Paralel kopya; biri reddedilirse
-      // hedef "gonderildi" isaretlenmez (kopyalanip baglanmayan ek sahipsiz kalir, presign'daki gibi).
-      const copies = await Promise.all(attachments.map((a) => attachmentsApi.forward(a.id)));
-      await sendMessage(
-        channelId,
-        forwardText,
-        undefined,
-        copies.map((c) => c.attachmentId),
-      );
-      setSentIds((prev) => [...prev, channelId]);
-    } catch (e) {
-      setErrorMessage(extractErrorMessage(e));
-    } finally {
-      setSendingId(null);
+  function toggle(channelId: string) {
+    if (sending || sentIds.includes(channelId)) return;
+    if (selectedIds.includes(channelId)) {
+      setSelectedIds((prev) => prev.filter((id) => id !== channelId));
+      setErrorMessage('');
+      return;
     }
+    if (selectedIds.length >= MAX_TARGETS) {
+      // Uygulama toast'i Modal'in altinda kalir; sinir uyarisi mevcut hata alanindan gosterilir.
+      setErrorMessage(t('message.forwardLimit'));
+      return;
+    }
+    setSelectedIds((prev) => [...prev, channelId]);
+    setErrorMessage('');
+  }
+
+  // Bir hedefe gonderim: bugunku mantik (her ek icin sunucuda kopya, sonra normal/E2EE gonderim).
+  // Biri reddedilirse hedef "gonderildi" isaretlenmez.
+  async function forwardTo(channelId: string) {
+    const copies = await Promise.all(attachments.map((a) => attachmentsApi.forward(a.id)));
+    await sendMessage(
+      channelId,
+      forwardText,
+      undefined,
+      copies.map((c) => c.attachmentId),
+    );
+  }
+
+  // C68 §3: kaynak ekran bir DM sohbetiyse (`/dm/<id>`) replace, degilse push; hedef = kaynak ise yalniz kapat.
+  function openTarget(channelId: string) {
+    const sourceMatch = /^\/dm\/([^/]+)/.exec(pathname);
+    const sourceChannelId = sourceMatch ? decodeURIComponent(sourceMatch[1]) : null;
+    onClose();
+    if (sourceChannelId === channelId) return;
+    const channel = channels.find((c) => c.id === channelId);
+    if (!channel) return;
+    if (sourceChannelId) router.replace(dmRouteParams(channel));
+    else router.push(dmRouteParams(channel));
+  }
+
+  async function send() {
+    if (sending || !hasContent || selectedIds.length === 0) return;
+    const targets = selectedIds;
+    setSending(true);
+    setErrorMessage('');
+    const results = await Promise.allSettled(targets.map((id) => forwardTo(id)));
+    const okIds = targets.filter((_, i) => results[i].status === 'fulfilled');
+    const firstFail = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+    setSending(false);
+
+    if (!firstFail) {
+      if (targets.length === 1) openTarget(targets[0]);
+      else {
+        onClose();
+        showToast(t('message.forwardedMany', { n: targets.length }));
+      }
+      return;
+    }
+    // Kismi/tam basarisizlik: pencere acik kalir, basarililar "Iletildi" olur ve secimden duser.
+    setSentIds((prev) => [...prev, ...okIds]);
+    setSelectedIds(targets.filter((id) => !okIds.includes(id)));
+    setErrorMessage(extractErrorMessage(firstFail.reason));
   }
 
   return (
@@ -145,30 +196,55 @@ export function ForwardMessageModal({ message, onClose }: Props) {
                 keyExtractor={(item) => item.id}
                 style={styles.list}
                 keyboardShouldPersistTaps="handled"
+                extraData={selectedIds}
                 renderItem={({ item }) => {
                   const sent = sentIds.includes(item.id);
+                  const selected = selectedIds.includes(item.id);
                   return (
                     <Pressable
-                      onPress={() => forwardTo(item.id)}
-                      disabled={sent || !!sendingId || !hasContent}
+                      onPress={() => toggle(item.id)}
+                      disabled={sent || sending || !hasContent}
                       style={styles.row}
                     >
                       <Text style={styles.rowName} numberOfLines={1}>
                         {channelTitle(item)}
                       </Text>
-                      {sendingId === item.id ? (
-                        <ActivityIndicator color={theme.colors.textMuted} />
-                      ) : sent ? (
+                      {sent ? (
                         <View style={styles.sentRow}>
                           <Ionicons name="checkmark" size={16} color={theme.colors.accent500} />
                           <Text style={styles.sentText}>{t('message.forwardedShort')}</Text>
                         </View>
-                      ) : null}
+                      ) : (
+                        <View style={[styles.check, selected && styles.checkOn]}>
+                          {selected ? (
+                            <Ionicons name="checkmark" size={14} color={theme.colors.textPrimary} />
+                          ) : null}
+                        </View>
+                      )}
                     </Pressable>
                   );
                 }}
               />
             )}
+
+            <Pressable
+              onPress={send}
+              disabled={sending || !hasContent || selectedIds.length === 0}
+              style={[
+                styles.sendButton,
+                (sending || !hasContent || selectedIds.length === 0) && styles.sendButtonDisabled,
+              ]}
+            >
+              {sending ? (
+                <ActivityIndicator color={theme.colors.textPrimary} />
+              ) : (
+                <Text style={styles.sendButtonText}>
+                  {selectedIds.length > 1
+                    ? t('message.forwardSendCount', { n: selectedIds.length })
+                    : t('message.forwardSend')}
+                </Text>
+              )}
+            </Pressable>
           </View>
         </Pressable>
       </Pressable>
@@ -270,6 +346,34 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.base,
     fontWeight: '500',
+  },
+  check: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: theme.colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkOn: {
+    backgroundColor: theme.colors.accent500,
+    borderColor: theme.colors.accent500,
+  },
+  sendButton: {
+    minHeight: theme.layout.inputMinHeight,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accent500,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    opacity: 0.5,
+  },
+  sendButtonText: {
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.base,
+    fontWeight: '700',
   },
   sentRow: {
     flexDirection: 'row',

@@ -9,13 +9,17 @@
  */
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useToastStore } from '@/stores/toast'
 import { useE2eeStore } from '@/stores/e2ee'
 import { attachmentsApi } from '@/api/attachments'
 import KvModal from '@/components/ui/KvModal.vue'
 import DmTargetList from '@/components/shared/DmTargetList.vue'
 import { useAttachmentThumb } from '@/composables/useAttachmentThumb'
-import type { MessageDto, DmChannelDto } from '@/types'
+import KvButton from '@/components/ui/KvButton.vue'
+import type { MessageDto } from '@/types'
+
+const MAX_TARGETS = 5
 
 const props = defineProps<{ message: MessageDto }>()
 const emit = defineEmits<{ close: [] }>()
@@ -23,7 +27,9 @@ const emit = defineEmits<{ close: [] }>()
 const { t } = useI18n()
 const toast = useToastStore()
 
-const sendingId = ref<string | null>(null)
+const router = useRouter()
+const sending = ref(false)
+const selectedIds = ref<Set<string>>(new Set())
 const sentIds = ref<Set<string>>(new Set())
 
 const forwardText = computed(() => props.message.content?.trim() ?? '')
@@ -36,23 +42,49 @@ const hasContent = computed(() => !!forwardText.value || attachments.value.lengt
 const firstAttachment = computed(() => attachments.value[0] ?? null)
 const previewThumb = useAttachmentThumb(() => firstAttachment.value)
 
-async function forwardTo(c: DmChannelDto) {
-  if (sendingId.value || sentIds.value.has(c.id) || !hasContent.value) return
-  sendingId.value = c.id
+/** Hedef başına gönderim: her ek sunucuda kopyalanır, sonra normal (E2EE) mesaj gönderimiyle bağlanır. */
+async function forwardTo(channelId: string) {
+  const copies = await Promise.all(attachments.value.map((a) => attachmentsApi.forward(a.id)))
+  const attachmentIds = copies.map((r) => r.data.attachmentId)
+  await useE2eeStore().send(channelId, forwardText.value, undefined, attachmentIds)
+}
+
+function onLimit() {
+  toast.info(t('message.forwardLimit'))
+}
+
+/** C68 §2: hedefler paralel; kısmi hatada pencere açık kalır, başarılılar işaretlenir ve seçimden düşer. */
+async function sendSelected() {
+  if (sending.value || !selectedIds.value.size || !hasContent.value) return
+  sending.value = true
+  const ids = [...selectedIds.value]
   try {
-    // Her hedef kendi kopyalarını alır (ek tek mesaja bağlanır). Paralel kopya; biri reddedilirse
-    // hedef "gönderildi" işaretlenmez (kopyalanıp bağlanmayan ek sahipsiz kalır, presign'daki gibi).
-    const copies = await Promise.all(attachments.value.map((a) => attachmentsApi.forward(a.id)))
-    const attachmentIds = copies.map((r) => r.data.attachmentId)
-    await useE2eeStore().send(c.id, forwardText.value, undefined, attachmentIds)
-    sentIds.value = new Set([...sentIds.value, c.id])
-    toast.success(t('message.forwarded'))
-  } catch (e: unknown) {
-    const serverMessage = (e as { response?: { data?: { message?: string } } }).response?.data?.message
+    const results = await Promise.allSettled(ids.map((id) => forwardTo(id)))
+    const okIds = ids.filter((_, i) => results[i].status === 'fulfilled')
+    const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+    if (!failed.length) {
+      finish(okIds)
+      return
+    }
+    sentIds.value = new Set([...sentIds.value, ...okIds])
+    selectedIds.value = new Set(ids.filter((id) => !okIds.includes(id)))
+    const serverMessage = (failed[0].reason as { response?: { data?: { message?: string } } })?.response?.data?.message
     toast.error(serverMessage ?? t('toast.saveError'))
   } finally {
-    sendingId.value = null
+    sending.value = false
   }
+}
+
+/** §3: tek hedef, mevcut DM açma yolu (router 'dm' rotası; HomeView.selectDm ile aynı); açıksa yalnız kapat. */
+function finish(okIds: string[]) {
+  emit('close')
+  if (okIds.length > 1) {
+    toast.success(t('message.forwardedMany', { n: okIds.length }))
+    return
+  }
+  const route = router.currentRoute.value
+  if (route.name === 'dm' && route.params.channelId === okIds[0]) return
+  void router.push({ name: 'dm', params: { channelId: okIds[0] } })
 }
 </script>
 
@@ -85,12 +117,23 @@ async function forwardTo(c: DmChannelDto) {
       </div>
 
       <DmTargetList
-        :disabled="!hasContent"
-        :sending-id="sendingId"
+        v-model:selected-ids="selectedIds"
+        selectable
+        :max="MAX_TARGETS"
+        :disabled="!hasContent || sending"
         :sent-ids="sentIds"
         :sent-label="t('message.forwardedShort')"
-        @pick="forwardTo"
+        @limit="onLimit"
       />
+
+      <KvButton
+        class="w-full"
+        :disabled="!hasContent || !selectedIds.size"
+        :loading="sending"
+        @click="sendSelected"
+      >
+        {{ selectedIds.size > 1 ? t('message.forwardSendCount', { n: selectedIds.size }) : t('message.forwardSend') }}
+      </KvButton>
     </div>
   </KvModal>
 </template>
