@@ -12,6 +12,7 @@ const AFTER = new Date('2026-11-10T13:00:00Z');
 const prismaMock = {
   message: { findMany: jest.fn(), findUnique: jest.fn() },
   channelMember: { findUnique: jest.fn() },
+  groupDmPastPeriod: { findMany: jest.fn() },
   guildMemberRole: { findMany: jest.fn() },
 };
 const membershipMock = { requireChannelAccess: jest.fn() };
@@ -181,7 +182,9 @@ describe('MessagesService.findMessages: eski grup üyesi penceresi (C62)', () =>
   });
 
   it('sayfalama: cursor (lt) pencere üst sınırını (lte leftAt) EZMEZ; cursor leftAt SONRASINI gösterse bile sınır kalır', async () => {
-    prismaMock.message.findUnique.mockResolvedValue({ createdAt: new Date('2026-11-13T00:00:00Z') });
+    prismaMock.message.findUnique.mockResolvedValue({
+      createdAt: new Date('2026-11-13T00:00:00Z'),
+    });
     await service.findMessages('u-old', 'g1', 'cursor-after-left');
     const where = prismaMock.message.findMany.mock.calls[0][0].where;
     expect(where.createdAt).toEqual({
@@ -360,5 +363,53 @@ describe('MessagesService.findMessages: pencere sıkılaştırma (C62 §2.3.b)',
     const [ok] = (await run(true)) as Array<Record<string, any>>;
     expect(ok.replyTo.content).toBe('eski düz mesaj');
     expect(ok.replyTo).not.toHaveProperty('editedAfterLeave');
+  });
+});
+
+describe('MessagesService: önceki üyelik dönemleri (C65)', () => {
+  const P = {
+    joinedAt: new Date('2026-11-01T00:00:00Z'),
+    leftAt: new Date('2026-11-03T00:00:00Z'),
+  };
+  let service: MessagesService;
+  beforeEach(() => {
+    jest.resetAllMocks();
+    prismaMock.guildMemberRole.findMany.mockResolvedValue([]);
+    prismaMock.message.findMany.mockResolvedValue([]);
+    service = makeService();
+    asGroup('GROUP_DM');
+    prismaMock.groupDmPastPeriod.findMany.mockResolvedValue([P]);
+  });
+
+  it('findMessages ve findPins where: dönem dışlaması açık (sayfalama dahil)', async () => {
+    prismaMock.message.findUnique.mockResolvedValue({ createdAt: AFTER });
+    await service.findMessages('u', 'g1', 'cursor');
+    const expected = {
+      encrypted: true,
+      createdAt: { lt: JOINED },
+      NOT: [{ createdAt: { gte: P.joinedAt, lte: P.leftAt } }],
+    };
+    expect(prismaMock.message.findMany.mock.calls[0][0].where.NOT).toEqual(expected);
+    await service.findPins('u', 'g1');
+    expect(prismaMock.message.findMany.mock.calls[1][0].where.NOT).toEqual(expected);
+  });
+
+  it('replyTo: dönem içi şifreli mesaja alıntı görünür, dönemler arası gizli', async () => {
+    prismaMock.message.findMany.mockResolvedValue([
+      msg('a', AFTER, quote(true, new Date('2026-11-02T00:00:00Z'))),
+      msg('b', AFTER, quote(true, new Date('2026-11-05T00:00:00Z'))),
+    ]);
+    const res = await service.findMessages('u', 'g1');
+    const by = Object.fromEntries(res.map((m) => [m.id, m]));
+    expect(by.a.replyTo).not.toBeNull();
+    expect(by.b.replyTo).toBeNull();
+  });
+
+  it('GROUP_DM dışı kanalda süzgeç ve dönem sorgusu yok', async () => {
+    asGroup('DM');
+    prismaMock.groupDmPastPeriod.findMany.mockClear();
+    await service.findMessages('u', 'g1');
+    expect(prismaMock.groupDmPastPeriod.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.message.findMany.mock.calls[0][0].where).not.toHaveProperty('NOT');
   });
 });

@@ -656,6 +656,18 @@ model GroupDmEvent {
   @@index([channelId, createdAt])
 }
 
+// C65: geri eklenen üyenin önceki üyelik dönemleri (şifreli mesaj süzgeci dönem aralıklarını görünür sayar).
+// Geri eklemede SİLİNMEZ; "Sohbeti sil" ve hesap imhasında silinir.
+model GroupDmPastPeriod {
+  id        String   @id @default(cuid())
+  channelId String
+  userId    String
+  joinedAt  DateTime // o dönemin ChannelMember.createdAt'i
+  leftAt    DateTime // ayrılma/çıkarılma anı (C62 leftAt ile aynı an)
+
+  @@index([channelId, userId])
+}
+
 // C62: gruptan ayrılan/çıkarılan üyenin listede kalması ve ayrılana kadarki geçmişi okuması için iz.
 // ChannelMember silme davranışı DEĞİŞMEZ; yalnız findMessages + DM listesi bu kayda bakar (R7).
 model GroupDmDeparture {

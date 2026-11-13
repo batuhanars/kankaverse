@@ -39,11 +39,16 @@ function setup() {
     user: { findMany: jest.fn().mockResolvedValue([]) },
     message: { findFirst: jest.fn().mockResolvedValue(null) },
     userBlock: { findMany: jest.fn().mockResolvedValue([]) },
+    groupDmPastPeriod: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockReturnValue('period-op'),
+      deleteMany: jest.fn().mockReturnValue('period-del'),
+    },
     groupDmEvent: { create: jest.fn().mockReturnValue('event-op') },
     groupDmDeparture: {
       findMany: jest.fn().mockResolvedValue([]),
       upsert: jest.fn().mockReturnValue('departure-op'),
-      deleteMany: jest.fn(),
+      deleteMany: jest.fn().mockReturnValue('dep-del-op'),
     },
     $transaction: jest.fn().mockResolvedValue([]),
   };
@@ -91,7 +96,7 @@ describe('departure yazımı (ayrılma/çıkarma)', () => {
       userId: { not: LEAVER },
     });
     // tek transaction: departure önce, üyelik silme sonra (aynı dizi)
-    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op', 'event-op']);
+    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op', 'event-op', 'period-op']);
 
     expect(realtime.emitToUser).toHaveBeenCalledTimes(1);
     expect(realtime.emitToUser).toHaveBeenCalledWith(LEAVER, 'dm.group_departed', {
@@ -117,7 +122,7 @@ describe('departure yazımı (ayrılma/çıkarma)', () => {
 
     const arg = prisma.groupDmDeparture.upsert.mock.calls[0][0];
     expect(arg.create).toMatchObject({ userId: LEAVER, reason: 'REMOVED', clearedAt: null });
-    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op', 'event-op']);
+    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op', 'event-op', 'period-op']);
     expect(realtime.emitToUser).toHaveBeenCalledTimes(1);
     expect(realtime.emitToUser.mock.calls[0][0]).toBe(LEAVER);
     expect(realtime.emitToUser.mock.calls[0][2]).toMatchObject({ reason: 'REMOVED' });
@@ -307,8 +312,13 @@ describe('getDmChannels: eski grup (departed)', () => {
 describe('deleteDeparture (DELETE /dm/groups/:id/departure)', () => {
   it('yalnız çağıranın kendi satırını siler; olay yok', async () => {
     const { prisma, realtime, service } = setup();
-    prisma.groupDmDeparture.deleteMany.mockResolvedValue({ count: 1 });
+    prisma.$transaction.mockResolvedValue([{ count: 1 }, { count: 2 }]);
     expect(await service.deleteDeparture(LEAVER, GROUP)).toBeNull();
+    // C65: önceki dönem satırları departure ile AYNI tx'te silinir
+    expect(prisma.$transaction).toHaveBeenCalledWith(['dep-del-op', 'period-del']);
+    expect(prisma.groupDmPastPeriod.deleteMany).toHaveBeenCalledWith({
+      where: { channelId: GROUP, userId: LEAVER },
+    });
     expect(prisma.groupDmDeparture.deleteMany).toHaveBeenCalledWith({
       where: { channelId: GROUP, userId: LEAVER },
     });
@@ -317,7 +327,7 @@ describe('deleteDeparture (DELETE /dm/groups/:id/departure)', () => {
 
   it('satır yoksa 404 DEPARTURE_NOT_FOUND', async () => {
     const { prisma, service } = setup();
-    prisma.groupDmDeparture.deleteMany.mockResolvedValue({ count: 0 });
+    prisma.$transaction.mockResolvedValue([{ count: 0 }, { count: 0 }]);
     const err = await service.deleteDeparture(LEAVER, GROUP).catch((e) => e);
     expect(err).toBeInstanceOf(NotFoundException);
     expect(err.getResponse()).toMatchObject({ error: 'DEPARTURE_NOT_FOUND' });

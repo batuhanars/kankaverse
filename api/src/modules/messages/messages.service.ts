@@ -17,7 +17,8 @@ import { MESSAGE_AUTHOR_SELECT } from '../../common/utils/message-author.select'
 import { canModerateGroupTarget, getGroupRole } from '../../shared/group-roles/group-roles';
 import { loadRoleEmojis } from '../../common/utils/role-emoji.util';
 import {
-  groupJoinedAt,
+  groupVisibility,
+  GroupVisibility,
   isHiddenBeforeJoin,
   preJoinEncryptedFilter,
 } from '../../common/utils/pre-join.util';
@@ -94,11 +95,12 @@ function buildReplyToDto(raw: ReplyToRaw, leftAt?: Date | null): ReplyToDto {
   if (!raw || raw.deletedAt !== null) return null;
   // C62 §2.3.b: eski üye alıntılanan mesajın `leftAt` anındaki halini görür; sonradan düzenlendiyse gövde verilmez.
   const editedAfterLeave = isEditedAfter(raw.editedAt, leftAt);
-  const snippet = raw.encrypted || editedAfterLeave
-    ? ''
-    : raw.content.trim().length > 0
-      ? raw.content.slice(0, REPLY_SNIPPET_MAX)
-      : '[dosya]';
+  const snippet =
+    raw.encrypted || editedAfterLeave
+      ? ''
+      : raw.content.trim().length > 0
+        ? raw.content.slice(0, REPLY_SNIPPET_MAX)
+        : '[dosya]';
   // C35 §5.1: webhook mesajına yanıtta oluşturanın adı sızmaz, webhook'un görünen adı gösterilir
   const authorUsername = raw.webhookId ? (raw.webhookName ?? '') : raw.author.username;
   const first = raw.attachments?.[0];
@@ -121,7 +123,10 @@ function buildReplyToDto(raw: ReplyToRaw, leftAt?: Date | null): ReplyToDto {
 }
 
 /** C62 §2.3.b: mesaj eski üyenin ayrılma anından SONRA düzenlendi mi (`leftAt` yoksa = aktif üye = hep false). */
-function isEditedAfter(editedAt: Date | null | undefined, leftAt: Date | null | undefined): boolean {
+function isEditedAfter(
+  editedAt: Date | null | undefined,
+  leftAt: Date | null | undefined,
+): boolean {
   return !!leftAt && !!editedAt && editedAt > leftAt;
 }
 
@@ -132,7 +137,7 @@ function isEditedAfter(editedAt: Date | null | undefined, leftAt: Date | null | 
 function toMessageDto(
   msg: MessageWithAuthor,
   callerId?: string,
-  joinedAt?: Date | null,
+  joinedAt?: GroupVisibility | null,
   leftAt?: Date | null,
 ) {
   // C62 §2.3.b: eski üye penceresinde `leftAt` sonrası düzenlenen mesajın gövdesi (içerik, şifreli yük, bahsetme,
@@ -592,7 +597,7 @@ export class MessagesService {
       if (member?.clearedAt) createdAtFilter.gt = member.clearedAt;
     }
     // E2 §2.5: grup DM'de katılım öncesi şifreli mesajlar (sayfalama dahil) dönmez.
-    const joinedAt = departed?.joinedAt ?? (await groupJoinedAt(this.prisma, channel, userId));
+    const joinedAt = await groupVisibility(this.prisma, channel, userId, departed?.joinedAt);
 
     const messages = await this.prisma.message.findMany({
       where: {
@@ -1359,7 +1364,7 @@ export class MessagesService {
       if (member?.clearedAt) createdAtFilter.gt = member.clearedAt;
     }
     // E2 §2.5: sonuçların yanıt alıntıları için (şifreli mesaj zaten aramaya girmez).
-    const joinedAt = await groupJoinedAt(this.prisma, channel, userId);
+    const joinedAt = await groupVisibility(this.prisma, channel, userId);
 
     const messages = await this.prisma.message.findMany({
       where: {
@@ -1408,7 +1413,7 @@ export class MessagesService {
     // requireChannelAccess: üyelik + yaş kapısı dahil
     const channel = await this.membership.requireChannelAccess(userId, channelId);
     // E2 §2.5: katılım öncesi şifreli sabitlenmiş mesaj yeni üyeye dönmez.
-    const joinedAt = await groupJoinedAt(this.prisma, channel, userId);
+    const joinedAt = await groupVisibility(this.prisma, channel, userId);
 
     const messages = await this.prisma.message.findMany({
       where: {

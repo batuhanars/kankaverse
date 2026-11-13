@@ -31,6 +31,11 @@ function setup() {
     friendship: { findFirst: jest.fn() },
     message: { findFirst: jest.fn() },
     // C62: ayrılma izi; op'lar tx dizisinde okunabilsin diye sabit dize döner
+    groupDmPastPeriod: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockReturnValue('period-op'),
+      deleteMany: jest.fn().mockReturnValue('period-del'),
+    },
     groupDmEvent: { create: jest.fn().mockReturnValue('event-op') },
     groupDmDeparture: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -117,6 +122,7 @@ describe('DmService.leaveGroupDm / removeGroupMember: E2EE bağlantısı (§2.4)
       'departure-op',
       'delete-op',
       'event-op',
+      'period-op',
       'former-upsert-op',
       'welcome-delete-op',
     ]);
@@ -159,7 +165,7 @@ describe('DmService.leaveGroupDm / removeGroupMember: E2EE bağlantısı (§2.4)
     await service.leaveGroupDm(TARGET, GROUP);
 
     expect(prisma.channelMember.delete).toHaveBeenCalledTimes(1);
-    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op', 'event-op']);
+    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op', 'event-op', 'period-op']);
     expect(e2ee.afterDeparture).toHaveBeenCalledWith(GROUP, TARGET, false);
   });
 

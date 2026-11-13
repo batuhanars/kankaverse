@@ -41,6 +41,11 @@ function setup() {
       ]),
     },
     friendship: { findFirst: jest.fn().mockResolvedValue({ id: 'f' }) },
+    groupDmPastPeriod: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockReturnValue('period-op'),
+      deleteMany: jest.fn().mockReturnValue('period-del'),
+    },
     groupDmEvent: { create: jest.fn().mockReturnValue('event-op'), findMany: jest.fn() },
     groupDmDeparture: {
       upsert: jest.fn().mockReturnValue('dep-op'),
@@ -102,7 +107,12 @@ describe('olay yazımı', () => {
     const ev = prisma.groupDmEvent.create.mock.calls[0][0].data;
     expect(ev).toMatchObject({ kind: 'MEMBER_LEFT', actorId: null, targetId: TARGET });
     expect(ev.createdAt).toBe(prisma.groupDmDeparture.upsert.mock.calls[0][0].create.leftAt);
-    expect(prisma.$transaction.mock.calls[0][0]).toEqual(['dep-op', 'delete-op', 'event-op']);
+    expect(prisma.$transaction.mock.calls[0][0]).toEqual([
+      'dep-op',
+      'delete-op',
+      'event-op',
+      'period-op',
+    ]);
     expect(prisma.channel.update).toHaveBeenCalled();
     const [recipients, name, payload] = realtime.emitToUsers.mock.calls[0];
     expect(name).toBe('dm.group_event');
@@ -195,6 +205,43 @@ describe('GET /dm/groups/:id/events penceresi', () => {
       gte: JOINED,
       lte: left,
     });
+  });
+
+  it('C65: önceki dönemi olan aktif üye: güncel pencere VEYA dönem aralığı (OR); clearedAt tüm kolları keser', async () => {
+    const { prisma, svc } = make();
+    const cleared = new Date('2026-11-02T00:00:00Z');
+    prisma.channelMember.findUnique.mockResolvedValue({ createdAt: JOINED, clearedAt: cleared });
+    const p1 = {
+      joinedAt: new Date('2026-10-01T00:00:00Z'),
+      leftAt: new Date('2026-10-05T00:00:00Z'),
+    };
+    prisma.groupDmPastPeriod.findMany.mockResolvedValue([p1]);
+    await svc.listEvents(OWNER, GROUP);
+    expect(prisma.groupDmEvent.findMany.mock.calls[0][0].where).toEqual({
+      channelId: GROUP,
+      createdAt: { gt: cleared },
+      OR: [{ createdAt: { gte: JOINED } }, { createdAt: { gte: p1.joinedAt, lte: p1.leftAt } }],
+    });
+  });
+
+  it('C65: eski üye + önceki dönem: C62 penceresi VEYA önceki dönem', async () => {
+    const { prisma, membership, svc } = make();
+    const left = new Date('2026-11-10T00:00:00Z');
+    prisma.channelMember.findUnique.mockResolvedValue(null);
+    membership.requireGroupHistoryAccess.mockResolvedValue({
+      channel: {},
+      window: { joinedAt: JOINED, leftAt: left, clearedAt: null },
+    });
+    const p1 = {
+      joinedAt: new Date('2026-10-01T00:00:00Z'),
+      leftAt: new Date('2026-10-05T00:00:00Z'),
+    };
+    prisma.groupDmPastPeriod.findMany.mockResolvedValue([p1]);
+    await svc.listEvents(TARGET, GROUP);
+    expect(prisma.groupDmEvent.findMany.mock.calls[0][0].where.OR).toEqual([
+      { createdAt: { gte: JOINED, lte: left } },
+      { createdAt: { gte: p1.joinedAt, lte: p1.leftAt } },
+    ]);
   });
 
   it('yabancı: 403 NOT_CHANNEL_MEMBER, sorgu yok', async () => {

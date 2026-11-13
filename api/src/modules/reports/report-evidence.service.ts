@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { verifyFrankingTag } from '../e2ee/e2ee-franking.util';
+import { GroupVisibility, isHiddenBeforeJoin, toPeriods } from '../../common/utils/pre-join.util';
 import { fromB64 } from '../e2ee/e2ee.util';
 import { ReportEvidenceItemDto } from './dto/create-report.dto';
 
@@ -28,7 +29,12 @@ const EVIDENCE_MESSAGE_SELECT = {
 type EvidenceMessage = Prisma.MessageGetPayload<{ select: typeof EVIDENCE_MESSAGE_SELECT }>;
 
 /** Şikâyetçinin görme penceresi: `clearedAt` alt sınır; `leftAt` yalnız eski grup üyesinde üst sınır (aksi null). */
-type EvidenceWindow = { clearedAt: Date | null; leftAt: Date | null };
+type EvidenceWindow = {
+  clearedAt: Date | null;
+  leftAt: Date | null;
+  /** C65: yalnız önceki üyelik dönemi olan GROUP_DM üyesinde dolu (aksi null = bugünkü davranış). */
+  visibility: GroupVisibility | null;
+};
 
 function invalidEvidence(message: string): HttpException {
   return new HttpException(
@@ -87,13 +93,17 @@ export class ReportEvidenceService {
   ): Promise<EvidenceWindow> {
     let clearedAt: Date | null;
     let leftAt: Date | null = null;
+    let joinedAt: Date | null = null;
+    let channelType: string | undefined;
     try {
-      await this.membership.requireChannelAccess(reporterId, target.channelId);
+      const channel = await this.membership.requireChannelAccess(reporterId, target.channelId);
+      channelType = channel?.type;
       const member = await this.prisma.channelMember.findUnique({
         where: { channelId_userId: { channelId: target.channelId, userId: reporterId } },
-        select: { clearedAt: true },
+        select: { clearedAt: true, createdAt: true },
       });
       clearedAt = member?.clearedAt ?? null;
+      joinedAt = member?.createdAt ?? null;
     } catch (err) {
       if (
         !(err instanceof ForbiddenException) ||
@@ -102,12 +112,14 @@ export class ReportEvidenceService {
         throw err;
       }
       try {
-        const { window } = await this.membership.requireGroupHistoryAccess(
+        const { channel, window } = await this.membership.requireGroupHistoryAccess(
           reporterId,
           target.channelId,
         );
+        channelType = channel?.type;
         clearedAt = window.clearedAt;
         leftAt = window.leftAt;
+        joinedAt = window.joinedAt;
       } catch {
         throw err;
       }
@@ -115,7 +127,19 @@ export class ReportEvidenceService {
     if ((clearedAt && target.createdAt <= clearedAt) || (leftAt && target.createdAt > leftAt)) {
       throw invalidEvidence('Şikâyet edilen mesaj erişilemiyor.');
     }
-    return { clearedAt, leftAt };
+    // C65: önceki dönemi olan üyede dönemler arası (dışarıdayken atılmış) şifreli mesaj kanıta girmez.
+    let visibility: GroupVisibility | null = null;
+    if (channelType === 'GROUP_DM' && joinedAt) {
+      const rows = await this.prisma.groupDmPastPeriod.findMany({
+        where: { channelId: target.channelId, userId: reporterId },
+        select: { joinedAt: true, leftAt: true },
+      });
+      if ((rows ?? []).length > 0) visibility = { joinedAt, periods: toPeriods(rows) };
+    }
+    if (target.encrypted && isHiddenBeforeJoin(target, visibility)) {
+      throw invalidEvidence('Şikâyet edilen mesaj erişilemiyor.');
+    }
+    return { clearedAt, leftAt, visibility };
   }
 
   /** Şifresiz: hedef (silinmiş olsa da) + aynı kanalda ondan önceki 5 silinmemiş mesaj; sunucu kaydı. */
@@ -154,7 +178,7 @@ export class ReportEvidenceService {
   private async fromReporter(
     target: EvidenceMessage,
     items: ReportEvidenceItemDto[],
-    { clearedAt, leftAt }: EvidenceWindow,
+    { clearedAt, leftAt, visibility }: EvidenceWindow,
   ): Promise<EvidenceRow[]> {
     if (items.length === 0) return []; // kanıt iletilmedi: moderatör "kanıt iletilmedi" görür
 
@@ -178,7 +202,8 @@ export class ReportEvidenceService {
         msg.channelId !== target.channelId ||
         !msg.encrypted ||
         (clearedAt && msg.createdAt <= clearedAt) ||
-        (leftAt && msg.createdAt > leftAt)
+        (leftAt && msg.createdAt > leftAt) ||
+        isHiddenBeforeJoin(msg, visibility)
       ) {
         throw invalidEvidence('Kanıt mesajlarından biri bu sohbete ait değil ya da erişilemiyor.');
       }

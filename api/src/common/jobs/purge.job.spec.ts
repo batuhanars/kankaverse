@@ -12,6 +12,7 @@ const prismaMock = {
   recoveryCode: { deleteMany: jest.fn() },
   recentGame: { deleteMany: jest.fn() },
   groupDmDeparture: { deleteMany: jest.fn() },
+  groupDmPastPeriod: { deleteMany: jest.fn() },
   externalAccount: { deleteMany: jest.fn() },
   externalLinkState: { deleteMany: jest.fn() },
   streamAnnounceOptIn: { deleteMany: jest.fn() },
@@ -44,6 +45,7 @@ function resetMocks() {
   prismaMock.recoveryCode.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.recentGame.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.groupDmDeparture.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.groupDmPastPeriod.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.externalAccount.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.externalLinkState.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.streamAnnounceOptIn.deleteMany.mockResolvedValue({ count: 0 });
@@ -193,6 +195,10 @@ describe('PurgeJob.run — Sprint R6a §2 asgari kimlik imhası', () => {
     await job.run();
 
     expect(prismaMock.groupDmDeparture.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-123' },
+    });
+    // C65: önceki üyelik dönemleri de silinir
+    expect(prismaMock.groupDmPastPeriod.deleteMany).toHaveBeenCalledWith({
       where: { userId: 'user-123' },
     });
   });

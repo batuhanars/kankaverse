@@ -34,23 +34,44 @@ export class DmGroupEventsService {
     }
 
     const createdAt: { gte?: Date; gt?: Date; lte?: Date } = {};
+    let clearedAt: Date | null = null;
     const member = await this.prisma.channelMember.findUnique({
       where: { channelId_userId: { channelId: groupId, userId } },
       select: { createdAt: true, clearedAt: true },
     });
     if (member) {
       createdAt.gte = member.createdAt;
-      if (member.clearedAt) createdAt.gt = member.clearedAt;
+      clearedAt = member.clearedAt;
     } else {
       // Eski üye penceresi; kaydı yoksa kapı bugünkü jenerik 403'ü fırlatır.
       const { window } = await this.membership.requireGroupHistoryAccess(userId, groupId);
       createdAt.gte = window.joinedAt;
       createdAt.lte = window.leftAt;
-      if (window.clearedAt) createdAt.gt = window.clearedAt;
+      clearedAt = window.clearedAt;
     }
+    if (clearedAt) createdAt.gt = clearedAt;
+
+    // C65: önceki üyelik dönemleri de görünür. Dönem yoksa sorgu bugünkü şekilde kalır (tek koşul).
+    const past = await this.prisma.groupDmPastPeriod.findMany({
+      where: { channelId: groupId, userId },
+      select: { joinedAt: true, leftAt: true },
+    });
+    const where =
+      (past ?? []).length === 0
+        ? { channelId: groupId, createdAt }
+        : {
+            channelId: groupId,
+            ...(clearedAt ? { createdAt: { gt: clearedAt } } : {}),
+            OR: [
+              {
+                createdAt: { gte: createdAt.gte, ...(createdAt.lte ? { lte: createdAt.lte } : {}) },
+              },
+              ...past.map((p) => ({ createdAt: { gte: p.joinedAt, lte: p.leftAt } })),
+            ],
+          };
 
     const rows = await this.prisma.groupDmEvent.findMany({
-      where: { channelId: groupId, createdAt },
+      where,
       orderBy: { createdAt: 'desc' },
       take: EVENT_LIMIT,
     });

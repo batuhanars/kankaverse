@@ -73,6 +73,7 @@ run('C62 grup DM departure gerçek DB', () => {
     prisma.message.create({ data: { channelId, authorId, content, createdAt } });
 
   afterAll(async () => {
+    await prisma.groupDmPastPeriod.deleteMany({ where: { channelId: { in: channelIds } } });
     await prisma.groupDmEvent.deleteMany({ where: { channelId: { in: channelIds } } });
     await prisma.groupDmDeparture.deleteMany({ where: { channelId: { in: channelIds } } });
     await prisma.messageReaction.deleteMany({
@@ -325,13 +326,91 @@ run('C62 grup DM departure gerçek DB', () => {
     });
     expect(added.createdAt).toEqual(cm.createdAt);
 
-    // aktif b: katılımından (yeni) önceki çıkarılma olayı dönmez, ekleme olayı döner
+    // aktif b: C65 ile önceki üyelik dönemi de görünür (çıkarılma olayı dönemin son anında)
     const active = await events.listEvents(b.id, ch.id);
-    expect(active.map((e) => e.kind)).toEqual(['MEMBER_ADDED']);
+    expect(active.map((e) => e.kind)).toEqual(['MEMBER_REMOVED', 'MEMBER_ADDED']);
     // owner (eski üyelikten beri) ikisini de eskiden yeniye görür
     const all = await events.listEvents(owner.id, ch.id);
     expect(all.map((e) => e.kind)).toEqual(['MEMBER_REMOVED', 'MEMBER_ADDED']);
     // olay mesaj hattına girmez
     expect(await prisma.message.count({ where: { channelId: ch.id } })).toBe(0);
+  });
+
+  it('C65: çık-gir dönemleri; m1 ve m3 görünür, dışarıdaki şifreli m2 görünmez (sayfalama, replyTo, liste, olay); Sohbeti sil sonrası m1 gizli', async () => {
+    const { ch, owner, b } = await makeGroup('8');
+    await prisma.friendship.create({
+      data: { requesterId: owner.id, addresseeId: b.id, status: 'ACCEPTED' },
+    });
+    const encMsg = (content: string, authorId: string, createdAt: Date, replyToId?: string) =>
+      prisma.message.create({
+        data: {
+          channelId: ch.id,
+          authorId,
+          content,
+          encrypted: true,
+          ciphertext: Buffer.from(content),
+          senderDeviceId: 'd',
+          createdAt,
+          ...(replyToId ? { replyToId } : {}),
+        },
+      });
+    const m1 = await encMsg('m1', b.id, new Date(Date.now() - 60_000));
+    await dm.removeGroupMember(owner.id, ch.id, b.id);
+    const periods1 = await prisma.groupDmPastPeriod.findMany({
+      where: { channelId: ch.id, userId: b.id },
+    });
+    expect(periods1).toHaveLength(1);
+    expect(periods1[0].joinedAt).toEqual(new Date('2026-11-01T00:00:00Z'));
+    await new Promise((r) => setTimeout(r, 30));
+    const m2 = await encMsg('m2', owner.id, new Date());
+    await new Promise((r) => setTimeout(r, 50));
+    await dm.addGroupMember(owner.id, ch.id, { userId: b.id });
+    const m3 = await encMsg('m3', owner.id, new Date(Date.now() + 5000));
+    const r1 = await encMsg('yanit-m1', owner.id, new Date(Date.now() + 6000), m1.id);
+    const r2 = await encMsg('yanit-m2', owner.id, new Date(Date.now() + 7000), m2.id);
+
+    const seen = (await messages.findMessages(b.id, ch.id)) as Array<Record<string, any>>;
+    const ids = seen.map((m) => m.id);
+    expect(ids).toEqual(expect.arrayContaining([m1.id, m3.id, r1.id, r2.id]));
+    expect(ids).not.toContain(m2.id);
+    const by = Object.fromEntries(seen.map((m) => [m.id, m]));
+    expect(by[r1.id].replyTo).not.toBeNull(); // m1 alıntısı görünür
+    expect(by[r2.id].replyTo).toBeNull(); // m2 alıntısı gizli
+    // sayfalama: cursor m3 iken m1 görünür, m2 yok
+    const paged = (await messages.findMessages(b.id, ch.id, m3.id)) as Array<Record<string, any>>;
+    expect(paged.map((m) => m.id)).toContain(m1.id);
+    expect(paged.map((m) => m.id)).not.toContain(m2.id);
+
+    // geçmiş dönemi olmayan üye (owner) hepsini görür (üyelik başlangıcından beri; m2 dışarıda değil)
+    const ownerSees = (await messages.findMessages(owner.id, ch.id)) as Array<Record<string, any>>;
+    expect(ownerSees.map((m) => m.id)).toContain(m2.id);
+
+    // olay penceresi: b hem ilk dönemdeki çıkarılma olayını hem eklenmeyi görür
+    const evs = await events.listEvents(b.id, ch.id);
+    expect(evs.map((e) => e.kind)).toEqual(['MEMBER_REMOVED', 'MEMBER_ADDED']);
+
+    // ikinci çık-gir: iki dönem
+    await dm.removeGroupMember(owner.id, ch.id, b.id);
+    await dm.addGroupMember(owner.id, ch.id, { userId: b.id });
+    expect(
+      await prisma.groupDmPastPeriod.count({ where: { channelId: ch.id, userId: b.id } }),
+    ).toBe(2);
+    const again = (await messages.findMessages(b.id, ch.id)) as Array<Record<string, any>>;
+    expect(again.map((m) => m.id)).toContain(m1.id);
+    expect(again.map((m) => m.id)).toContain(m3.id);
+
+    // liste lastMessage: görünür en yeni mesaj
+    const item = (await dm.getDmChannels(b.id)).find((x) => x.id === ch.id) as Record<string, any>;
+    expect(item.lastMessage.id).toBe(r2.id);
+
+    // Sohbeti sil: kaydı olan eski üye için; çıkar -> sil -> geri ekle -> m1 görünmez
+    await dm.removeGroupMember(owner.id, ch.id, b.id);
+    await dm.deleteDeparture(b.id, ch.id);
+    expect(
+      await prisma.groupDmPastPeriod.count({ where: { channelId: ch.id, userId: b.id } }),
+    ).toBe(0);
+    await dm.addGroupMember(owner.id, ch.id, { userId: b.id });
+    const afterDelete = (await messages.findMessages(b.id, ch.id)) as Array<Record<string, any>>;
+    expect(afterDelete.map((m) => m.id)).not.toContain(m1.id);
   });
 });

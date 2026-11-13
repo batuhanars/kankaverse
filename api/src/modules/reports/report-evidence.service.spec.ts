@@ -15,6 +15,7 @@ const [vec] = JSON.parse(
 const prisma = {
   message: { findUnique: jest.fn(), findMany: jest.fn() },
   channelMember: { findUnique: jest.fn() },
+  groupDmPastPeriod: { findMany: jest.fn() },
 };
 const membership = { requireChannelAccess: jest.fn(), requireGroupHistoryAccess: jest.fn() };
 
@@ -335,5 +336,43 @@ describe('ReportEvidenceService: eski grup üyesi (C62 §2.3.c)', () => {
     prisma.message.findUnique.mockResolvedValue(plain('t', 10));
     await expect(svc.build('old', 't', undefined)).rejects.toBeInstanceOf(ForbiddenException);
     expect(membership.requireGroupHistoryAccess).not.toHaveBeenCalled();
+  });
+});
+
+/** C65: önceki üyelik dönemi olan üyede dönemler arası şifreli mesaj kanıta/şikâyete girmez. */
+describe('ReportEvidenceService: geçmiş dönemler (C65)', () => {
+  let svc: ReportEvidenceService;
+  beforeEach(() => {
+    jest.resetAllMocks();
+    svc = new ReportEvidenceService(prisma as never, membership as never);
+    membership.requireChannelAccess.mockResolvedValue({ type: 'GROUP_DM' });
+    prisma.channelMember.findUnique.mockResolvedValue({ clearedAt: null, createdAt: at(50) });
+    prisma.groupDmPastPeriod.findMany.mockResolvedValue([{ joinedAt: at(0), leftAt: at(20) }]);
+  });
+
+  it('dönemler ARASI şifreli hedef 422; dönem içi hedef kabul', async () => {
+    prisma.message.findUnique.mockResolvedValue(enc('gap', 30));
+    await expect(svc.build('rep', 'gap', [item('gap')] as never)).rejects.toMatchObject({
+      status: 422,
+    });
+    prisma.message.findUnique.mockResolvedValue(enc('old', 10));
+    prisma.message.findMany.mockResolvedValue([enc('old', 10)]);
+    const rows = await svc.build('rep', 'old', [item('old')] as never);
+    expect(rows.map((r) => r.messageId)).toEqual(['old']);
+  });
+
+  it('kanıt listesindeki dönemler arası mesaj 422', async () => {
+    prisma.message.findUnique.mockResolvedValue(enc('t', 55));
+    prisma.message.findMany.mockResolvedValue([enc('t', 55), enc('gap', 30)]);
+    await expect(svc.build('rep', 't', [item('t'), item('gap')] as never)).rejects.toMatchObject({
+      status: 422,
+    });
+  });
+
+  it('dönem satırı yoksa davranış değişmez (süzgeç kurulmaz)', async () => {
+    prisma.groupDmPastPeriod.findMany.mockResolvedValue([]);
+    prisma.message.findUnique.mockResolvedValue(enc('t', 30));
+    prisma.message.findMany.mockResolvedValue([enc('t', 30)]);
+    expect(await svc.build('rep', 't', [item('t')] as never)).toHaveLength(1);
   });
 });

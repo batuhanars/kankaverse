@@ -23,13 +23,22 @@ import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { PushService } from '../../shared/push/push.service';
 import { E2eeMembershipService } from '../e2ee/e2ee-membership.service';
 import { VoiceService } from '../voice/voice.service';
-import { isHiddenBeforeJoin, preJoinEncryptedFilter } from '../../common/utils/pre-join.util';
+import {
+  GroupVisibility,
+  isHiddenBeforeJoin,
+  preJoinEncryptedFilter,
+  toPeriods,
+} from '../../common/utils/pre-join.util';
 import {
   DepartureReasonValue,
   departureUpsertOp,
   loadDepartedGroupItems,
 } from './dm-departure.util';
-import { GroupDmEventInput, buildGroupEventPayload, groupEventCreateOp } from './dm-group-event.util';
+import {
+  GroupDmEventInput,
+  buildGroupEventPayload,
+  groupEventCreateOp,
+} from './dm-group-event.util';
 
 /**
  * 🫀 C12 §3.2 — okundu bilgisi görünürlük kararı. **T&S karar fonksiyonu (R7), satır satır insan
@@ -317,13 +326,29 @@ export class DmService {
       });
     }
 
+    // C65: aktif grupların önceki üyelik dönemleri TEK sorguda (grup yoksa sorgu yok).
+    const periodsByChannel = new Map<string, { joinedAt: Date; leftAt: Date }[]>();
+    if (groupMemberships.length > 0) {
+      const pastRows = await this.prisma.groupDmPastPeriod.findMany({
+        where: { userId, channelId: { in: groupMemberships.map((g) => g.channel.id) } },
+        select: { channelId: true, joinedAt: true, leftAt: true },
+      });
+      for (const r of pastRows ?? []) {
+        periodsByChannel.set(r.channelId!, [...(periodsByChannel.get(r.channelId!) ?? []), r]);
+      }
+    }
+
     // GROUP_DM kanalları
     for (const m of groupMemberships) {
+      const visibility: GroupVisibility = {
+        joinedAt: m.createdAt,
+        periods: toPeriods(periodsByChannel.get(m.channel.id) ?? []),
+      };
       // E2 §2.5: katılım öncesi şifreli mesaj önizlemede/okunmamışta yok; son mesaj bu süzgeçle yeniden seçilir.
       const newest = m.channel.messages[0] ?? null;
       const lastMsg =
-        newest && isHiddenBeforeJoin(newest, m.createdAt)
-          ? await this.latestVisibleMessage(m.channel.id, m.createdAt)
+        newest && isHiddenBeforeJoin(newest, visibility)
+          ? await this.latestVisibleMessage(m.channel.id, visibility)
           : newest;
       const lastReaction = visibleLastReaction({
         raw: m.lastReaction,
@@ -744,6 +769,10 @@ export class DmService {
     });
     const leftAt = new Date();
     // C64 §2.2: olay `leftAt` ile AYNI an ve AYNI tx. LEFT → actor null; REMOVED → çıkaran.
+    // C65: bu üyelik dönemi (geri eklemede SİLİNMEZ) aynı tx'te kaydedilir.
+    const periodOp = this.prisma.groupDmPastPeriod.create({
+      data: { channelId: groupId, userId, joinedAt: membership.createdAt, leftAt },
+    });
     const left = groupEventCreateOp(this.prisma, {
       channelId: groupId,
       kind: reason === 'LEFT' ? 'MEMBER_LEFT' : 'MEMBER_REMOVED',
@@ -763,6 +792,7 @@ export class DmService {
       }),
       this.prisma.channelMember.delete({ where: { id: membership.id } }),
       left.op,
+      periodOp,
       ...e2eeOps,
     ]);
 
@@ -799,9 +829,11 @@ export class DmService {
 
   /** DELETE /dm/groups/:id/departure — eski üye, ayrılma kaydını (listedeki grubu) siler; yerel etki, olay yok. */
   async deleteDeparture(userId: string, groupId: string) {
-    const { count } = await this.prisma.groupDmDeparture.deleteMany({
-      where: { channelId: groupId, userId },
-    });
+    // C65: sildiği geçmiş geri eklenince geri gelmesin; dönem satırları departure ile aynı tx'te silinir.
+    const [{ count }] = await this.prisma.$transaction([
+      this.prisma.groupDmDeparture.deleteMany({ where: { channelId: groupId, userId } }),
+      this.prisma.groupDmPastPeriod.deleteMany({ where: { channelId: groupId, userId } }),
+    ]);
     if (count === 0) {
       throw new NotFoundException({
         message: 'Ayrılma kaydı bulunamadı.',
@@ -812,9 +844,9 @@ export class DmService {
   }
 
   /** Grup listesinin son mesajı, katılım öncesi şifreli mesajlar hariç (nadir yol: en yeni mesaj gizliyse). */
-  private latestVisibleMessage(channelId: string, joinedAt: Date) {
+  private latestVisibleMessage(channelId: string, visibility: GroupVisibility) {
     return this.prisma.message.findFirst({
-      where: { channelId, deletedAt: null, ...preJoinEncryptedFilter(joinedAt) },
+      where: { channelId, deletedAt: null, ...preJoinEncryptedFilter(visibility) },
       orderBy: { createdAt: 'desc' },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },

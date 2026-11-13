@@ -40,6 +40,11 @@ const prismaMock = {
   message: {
     findFirst: jest.fn(),
   },
+  groupDmPastPeriod: {
+    findMany: jest.fn().mockResolvedValue([]),
+    create: jest.fn().mockReturnValue('period-op'),
+    deleteMany: jest.fn().mockReturnValue('period-del'),
+  },
   groupDmEvent: { create: jest.fn().mockReturnValue('event-op') },
   groupDmDeparture: {
     findMany: jest.fn(),
@@ -951,7 +956,11 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     };
     prismaMock.channel.findMany.mockResolvedValue([
       { id: 'c-enc', ...base, messages: [{ content: '', encrypted: true, createdAt: now }] },
-      { id: 'c-plain', ...base, messages: [{ content: 'selam', encrypted: false, createdAt: now }] },
+      {
+        id: 'c-plain',
+        ...base,
+        messages: [{ content: 'selam', encrypted: false, createdAt: now }],
+      },
     ]);
 
     const res = await service.getMessageRequests(SENDER);

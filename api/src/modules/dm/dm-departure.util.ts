@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { previewFromAttachments } from '../../common/utils/attachment-preview.util';
-import { preJoinEncryptedFilter } from '../../common/utils/pre-join.util';
+import { preJoinEncryptedFilter, toPeriods } from '../../common/utils/pre-join.util';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**
@@ -57,6 +57,12 @@ export async function loadDepartedGroupItems(
   const channelById = new Map(channels.map((c) => [c.id, c]));
 
   const live = departures.filter((d) => channelById.has(d.channelId));
+  // C65: önceki dönemler TEK sorguda (eski üyenin süzgeci de dönem farkında).
+  const pastRows =
+    (await prisma.groupDmPastPeriod.findMany({
+      where: { userId, channelId: { in: live.map((d) => d.channelId) } },
+      select: { channelId: true, joinedAt: true, leftAt: true },
+    })) ?? [];
   const users = await prisma.user.findMany({
     // KVKK: imha edilmiş (deletedAt dolu) üyeler eski grup listesinde görünmez.
     where: { id: { in: [...new Set(live.flatMap((d) => d.memberIds))] }, deletedAt: null },
@@ -72,7 +78,10 @@ export async function loadDepartedGroupItems(
           channelId: d.channelId,
           deletedAt: null,
           createdAt: { lte: d.leftAt, ...(d.clearedAt ? { gt: d.clearedAt } : {}) },
-          ...preJoinEncryptedFilter(d.joinedAt),
+          ...preJoinEncryptedFilter({
+            joinedAt: d.joinedAt,
+            periods: toPeriods(pastRows.filter((r) => r.channelId === d.channelId)),
+          }),
         },
         orderBy: { createdAt: 'desc' },
         include: LAST_MESSAGE_INCLUDE,

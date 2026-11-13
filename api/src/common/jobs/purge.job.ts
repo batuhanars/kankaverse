@@ -111,6 +111,7 @@ export class PurgeJob {
       await tx.recentGame.deleteMany({ where: { userId } });
       // C62 §2.3.b (KVKK): kullanıcının kendi grup DM ayrılma kayıtları (eski grup listesi izi) silinir.
       await tx.groupDmDeparture.deleteMany({ where: { userId } });
+      await tx.groupDmPastPeriod.deleteMany({ where: { userId } }); // C65
       // C36 (KVKK): bağlı Kick/Twitch hesapları, bekleyen bağlama state'leri ve duyuru opt-in'leri silinir.
       // Platform aboneliği günlük uzlaştırma işince kapatılır (hesap satırı yok → bağlı olmayan abonelik).
       await tx.externalAccount.deleteMany({ where: { userId } });
