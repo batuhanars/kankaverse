@@ -6,6 +6,7 @@ import { E2eeEngine } from '../src/engine'
 import { serialLock } from '../src/lock'
 import { backupDeps } from './fakeBackup'
 import { as, CH, login, provider, send, server, show, type Msg, type Profile } from './flowSuite'
+import { LocalStore } from '../src/localStore'
 import { MemoryVault } from './memoryVault'
 
 /** B'nin grup durumuna yazım sayısı: her MLS çözmesi anahtar tükettiği için bir `saveGroup` demektir. */
@@ -221,6 +222,106 @@ export function notificationSuite(label: string) {
       const m2: Msg = { ...first, id: 'm2', ciphertext: toB64(sealed.ciphertext) }
 
       expect(await (await local(B1)).decryptOffline(m2)).toEqual({ kind: 'unavailable' })
+    })
+  })
+
+  describe(`[${label}] push commit'li ağsız önizleme (C66)`, () => {
+    /** Deponun tüm içeriği: bayt bayt karşılaştırma için. */
+    async function dump(p: Profile) {
+      const out: Record<string, string> = {}
+      for (const store of ['device', 'groups', 'messages'] as const) {
+        for (const k of (await p.vault.keys(store)).sort()) out[`${store}/${k}`] = toB64((await p.vault.get(store, k))!)
+      }
+      return out
+    }
+    const pushCommits = () =>
+      server.handshakes.filter((h) => h.channelId === CH && h.epoch >= 1).map((h) => ({ epoch: h.epoch, commit: h.commit }))
+
+    /** B bir commit geride: A2 eklendi (commit sunucuda), A2'nin mesajı yeni epoch'ta. */
+    async function behind(freshView = true) {
+      const { A1, B1 } = await pair()
+      const m1 = await send(A1, 'm1', 'önce')
+      await as(B1, (e) => e.onWelcome())
+      await show(B1, [m1])
+      const A2 = await login('A')
+      await as(A1, (e) => e.onGroupChanged(CH))
+      await as(A2, (e) => e.onWelcome())
+      const m2 = await send(A2, 'm2', 'yeni epoch metni')
+      // Önizleme yeni cihazı önbellek görünümüyle doğrular (ağsız: tazeleme yok); B kanalı yeni üyeden sonra açmış gibi.
+      if (freshView) {
+        const state = (await server.apiFor('B', B1.family).channelState(CH)).data
+        await new LocalStore(B1.vault, provider).saveView(CH, state)
+      }
+      return { B1, m2, A2 }
+    }
+
+    it('commit ile metin çözülür; depo bayt bayt aynı; ağ yok; sonra çevrimiçi yol aynı mesajı çözer', async () => {
+      const { B1, m2 } = await behind()
+      const before = await dump(B1)
+      const logs: string[] = []
+      const offline = await local(B1, logs) // ağ portu yok: çağrılırsa OfflineApiError loglanır
+
+      expect(await offline.previewWithCommits(m2, pushCommits())).toEqual({ kind: 'text', body: 'yeni epoch metni' })
+      expect(logs).toEqual([])
+      expect(await dump(B1)).toEqual(before)
+      expect(B1.warnings).toEqual([])
+      expect((await show(B1, [m2]))[0]).toMatchObject({ content: 'yeni epoch metni', e2eeStatus: 'ok' })
+    })
+
+    it("bayat önbellek (yeni cihaz kayıtlı değil): ekleme commit'iyle metin yine doğru, depo aynı", async () => {
+      const { B1, m2 } = await behind(false)
+      const before = await dump(B1)
+      expect(await (await local(B1)).previewWithCommits(m2, pushCommits())).toEqual({ kind: 'text', body: 'yeni epoch metni' })
+      expect(await dump(B1)).toEqual(before)
+    })
+
+    it('önbellekteki kimlik farklı anahtarla gelirse: unavailable (kayıtlı kimlik bayt bayt doğrulanır)', async () => {
+      const { B1, m2, A2 } = await behind(true)
+      const store = new LocalStore(B1.vault, provider)
+      const view = (await store.loadView(CH))!
+      for (const mem of view.members) for (const d of mem.devices) if (d.deviceId === A2.deviceId()) d.signatureKey = toB64(new Uint8Array(32).fill(7))
+      await store.saveView(CH, view)
+      const before = await dump(B1)
+      expect(await (await local(B1)).previewWithCommits(m2, pushCommits())).toEqual({ kind: 'unavailable' })
+      expect(await dump(B1)).toEqual(before)
+    })
+
+    it('aynı commit kalıcı çevrimiçi yolda tanınmayan cihaz kuralıyla değerlendirilir (davranış değişmedi)', async () => {
+      const { B1, A2 } = await behind(false)
+      server.hidden.set('B', new Set([A2.deviceId()])) // B'nin gördüğü kayıt listesinde A2 yok
+      await as(B1, (e) => e.onGroupChanged(CH)).catch(() => {})
+      expect(B1.warnings).toContainEqual([CH, 'unknown-device'])
+    })
+
+    it('commit yoksa bugünkü davranış: unavailable, depo aynı', async () => {
+      const { B1, m2 } = await behind()
+      const before = await dump(B1)
+      const offline = await local(B1)
+      expect(await offline.previewWithCommits(m2, [])).toEqual({ kind: 'unavailable' })
+      expect(await dump(B1)).toEqual(before)
+    })
+
+    it('yerel epoch yetiyorsa commit uygulanmaz (decryptOffline yolu aynen)', async () => {
+      const { A1, B1 } = await pair()
+      const m1 = await send(A1, 'm1', 'normal')
+      await as(B1, (e) => e.onWelcome())
+      const offline = await local(B1)
+      expect(await offline.previewWithCommits(m1, [{ epoch: 99, commit: 'AAAA' }])).toEqual({ kind: 'text', body: 'normal' })
+    })
+
+    it('yanlış epoch, boşluk ya da bozuk commit: unavailable, depo aynı', async () => {
+      const { B1, m2 } = await behind()
+      const before = await dump(B1)
+      const offline = await local(B1)
+      const good = pushCommits()
+      const bad = [
+        [{ ...good[good.length - 1], epoch: good[good.length - 1].epoch + 1 }], // yerel epoch'tan ileri (boşluk)
+        [{ ...good[good.length - 1], epoch: 0 }], // yanlış epoch
+        [good[good.length - 1], { epoch: good[good.length - 1].epoch + 2, commit: good[0].commit }], // arada boşluk
+        [{ epoch: good[good.length - 1].epoch, commit: 'bozuk!' }],
+      ]
+      for (const c of bad) expect(await offline.previewWithCommits(m2, c)).toEqual({ kind: 'unavailable' })
+      expect(await dump(B1)).toEqual(before)
     })
   })
 }

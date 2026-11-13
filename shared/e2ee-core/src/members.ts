@@ -65,3 +65,28 @@ export function createAuthService(registry: DeviceRegistry): AuthenticationServi
 export function verifyAllLeaves(state: ClientState, registry: DeviceRegistry): string[] {
   return getGroupMembers(state).map((leaf) => checkIdentity(leaf.credential, leaf.signaturePublicKey, registry))
 }
+
+/**
+ * C66 (yalnız bildirim önizlemesi, bellekte): kayıt listesinde OLMAYAN YENİ yapraklar (commit'ten önce grupta
+ * olmayan cihaz kimlikleri) kimlik doğrulamasından muaf. Kayıtlı bir kimlik (yeni ya da eski) anahtarı bayt bayt
+ * tutmalı; kayıtsız ama zaten grupta olan kimlik reddedilir. Kalıcı yolda KULLANILMAZ.
+ */
+export function createPreviewAuthService(registry: DeviceRegistry, existing: ReadonlySet<string>): AuthenticationService {
+  return {
+    async validateCredential(credential, signaturePublicKey) {
+      const deviceId = deviceIdOf(credential)
+      if (registry.has(deviceId) || existing.has(deviceId)) checkIdentity(credential, signaturePublicKey, registry)
+      return true
+    },
+    async validateSuccessorCredential(oldCredential, newCredential) {
+      return deviceIdOf(oldCredential) === deviceIdOf(newCredential)
+    },
+  }
+}
+
+export function verifyLeavesForPreview(state: ClientState, registry: DeviceRegistry, existing: ReadonlySet<string>): void {
+  for (const leaf of getGroupMembers(state)) {
+    const deviceId = deviceIdOf(leaf.credential)
+    if (registry.has(deviceId) || existing.has(deviceId)) checkIdentity(leaf.credential, leaf.signaturePublicKey, registry)
+  }
+}

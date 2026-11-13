@@ -9,6 +9,7 @@ export {
   type NotificationPreview,
   type SentCipher,
 } from './engine'
+export { type PushCommit } from './commitPreview'
 export { GroupNotReadyError, type E2eeContext } from './context'
 export { DeviceRemovedError, type ChannelInfo } from './channelSync'
 export { DeviceBrokenError } from './deviceSetup'

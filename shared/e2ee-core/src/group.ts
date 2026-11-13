@@ -34,7 +34,14 @@ import {
   UnexpectedMessageError,
   wrapMlsError,
 } from './errors'
-import { deviceIdOf, toRegistry, verifyAllLeaves, type ExpectedDevice } from './members'
+import {
+  createPreviewAuthService,
+  deviceIdOf,
+  toRegistry,
+  verifyAllLeaves,
+  verifyLeavesForPreview,
+  type ExpectedDevice,
+} from './members'
 import { takePending, type PendingCommit } from './pending'
 import { decodePayload, encodePayload, type DecodedPayload, type TextPayload } from './payload'
 import type { CryptoProvider } from './provider'
@@ -122,6 +129,38 @@ export class Group {
     if (epochOf(newState) !== this.epoch + 1) throw new GroupStateError('Bekleyen commit bu epoch için değil')
     this.state = newState
     consumed.forEach(zeroOutUint8Array)
+  }
+
+  /**
+   * C66: bildirim önizlemesi için `processCommit`; AYNI MLS doğrulamaları, tek fark: kayıt listesinde olmayan ve
+   * commit'le EKLENEN yeni yapraklar kimlik listesinden muaf (ağsız yolda taze liste yok). Mevcut yapraklar ve
+   * kayıtlı kimlikler bayt bayt doğrulanır. Yalnız bellekteki taze grup kopyasında kullanılır, kalıcı yolda ASLA.
+   */
+  async processCommitForPreview(commit: Uint8Array, expected: readonly ExpectedDevice[]): Promise<ProcessCommitResult> {
+    const registry = toRegistry(expected)
+    const existing: ReadonlySet<string> = new Set(this.memberDeviceIds())
+    const suite = await this.provider.loadSuite()
+    try {
+      const message = decode(mlsMessageDecoder, commit)
+      if (!message || (message.wireformat !== wireformats.mls_private_message && message.wireformat !== wireformats.mls_public_message)) {
+        throw new UnexpectedMessageError('Commit çözülemedi ya da çerçeveli mesaj değil')
+      }
+      const result = await processMessage({
+        context: { cipherSuite: suite, authService: createPreviewAuthService(registry, existing) },
+        state: this.state,
+        message,
+      })
+      const removed = result.kind === 'newState' && result.newState.groupActiveState.kind === 'removedFromGroup'
+      if (result.kind !== 'newState' || (!removed && epochOf(result.newState) !== this.epoch + 1)) {
+        throw new UnexpectedMessageError('Mesaj bir commit değil (epoch ilerlemedi)')
+      }
+      if (!removed) verifyLeavesForPreview(result.newState, registry, existing)
+      this.state = result.newState
+      result.consumed.forEach(zeroOutUint8Array)
+      return { epoch: this.epoch, removed }
+    } catch (e) {
+      throw wrapMlsError(e)
+    }
   }
 
   /** Başkasının commit'ini uygular. Sonuç yeni ağaçtaki her yaprak sunucu listesine karşı doğrulanır. */

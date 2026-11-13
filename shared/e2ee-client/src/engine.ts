@@ -21,6 +21,7 @@ import {
 import { BackupManager } from './backup'
 import { TransferManager } from './transfer'
 import type { E2eeContext } from './context'
+import { previewInMemory, type PushCommit } from './commitPreview'
 import { mentionIdsOf } from './mentionIds'
 import { DeviceBrokenError, ensureDevice } from './deviceSetup'
 import { Hydrator, type OwnEntry, type OwnPlain, type Resolution, type WireMessage } from './hydrate'
@@ -423,6 +424,22 @@ export class E2eeEngine {
       // İçerik/yük asla loglanmaz: yalnız hata türünün adı.
       this.log(`[e2ee] çevrimdışı çözülemedi: ${e instanceof Error ? e.name : typeof e}`)
       return { kind: 'unavailable' }
+    }
+  }
+
+  /**
+   * C66 §3: push'un taşıdığı commit'lerle ağsız önizleme. Önce mevcut `decryptOffline`; `unavailable` ve commit
+   * varsa commit'ler yalnız BELLEKTEKİ taze grup kopyasına uygulanır (hiçbir depo yazımı, ağ çağrısı yok).
+   */
+  async previewWithCommits(msg: WireMessage, commits: PushCommit[]): Promise<NotificationPreview> {
+    const first = await this.decryptOffline(msg)
+    if (first.kind !== 'unavailable' || commits.length === 0) return first
+    try {
+      const body = await this.run((ctx) => previewInMemory(ctx, msg, commits))
+      return body === null ? first : { kind: 'text', body }
+    } catch (e) {
+      this.log(`[e2ee] commit'li önizleme başarısız: ${e instanceof Error ? e.name : typeof e}`)
+      return first
     }
   }
 
