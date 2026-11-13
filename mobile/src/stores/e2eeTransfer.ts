@@ -57,7 +57,7 @@ let timer: ReturnType<typeof setInterval> | null = null;
 const dmIds = () =>
   useDmStore
     .getState()
-    .channels.filter((c) => c.type === 'DM')
+    .channels.filter((c) => c.type === 'DM' || c.type === 'GROUP_DM')
     .map((c) => c.id);
 
 const log = (e: unknown) => console.error('[E2EE] aktarım', e instanceof Error ? e.name : typeof e);

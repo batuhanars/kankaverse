@@ -1,5 +1,9 @@
 import { useMemo } from 'react';
+import { noticeSlots } from '@kankaverse/e2ee-client';
 import { useE2eeStore } from '@/stores/e2ee';
+import { useE2eeNoticesStore } from '@/stores/e2eeNotices';
+import { useDmStore } from '@/stores/dm';
+import { useMessagesStore } from '@/stores/messages';
 import type { MessageDto } from '@/api/messages';
 
 /**
@@ -20,5 +24,17 @@ export function useE2eeChannelView(channelId: string, messages: MessageDto[], ha
     return { dividerBeforeId: messages[first].id, dividerAtEnd: false };
   }, [messages, hasMore, encrypted]);
 
-  return { encrypted, warning, dividerBeforeId, dividerAtEnd };
+  // E2 §3.3: "yeni cihaz eklendi" satırları. `messages` eskiden yeniye; yuva i = i. mesajdan ÖNCE, length = son mesajdan sonra.
+  const notices = useE2eeNoticesStore((s) => s.byChannel[channelId]);
+  const deviceNotices = useMemo(() => noticeSlots(notices ?? [], messages, hasMore), [notices, messages, hasMore]);
+  const dmChannel = useDmStore((s) => s.channels.find((c) => c.id === channelId));
+  const known = useMessagesStore((s) => s.knownUsers[channelId]);
+  /** Satırdaki ad: grup üyesi ya da 1-1'de karşı taraf, yoksa mesajlardan öğrenilen ad; bilinmiyorsa null. */
+  const noticeName = (userId: string): string | null => {
+    if (dmChannel?.type === 'GROUP_DM') return dmChannel.members.find((m) => m.id === userId)?.username ?? known?.[userId] ?? null;
+    if (dmChannel?.type === 'DM' && dmChannel.otherUser.id === userId) return dmChannel.otherUser.username;
+    return known?.[userId] ?? null;
+  };
+
+  return { encrypted, warning, dividerBeforeId, dividerAtEnd, deviceNotices, noticeName };
 }

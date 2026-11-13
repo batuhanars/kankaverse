@@ -126,7 +126,7 @@ export async function evaluateHistoryBanner(): Promise<void> {
   if (e.backup && get().state === null) return; // yedek durumu henüz okunmadı
   const hasEncryptedDm = useDmStore
     .getState()
-    .channels.some((c) => c.type === 'DM' && c.lastMessage?.encrypted);
+    .channels.some((c) => (c.type === 'DM' || c.type === 'GROUP_DM') && c.lastMessage?.encrypted);
   if (!hasEncryptedDm) return;
   historyEvaluated = true;
   if (!get().state?.configured && !e.transfer) return;
@@ -177,7 +177,7 @@ export async function restoreOnly(): Promise<BackupOutcome & { restored?: number
   try {
     const ids = useDmStore
       .getState()
-      .channels.filter((c) => c.type === 'DM')
+      .channels.filter((c) => c.type === 'DM' || c.type === 'GROUP_DM')
       .map((c) => c.id);
     const res = await backupEngine()!.restoreBackup(ids);
     await refreshBackup();

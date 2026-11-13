@@ -22,6 +22,7 @@ import { MessageSearchModal } from './MessageSearchModal';
 import { ComposerHost } from './message/ComposerHost';
 import { EmailVerificationBanner } from './EmailVerificationBanner';
 import { DateSeparator } from './message/DateSeparator';
+import { E2eeDeviceNotice } from './message/E2eeDeviceNotice';
 import { E2eeDivider } from './message/E2eeDivider';
 import { E2eeWarningBanner } from './message/E2eeWarningBanner';
 import { useE2eeChannelView } from './message/useE2eeChannelView';
@@ -284,6 +285,11 @@ export function MessageScreen({
   // E5b Parça C: cihaz öncesi mesajlar gizlendiyse (daha eskisi yokken) listenin başında tek satır bilgi.
   const hiddenBefore = useMessagesStore((s) => s.byChannel[channelId]?.hiddenBefore ?? false);
   const e2eeView = useE2eeChannelView(channelId, plainMessages, hasMoreOlder);
+  /** E2 §3.3: `slot` = eskiden-yeniye dizideki yer (bu mesajdan ÖNCE; `items.length` = son mesajdan sonra). */
+  const renderNotices = (slot: number) =>
+    e2eeView.deviceNotices.get(slot)?.map((n) => (
+      <E2eeDeviceNotice key={`${n.userId}-${n.at}`} name={e2eeView.noticeName(n.userId)} />
+    ));
   useBackupInChannel(e2eeView.encrypted, fetchMessages); // E5a: kurulum sorusu + geri yükleme sonrası yenileme
   // M6b §8.4 — sesli mesaj otomatik geçişi için kronolojik (eski → yeni) CLEAN ses eki sırası.
   useEffect(() => {
@@ -444,7 +450,12 @@ export function MessageScreen({
             }, 60);
           }}
           // Inverted listede başlık görsel olarak EN ALTTA durur: henüz şifreli mesaj yokken ayraç sonda.
-          ListHeaderComponent={e2eeView.dividerAtEnd ? <E2eeDivider /> : null}
+          ListHeaderComponent={
+            <View>
+              {e2eeView.dividerAtEnd && <E2eeDivider />}
+              {renderNotices(items.length)}
+            </View>
+          }
           ListFooterComponent={
             list.loadingOlder ? (
               <ActivityIndicator color={theme.colors.textMuted} style={styles.loadMore} />
@@ -452,7 +463,7 @@ export function MessageScreen({
               <Text style={styles.hiddenNote}>{t('e2ee.backup.history.hiddenNote')}</Text>
             ) : null
           }
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             // 🔴 C11 — bu sarmalayıcı `View` ŞART, `<>` fragment DEĞİL. `inverted` listede RN
             // hücre kabını `flexDirection: 'column-reverse'` + `scaleY(-1)` ile kuruyor
             // (VirtualizedListCellRenderer: `[styles.columnReverse, inversionStyle]`) — bu
@@ -462,6 +473,7 @@ export function MessageScreen({
             <View>
               {item.isDayStart && <DateSeparator iso={item.message.createdAt} />}
               {item.message.id === e2eeView.dividerBeforeId && <E2eeDivider />}
+              {renderNotices(items.length - 1 - index)}
               {/* C23 — Yanıtla her mesajda açık (eylem paneli de koşulsuz sunuyor); tek işlev. */}
               <SwipeToReply
                 // C29: gecici/basarisiz mesajda kaydirarak yanit/duzenle kapali (iki islev de yok = jest kapali).

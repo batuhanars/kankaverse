@@ -34,6 +34,7 @@ export { BackupScheduler, BACKUP_FIRST_DELAY_MS, BACKUP_MAX_DELAY_MS, type Timer
 export { buildSnapshot, parseSnapshot, pickCandidates, shouldWrite, type SnapshotContent, type SnapshotMessage } from './backupSnapshot'
 export { fromB64, toB64 } from './b64'
 export { MAX_MENTION_IDS, mentionIdsOf } from './mentionIds'
+export { noticeSlots } from './deviceNoticeSlots'
 export type { DeviceNotice, StoredStatus, StoredMessage } from './localStore'
 export type { WireMessage } from './hydrate'
 export type * from './ports'

@@ -257,7 +257,7 @@ export const messagesApi = {
   /** E1: şifreli DM mesajı. `content` GÖNDERİLMEZ (sunucu 409 E2EE_REQUIRED); ciphertext base64. */
   async sendEncrypted(
     channelId: string,
-    cipher: { ciphertext: string; epoch: number; frankingTag?: string },
+    cipher: { ciphertext: string; epoch: number; frankingTag?: string; mentionUserIds?: string[] },
     replyToId?: string,
     nonce?: string,
     attachmentIds?: string[],
@@ -274,7 +274,7 @@ export const messagesApi = {
   async editEncrypted(
     channelId: string,
     messageId: string,
-    cipher: { ciphertext: string; epoch: number; frankingTag?: string },
+    cipher: { ciphertext: string; epoch: number; frankingTag?: string; mentionUserIds?: string[] },
   ): Promise<MessageDto> {
     const res = await http.patch<MessageDto>(`/channels/${channelId}/messages/${messageId}`, cipher);
     return res.data;

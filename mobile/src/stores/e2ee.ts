@@ -4,6 +4,7 @@ import { messagesApi, type MessageDto } from '@/api/messages';
 import { startMobileEngine } from '@/e2ee/startEngine';
 import { wipeMobileVaults } from '@/e2ee/sqliteRows';
 import { useDmStore } from '@/stores/dm';
+import { clearDeviceNotices, loadDeviceNotices } from '@/stores/e2eeNotices';
 import { t } from '@/i18n';
 
 /**
@@ -54,6 +55,7 @@ export function initE2ee(userId: string): Promise<void> {
 export async function wipeE2ee(): Promise<void> {
   const current = get().engine;
   set({ engine: null, channels: {}, warnings: {} });
+  clearDeviceNotices();
   ready = Promise.resolve();
   try {
     await current?.destroy();
@@ -63,31 +65,33 @@ export async function wipeE2ee(): Promise<void> {
   }
 }
 
-/** Yalnız 1-1 DM şifrelenir (E1 kapsamı); liste yüklü değilse (soğuk açılış, bildirim) önce yüklenir. */
-async function isOneToOneDm(channelId: string): Promise<boolean> {
+/** Şifrelenebilen sohbet: 1-1 DM ya da grup DM (E2 §3.1); liste yüklü değilse (soğuk açılış, bildirim) önce yüklenir. */
+async function isEncryptableDm(channelId: string): Promise<boolean> {
   const dm = useDmStore.getState();
   if (dm.channels.length === 0) await dm.fetchAll().catch(() => undefined);
-  return useDmStore.getState().channels.some((c) => c.id === channelId && c.type === 'DM');
+  return useDmStore.getState().channels.some((c) => c.id === channelId && (c.type === 'DM' || c.type === 'GROUP_DM'));
 }
 
 export async function openE2eeChannel(channelId: string): Promise<void> {
   await ready;
   const engine = get().engine;
-  if (!engine || !(await isOneToOneDm(channelId))) return;
+  if (!engine || !(await isEncryptableDm(channelId))) return;
   try {
     const info = await engine.open(channelId);
     set((s) => ({ channels: { ...s.channels, [channelId]: info } }));
   } catch (e) {
     console.error('[E2EE] kanal açılamadı', e instanceof Error ? e.name : '');
   }
+  void loadDeviceNotices(channelId); // E2 §3.3: yerel depodan "yeni cihaz eklendi" satırları (web açılış davranışı)
 }
 
 /** Mesajlar çözüldükten sonra: eksik commit'leri işle, üyelik farkını kapat (yerel grup yoksa no-op). */
 export async function syncE2eeChannel(channelId: string): Promise<void> {
   await ready;
   const engine = get().engine;
-  if (!engine || !(await isOneToOneDm(channelId))) return;
+  if (!engine || !(await isEncryptableDm(channelId))) return;
   await engine.onGroupChanged(channelId).catch((e) => console.error('[E2EE] senkron', e instanceof Error ? e.name : ''));
+  await loadDeviceNotices(channelId); // commit "yeni cihaz eklendi" satırı üretmiş olabilir (E2 §3.3)
 }
 
 /**
@@ -97,7 +101,7 @@ export async function syncE2eeChannel(channelId: string): Promise<void> {
 export async function forgetE2eeMessage(channelId: string, messageId: string): Promise<void> {
   await ready;
   const engine = get().engine;
-  if (!engine || !(await isOneToOneDm(channelId))) return;
+  if (!engine || !(await isEncryptableDm(channelId))) return;
   await engine
     .forgetMessage(messageId)
     .catch((e) => console.error('[E2EE] yerel kayıt silinemedi', e instanceof Error ? e.name : ''));
@@ -218,7 +222,7 @@ export async function hydratePage(
 async function prepareSend(channelId: string, text: string): Promise<SentCipher | null> {
   await ready;
   const engine = get().engine;
-  if (!engine || !(await isOneToOneDm(channelId))) return null;
+  if (!engine || !(await isEncryptableDm(channelId))) return null;
   return engine.encrypt(channelId, text);
 }
 
