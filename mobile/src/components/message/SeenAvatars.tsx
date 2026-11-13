@@ -24,7 +24,7 @@ export interface SeenReader {
 }
 
 const MAX_SHOWN = 5;
-const SIZE = 16;
+const SIZE = 22; // sahip isteği: 16 küçük kalıyordu, ne olduğu belli olsun
 const LABEL_MS = 2500;
 const SLIDE_MS = 250;
 
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 2, height: SIZE },
   avatar: { width: SIZE, height: SIZE, borderRadius: SIZE / 2 },
   fallback: { backgroundColor: theme.colors.accentSubtle, alignItems: 'center', justifyContent: 'center' },
-  fallbackText: { color: theme.colors.accent500, fontSize: 9, fontWeight: '700' },
+  fallbackText: { color: theme.colors.accent500, fontSize: 11, fontWeight: '700' },
   more: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs, marginRight: 2 },
   label: { position: 'absolute', right: 12, bottom: SIZE + 2, color: theme.colors.textMuted, fontSize: theme.fontSize.xs },
 });
