@@ -826,6 +826,50 @@ describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
       });
     });
 
+    it('şifreli + görsel eki → push metni ve lastMessage.content etiket, düz içerik sızmaz', async () => {
+      setup(true);
+      await gateway.notifyDmActivity(
+        DM_CHANNEL_ID,
+        encDto({ content: 'GIZLI', attachments: [{ contentType: 'image/png' }] }),
+      );
+      const v2 = pushSendToUsersMock.mock.calls[0][1].v2;
+      expect(v2.text).toBe('📷 Görsel');
+      expect(JSON.stringify(v2)).not.toContain('GIZLI');
+      const emit = emitToUserMock.mock.calls.filter((c: any[]) => c[1] === 'dm.message').pop()!;
+      expect(emit[2].lastMessage.content).toBe('📷 Görsel');
+    });
+
+    it('şifreli + ses/video/dosya etiketleri', async () => {
+      for (const [ct, label] of [
+        ['audio/ogg', '🎤 Sesli mesaj'],
+        ['video/mp4', '🎥 Video'],
+        ['application/pdf', '📎 Dosya'],
+      ]) {
+        pushSendToUsersMock.mockClear();
+        setup(true);
+        await gateway.notifyDmActivity(
+          DM_CHANNEL_ID,
+          encDto({ attachments: [{ contentType: ct }] }),
+        );
+        expect(pushSendToUsersMock.mock.calls[0][1].v2.text).toBe(label);
+      }
+    });
+
+    it('şifreli + eksiz (metin) → genel metin', async () => {
+      setup(true);
+      await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto({ attachments: [] }));
+      expect(pushSendToUsersMock.mock.calls[0][1].v2.text).toBe(E2EE_PUSH_GENERIC_TEXT);
+    });
+
+    it('şifresiz + görsel eki davranışı aynı (etiket)', async () => {
+      setup(true);
+      await gateway.notifyDmActivity(
+        DM_CHANNEL_ID,
+        makeDmMessageDto({ content: '', attachments: [{ contentType: 'image/png' }] }),
+      );
+      expect(pushSendToUsersMock.mock.calls[0][1].v2.text).toBe('📷 Görsel');
+    });
+
     it('bayrak açık + şifreli + sınır altı → e2ee var, ciphertext aynı, text genel metin', async () => {
       setup(true);
       const dto = encDto();

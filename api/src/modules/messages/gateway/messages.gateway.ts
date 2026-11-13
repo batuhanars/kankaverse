@@ -862,8 +862,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const rawContent = typeof messageDto['content'] === 'string' ? messageDto['content'] : '';
     // E1: şifreli mesajda içerik sunucuya görünmez; push + liste önizlemesi sabit genel metin (E3'te değişecek).
     const encrypted = messageDto['encrypted'] === true;
+    // Şifreli mesajda düz içerik ASLA kullanılmaz (boş verilir); yalnız ek TÜRÜ etiketi (📷/🎥/🎤/📎) çıkar,
+    // ek yoksa genel metin.
     const content = encrypted
-      ? E2EE_PUSH_GENERIC_TEXT
+      ? previewFromAttachments(
+          '',
+          messageDto['attachments'] as { contentType: string }[] | undefined,
+        ) || E2EE_PUSH_GENERIC_TEXT
       : previewFromAttachments(
           rawContent,
           messageDto['attachments'] as { contentType: string }[] | undefined,
