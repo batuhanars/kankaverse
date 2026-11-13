@@ -38,6 +38,21 @@ Vault pattern: `knowledge/stack/claude-code/multi-session-pm-dev-contract.md`. E
 - **Sapma ihtiyacı doğarsa:** dev DURUR, kullanıcıya bildirir, Opus contract'ı revize eder, sonra devam.
 - **`TASK.md`:** dev checkbox işaretler, **item EKLEMEZ** (yeni item = scope creep = Opus onayı).
 
+## Sahibin Notu (oturum kapanışı)
+
+Teknik günlüğü AI zaten tutuyor. Eksik olan, sahibin (Batuhan) o günkü anı: neye şaşırdı, hangi kararı kendisi verdi.
+Bu not içerik üretimine kaynak olur.
+
+- **Kim:** oturumu kapatan yönetici oturumu (Opus). Dev oturumları (Sonnet) sormaz.
+- **Ne zaman:** anlamlı bir iş kapanırken (sprint/contract bitti, cihaz turu bitti, gün kapanıyor). Her küçük görevde değil.
+- **Nasıl:** sahibe **tek soru** sorulur, cevap **en fazla bir iki cümle** beklenir. Örnek: "Bugün seni ne şaşırttı?",
+  "Bugün hangi kararı sen verdin?", "Bu işte en çok neye uğraştın?" Şablon, ek soru, ısrar yok.
+- **Nereye:** aktif serüven günlüğünün (`knowledge/projects/kankaverse/seruven-*.md`) ilgili bölümüne
+  **"Sahibin notu:"** satırı olarak, sahibin kendi cümleleriyle (düzeltme, süsleme, yorum katmadan). Aktif günlük
+  yoksa `knowledge/projects/kankaverse/kankaverse-kronoloji.md` içinde o ayın "Anılar" alanına.
+- **Cevap yoksa ya da "geç" derse:** not düşülmez, bir dahaki kapanışta yeniden sorulur. Boş satır uydurulmaz.
+- **Kural:** bu notlarda ve günlükte rakip platform adı geçmez.
+
 ---
 
 ## Response Envelope (tüm HTTP endpoint'leri)
