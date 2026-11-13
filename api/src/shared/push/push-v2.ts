@@ -36,6 +36,14 @@ export interface V2E2eePayload {
   createdAt: string;
   /** E4 — mesajda parmak izi varsa (base64, 32 bayt); telefon çözünce doğrular. */
   frankingTag?: string;
+  /** C66 — son 30 dk içindeki en çok 2 üye-değişikliği commit'i (base64), epoch ARTAN; ağsız önizleme için. */
+  commits?: V2E2eeCommit[];
+}
+
+/** `epoch` = commit'in UYGULANDIĞI epoch (`E2eeHandshake.epoch` ile aynı anlam). */
+export interface V2E2eeCommit {
+  epoch: number;
+  commit: string;
 }
 
 export interface V2ReadData {

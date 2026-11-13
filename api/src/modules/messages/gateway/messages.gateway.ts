@@ -9,7 +9,7 @@ import {
   OnGatewayDisconnect,
   OnGatewayInit,
 } from '@nestjs/websockets';
-import { HttpException } from '@nestjs/common';
+import { HttpException, Logger } from '@nestjs/common';
 import { NotifTargetType, NotificationLevel } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
@@ -32,7 +32,13 @@ import {
 import { CallSignalService } from '../../../shared/call-signal/call-signal.service';
 import { VoiceService } from '../../voice/voice.service';
 import { GamesService } from '../../../shared/games/games.service';
-import { E2EE_PUSH_GENERIC_TEXT, E2EE_PUSH_MAX_CIPHERTEXT } from '../../e2ee/e2ee.constants';
+import {
+  E2EE_PUSH_COMMIT_MAX,
+  E2EE_PUSH_COMMIT_WINDOW_MS,
+  E2EE_PUSH_DATA_MAX_BYTES,
+  E2EE_PUSH_GENERIC_TEXT,
+  E2EE_PUSH_MAX_CIPHERTEXT,
+} from '../../e2ee/e2ee.constants';
 
 interface AuthSocket extends Socket {
   data: { userId: string; sessionId: string; username?: string };
@@ -42,6 +48,7 @@ interface AuthSocket extends Socket {
 // Dekoratörde sabit origin yazılmaz — adapter seviyesinde dinamik olarak ayarlanır.
 @WebSocketGateway()
 export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit {
+  private readonly pushLogger = new Logger('E2eePushCommits');
   @WebSocketServer()
   server: Server;
 
@@ -950,6 +957,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         }
       : undefined;
 
+    // C66 — kanal başına TEK sorgu (alıcı başına değil); yalnız şifreli yük varsa.
+    if (v2?.e2ee) await this.attachPushCommits(channelId, v2);
+
     await this.push
       .sendToUsers(allowed, {
         ...(v2 && { v2 }),
@@ -984,6 +994,46 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         priority: 'high',
       })
       .catch(() => {});
+  }
+
+  /**
+   * C66 §2 — son 30 dk içindeki en yeni en çok 2 handshake commit'ini push'un `e2ee.commits` alanına koyar
+   * (epoch artan). Boyut, push.service'in FCM `data` olarak gönderdiği v2 nesnesinin JSON bayt uzunluğuyla
+   * ölçülür (en yeniden geriye eklenir); sığmayan atlanır ve içeriksiz log yazılır. Hata push'u bozmaz.
+   */
+  private async attachPushCommits(channelId: string, v2: V2MessageData): Promise<void> {
+    if (!v2.e2ee) return;
+    try {
+      const rows = await this.prisma.e2eeHandshake.findMany({
+        where: {
+          channelId,
+          createdAt: { gte: new Date(Date.now() - E2EE_PUSH_COMMIT_WINDOW_MS) },
+        },
+        orderBy: { epoch: 'desc' },
+        take: E2EE_PUSH_COMMIT_MAX,
+        select: { epoch: true, commit: true },
+      });
+      let picked: { epoch: number; commit: string }[] = [];
+      for (const row of rows) {
+        const candidate = [
+          { epoch: row.epoch, commit: Buffer.from(row.commit).toString('base64') },
+          ...picked,
+        ];
+        const size = Buffer.byteLength(
+          JSON.stringify({ ...v2, e2ee: { ...v2.e2ee, commits: candidate } }),
+        );
+        if (size > E2EE_PUSH_DATA_MAX_BYTES) {
+          this.pushLogger.warn(
+            `push commit dışarıda: kanal=${channelId} boyut=${size} sınır=${E2EE_PUSH_DATA_MAX_BYTES}`,
+          );
+          continue;
+        }
+        picked = candidate;
+      }
+      if (picked.length > 0) v2.e2ee.commits = picked;
+    } catch {
+      // commit eki isteğe bağlıdır; sorgu hatası bildirimi engellemez.
+    }
   }
 
   /**

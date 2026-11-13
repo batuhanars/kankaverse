@@ -27,6 +27,7 @@ const prismaMock = {
   guildMemberRole: { findMany: jest.fn() },
   // M5a §4 — voice:group_call_ring: çağıran↔hedef doğrudan blok sorgusu
   userBlock: { findFirst: jest.fn() },
+  e2eeHandshake: { findMany: jest.fn() },
 };
 
 const jwtMock = { verify: jest.fn() };
@@ -751,6 +752,78 @@ describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
 
     afterEach(() => {
       delete (pushMock as any).v2Enabled;
+    });
+
+    // ── C66: push'a commit eki ──
+    describe('C66 commit eki', () => {
+      const row = (epoch: number, len = 100) => ({ epoch, commit: Buffer.alloc(len, epoch) });
+      const sentE2ee = () => pushSendToUsersMock.mock.calls[0][1].v2.e2ee;
+
+      it('sorgu: kanal + 30 dk pencere + en yeni 2, kanal başına tek sorgu', async () => {
+        setup(true);
+        prismaMock.e2eeHandshake.findMany.mockResolvedValue([]);
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto());
+        expect(prismaMock.e2eeHandshake.findMany).toHaveBeenCalledTimes(1);
+        const arg = prismaMock.e2eeHandshake.findMany.mock.calls[0][0];
+        expect(arg.where.channelId).toBe(DM_CHANNEL_ID);
+        expect(arg.take).toBe(2);
+        const gte = arg.where.createdAt.gte.getTime();
+        expect(Math.abs(Date.now() - 30 * 60 * 1000 - gte)).toBeLessThan(5000);
+      });
+
+      it('commit yoksa commits alanı yok', async () => {
+        setup(true);
+        prismaMock.e2eeHandshake.findMany.mockResolvedValue([]);
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto());
+        expect('commits' in sentE2ee()).toBe(false);
+      });
+
+      it('2 commit: epoch ARTAN sırada, base64', async () => {
+        setup(true);
+        prismaMock.e2eeHandshake.findMany.mockResolvedValue([row(5), row(4)]); // desc gelir
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto());
+        expect(sentE2ee().commits).toEqual([
+          { epoch: 4, commit: row(4).commit.toString('base64') },
+          { epoch: 5, commit: row(5).commit.toString('base64') },
+        ]);
+      });
+
+      it('boyut: sığmayan eski commit atlanır, log yazılır, en yeni kalır', async () => {
+        setup(true);
+        const warn = jest.spyOn((gateway as any).pushLogger, 'warn').mockImplementation();
+        prismaMock.e2eeHandshake.findMany.mockResolvedValue([row(5, 400), row(4, 2000)]);
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto());
+        expect(sentE2ee().commits.map((c: any) => c.epoch)).toEqual([5]);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0][0]).toContain(DM_CHANNEL_ID);
+        const v2 = pushSendToUsersMock.mock.calls[0][1].v2;
+        expect(Buffer.byteLength(JSON.stringify(v2))).toBeLessThanOrEqual(3800);
+      });
+
+      it('hiçbiri sığmazsa alan yok', async () => {
+        setup(true);
+        jest.spyOn((gateway as any).pushLogger, 'warn').mockImplementation();
+        prismaMock.e2eeHandshake.findMany.mockResolvedValue([row(5, 3000)]);
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto());
+        expect('commits' in sentE2ee()).toBe(false);
+      });
+
+      it('düz içerik push yükünde ASLA yok', async () => {
+        setup(true);
+        prismaMock.e2eeHandshake.findMany.mockResolvedValue([row(1)]);
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, encDto({ content: 'GIZLI-DUZ-METIN' }));
+        expect(JSON.stringify(pushSendToUsersMock.mock.calls[0][1].v2)).not.toContain(
+          'GIZLI-DUZ-METIN',
+        );
+      });
+
+      it('şifresiz mesajda commit sorgusu da alan da yok', async () => {
+        setup(true);
+        prismaMock.e2eeHandshake.findMany.mockResolvedValue([row(1)]);
+        await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+        expect(prismaMock.e2eeHandshake.findMany).not.toHaveBeenCalled();
+        expect(pushSendToUsersMock.mock.calls[0][1].v2.e2ee).toBeUndefined();
+      });
     });
 
     it('bayrak açık + şifreli + sınır altı → e2ee var, ciphertext aynı, text genel metin', async () => {

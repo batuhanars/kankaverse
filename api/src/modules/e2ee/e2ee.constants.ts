@@ -6,6 +6,11 @@ export const E2EE_PUSH_GENERIC_TEXT = '🔒 Yeni mesaj';
 /** E3 §2.1 — push'a konabilecek en uzun base64 şifreli yük (karakter); FCM 4 KB sınırı için. */
 export const E2EE_PUSH_MAX_CIPHERTEXT = 2800;
 
+/** C66 — push'a girebilecek commit penceresi (ms), en çok adet ve FCM data JSON bayt tavanı. */
+export const E2EE_PUSH_COMMIT_WINDOW_MS = 30 * 60 * 1000;
+export const E2EE_PUSH_COMMIT_MAX = 2;
+export const E2EE_PUSH_DATA_MAX_BYTES = 3800;
+
 export const E2EE_MAX_ACTIVE_DEVICES = 10;
 export const E2EE_KEY_PACKAGES_PER_CALL = 50;
 export const E2EE_KEY_PACKAGES_PENDING_MAX = 100;
