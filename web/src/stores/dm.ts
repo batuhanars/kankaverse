@@ -185,6 +185,7 @@ export const useDmStore = defineStore('dm', () => {
       await fetchChannels()
       return
     }
+    if (ch.departed) return // olay ve yerel ayrılma ikisi de gelir; ilk yazılan kalır
     const myId = useAuthStore().user?.id
     ch.departed = { leftAt: payload.leftAt, reason: payload.reason }
     ch.members = ch.members.filter((m) => m.id !== myId)
@@ -326,7 +327,12 @@ export const useDmStore = defineStore('dm', () => {
 
   async function leaveGroup(groupId: string) {
     await dmApi.leaveGroup(groupId)
-    removeChannel(groupId)
+    // C62: ayrılan grup listede kalır (salt okunur, "ayrıldın" bandı); sunucu olayı da aynı işi yapar (idempotent).
+    await applyGroupDeparted({
+      channelId: groupId,
+      reason: 'LEFT',
+      leftAt: new Date().toISOString(),
+    })
   }
 
   async function deleteGroup(groupId: string) {

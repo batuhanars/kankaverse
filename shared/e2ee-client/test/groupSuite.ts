@@ -172,6 +172,21 @@ export function groupSuite(label: string) {
       expect(await text(B1, sent)).toBe('döndüm')
     })
 
+    // C62 sahip bulgusu 2026-11-13: eski üye sayfayı yenileyince kanal durumu 403 dönüyor, tüm sayfa "çözülemedi"
+    // sayılıp gizleniyordu. localOnly: ağa çıkmadan yerel kayıtlar gösterilir.
+    it('eski üye (localOnly): çözülmüş geçmiş ağsız görünür, kanal durumu istenmez', async () => {
+      const { A1, C1 } = await trio()
+      const seen = await send(A1, 'm2', 'C görmüştü')
+      expect(await text(C1, seen)).toBe('C görmüştü') // C1 çözer, yerel depoya yazar
+      const unseen = await send(A1, 'm3', 'C hiç açmadı')
+      server.removeMember(CH, 'C', LEFT)
+      server.failChannelState = true // eski üyeye 403
+      const out = await as(C1, (e) => e.hydrate(CH, [seen, unseen], { localOnly: true }))
+      expect(out[0].content).toBe('C görmüştü')
+      // Açılmamış ama ayrılmadan önceki mesaj yerel grup durumuyla ağsız çözülür (leftAt sonrasını sunucu zaten vermez).
+      expect(out[1].content).toBe('C hiç açmadı')
+    })
+
     it('yeniden katılınca "çıkarıldı" uyarısı kalkar (null); aradaki (katılım öncesi) mesaj "çözülemedi" değil cihaz öncesi', async () => {
       const { A1, C1 } = await removedThenReAdded()
       const gap = await send(A1, 'mg', 'C henüz MLS dışında', new Date(Date.now() + 60_000).toISOString())

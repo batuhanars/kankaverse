@@ -4,6 +4,7 @@ export {
   type EvidenceItem,
   EVIDENCE_CONTEXT,
   type Hydrated,
+  type HydrateOptions,
   type LocalEngineDeps,
   type NotificationPreview,
   type SentCipher,

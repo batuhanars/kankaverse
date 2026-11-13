@@ -45,6 +45,11 @@ export interface Hydrated {
   e2eeStatus?: StoredStatus
 }
 
+/** Çözme seçenekleri. `localOnly`: eski grup (C62), ağsız ve senkronsuz; yalnız yerel kayıtlar. */
+export interface HydrateOptions {
+  localOnly?: boolean
+}
+
 const MAX_HISTORY_PAGES = 10 // geçmiş sayfası sınırı: ilk girişte sonsuza kadar geriye gitme
 const PAGE_SIZE = 50
 
@@ -322,9 +327,22 @@ export class E2eeEngine {
   }
 
   /** Mesajları (eskiden yeniye) çözüp `content`'e düz metni yazar; iptal cihazdan gelenleri eler. */
-  hydrate<T extends WireMessage & { content: string }>(channelId: string, asc: T[]): Promise<T[]> {
+  hydrate<T extends WireMessage & { content: string }>(
+    channelId: string,
+    asc: T[],
+    opts: HydrateOptions = {},
+  ): Promise<T[]> {
     if (!asc.some((m) => m.encrypted)) return Promise.resolve(asc)
-    return this.run((ctx) => this.hydrateIn(ctx, channelId, asc))
+    return this.run((ctx) => this.hydrateIn(ctx, channelId, asc, this.hydrator(ctx, channelId, opts)))
+  }
+
+  /**
+   * C62: `localOnly` = ayrıldığım/çıkarıldığım grup. Kanal durumu sunucudan istenmez (eski üyeye 403 döner ve
+   * tüm sayfa "çözülemedi" sayılırdı), commit senkronu yok: yalnız yerel depodaki kayıtlar gösterilir, kalıcı
+   * başarısızlık yazılmaz (çevrimdışı Hydrator ile aynı kurallar).
+   */
+  private hydrator(ctx: E2eeContext, channelId: string, opts: HydrateOptions): Hydrator {
+    return new Hydrator(ctx, channelId, this.own, opts.localOnly === true)
   }
 
   /**
@@ -336,10 +354,11 @@ export class E2eeEngine {
     channelId: string,
     descPage: T[],
     loadOlder: (beforeId: string) => Promise<T[]>,
+    opts: HydrateOptions = {},
   ): Promise<T[]> {
     if (!descPage.some((m) => m.encrypted)) return Promise.resolve(descPage)
     return this.run(async (ctx) => {
-      const h = new Hydrator(ctx, channelId, this.own)
+      const h = this.hydrator(ctx, channelId, opts)
       let all = descPage
       let last = descPage
       for (

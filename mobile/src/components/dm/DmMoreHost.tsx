@@ -87,14 +87,9 @@ export function DmMoreHost({ channel, visible, onClose }: Props) {
     try {
       await useDmStore.getState().leaveGroup(channel.id);
       setConfirm(null);
-      // Gruptan çıkınca bu ekranın dayandığı kanal artık yok → ana ekrana dön (eski davranış).
-      // D34 (PLAN.md) — eski `replace('/home')` yalnız ÜSTTEKİ ekranı (dm-details) değiştiriyordu;
-      // altta duran `dm/[id]` (artık var olmayan gruba ait) yığında kalıyordu, geri tuşu ölü sohbete
-      // düşürüyordu. `dismissAll` önce yığını en alta (tabs kökü) indiriyor, `replace` sonra Ana
-      // Sayfa sekmesinde olduğumuzu garanti ediyor. Kayıt notu gereği bu yalnız bu dalı düzeltir —
-      // genel gezinme davranışına dokunulmadı.
-      router.dismissAll();
-      router.replace('/home');
+      setBusy(false);
+      // C62: ayrılınca grup yaşamaya devam eder (salt okunur, "ayrıldın" bandı); ana ekrana atılmaz.
+      // Detay ekranı açıksa kendisi geri döner (dm-details `departed` izleyicisi), sohbette kalınır.
     } catch (e) {
       setConfirm(null);
       setActionError(extractErrorMessage(e));

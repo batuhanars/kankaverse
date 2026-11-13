@@ -85,6 +85,13 @@ export const useE2eeStore = defineStore('e2ee', () => {
       (c) => c.id === channelId && (c.type === 'DM' || (c.type === 'GROUP_DM' && !c.departed)),
     )
 
+  /** C62: eski grupta çözme yalnız yerel depodan; kanal durumu istenmez (eski üyeye 403, tüm sayfa gizlenirdi). */
+  const hydrateOpts = (channelId: string) => ({
+    localOnly: useDmStore().channels.some(
+      (c) => c.id === channelId && c.type === 'GROUP_DM' && !!c.departed,
+    ),
+  })
+
   async function openChannel(channelId: string): Promise<void> {
     await ready
     if (!engine.value || !isEncryptableDm(channelId)) return
@@ -125,7 +132,9 @@ export const useE2eeStore = defineStore('e2ee', () => {
     await ready
     if (!asc.some((m) => m.encrypted)) return Promise.all(asc.map(fillQuote))
     const out = engine.value
-      ? await engine.value.hydrate(channelId, asc).catch(() => asc.map(undecryptable))
+      ? await engine.value
+          .hydrate(channelId, asc, hydrateOpts(channelId))
+          .catch(() => asc.map(undecryptable))
       : asc.map(undecryptable)
     return Promise.all(out.map(fillQuote))
   }
@@ -177,7 +186,12 @@ export const useE2eeStore = defineStore('e2ee', () => {
       return [...(await hydrate(channelId, [...descPage].reverse()))].reverse()
     }
     try {
-      const out = await engine.value.hydrateHistory(channelId, descPage, loadOlder)
+      const out = await engine.value.hydrateHistory(
+        channelId,
+        descPage,
+        loadOlder,
+        hydrateOpts(channelId),
+      )
       return Promise.all(out.map(fillQuote))
     } catch {
       return descPage.map(undecryptable)

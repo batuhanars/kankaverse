@@ -48,6 +48,8 @@ export class FakeServer {
   conflictOnce = false
   /** true ise TÜM commit gönderimleri 409 ile reddedilir (çıkarma commit'i kabul edilemiyor: gönderim kapısı testi). */
   rejectCommits = false
+  /** true ise channelState 403 (C62: gruptan çıkarılmış eski üye). */
+  failChannelState = false
   /** true ise commit satırlarında createdAt yok (eski sunucu). */
   legacyCommits = false
   /** `/e2ee/status.franking` (E4 §2.2): istemcinin v2 gönderip göndermeyeceği. */
@@ -141,6 +143,7 @@ export class FakeServer {
       },
       channelState: (channelId: string) => {
         active()
+        if (this.failChannelState) throw fail(403, 'NOT_CHANNEL_MEMBER')
         return ok(this.state(channelId, userId))
       },
       claim: (channelId: string, ids: string[]) => {

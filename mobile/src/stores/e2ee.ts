@@ -139,7 +139,7 @@ export async function hydrateMessages(channelId: string, asc: MessageDto[]): Pro
   if (!asc.some((m) => m.encrypted)) return Promise.all(asc.map(fillQuote));
   const engine = get().engine;
   const out = engine
-    ? await engine.hydrate(channelId, asc).catch(() => asc.map(undecryptable))
+    ? await engine.hydrate(channelId, asc, { localOnly: isDeparted(channelId) }).catch(() => asc.map(undecryptable))
     : asc.map(undecryptable);
   return Promise.all(out.map(keepEditedAfterLeaveEmpty).map(fillQuote));
 }
@@ -224,7 +224,8 @@ export async function hydratePage(
     return [...(await hydrateMessages(channelId, [...descPage].reverse()))].reverse();
   }
   try {
-    const out = await engine.hydrateHistory(channelId, descPage, loadOlder);
+    // C62: eski grupta yalnız yerel depo (kanal durumu eski üyeye 403; aksi hâlde tüm sayfa gizlenirdi).
+    const out = await engine.hydrateHistory(channelId, descPage, loadOlder, { localOnly: isDeparted(channelId) });
     return Promise.all(out.map(keepEditedAfterLeaveEmpty).map(fillQuote));
   } catch {
     return descPage.map(undecryptable).map(keepEditedAfterLeaveEmpty);

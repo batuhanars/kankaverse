@@ -368,8 +368,8 @@ async function confirmLeaveGroup() {
   if (!target) return
   leavingGroup.value = true
   try {
+    // C62: grup listede kalır, açık sohbet "ayrıldın" bandıyla salt okunur olur (yönlendirme yok).
     await dmStore.leaveGroup(target.id)
-    if (props.activeChannelId === target.id) router.push({ name: 'app' })
   } catch {
     toast.error(t('group.leaveError'))
   } finally {

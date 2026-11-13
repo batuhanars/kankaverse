@@ -145,8 +145,8 @@ async function confirmLeave() {
   if (leaving.value) return
   leaving.value = true
   try {
+    // C62: sohbette kalınır; eski grup salt okunur, "ayrıldın" bandı çıkar.
     await dmStore.leaveGroup(props.groupId)
-    await router.push({ name: 'app' })
   } catch {
     toast.error(t('group.leaveError'))
   } finally {
