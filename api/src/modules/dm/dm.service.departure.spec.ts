@@ -96,7 +96,12 @@ describe('departure yazımı (ayrılma/çıkarma)', () => {
       userId: { not: LEAVER },
     });
     // tek transaction: departure önce, üyelik silme sonra (aynı dizi)
-    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op', 'event-op', 'period-op']);
+    expect(prisma.$transaction).toHaveBeenCalledWith([
+      'departure-op',
+      'delete-op',
+      'event-op',
+      'period-op',
+    ]);
 
     expect(realtime.emitToUser).toHaveBeenCalledTimes(1);
     expect(realtime.emitToUser).toHaveBeenCalledWith(LEAVER, 'dm.group_departed', {
@@ -122,7 +127,12 @@ describe('departure yazımı (ayrılma/çıkarma)', () => {
 
     const arg = prisma.groupDmDeparture.upsert.mock.calls[0][0];
     expect(arg.create).toMatchObject({ userId: LEAVER, reason: 'REMOVED', clearedAt: null });
-    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op', 'event-op', 'period-op']);
+    expect(prisma.$transaction).toHaveBeenCalledWith([
+      'departure-op',
+      'delete-op',
+      'event-op',
+      'period-op',
+    ]);
     expect(realtime.emitToUser).toHaveBeenCalledTimes(1);
     expect(realtime.emitToUser.mock.calls[0][0]).toBe(LEAVER);
     expect(realtime.emitToUser.mock.calls[0][2]).toMatchObject({ reason: 'REMOVED' });

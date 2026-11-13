@@ -165,7 +165,12 @@ describe('DmService.leaveGroupDm / removeGroupMember: E2EE bağlantısı (§2.4)
     await service.leaveGroupDm(TARGET, GROUP);
 
     expect(prisma.channelMember.delete).toHaveBeenCalledTimes(1);
-    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op', 'event-op', 'period-op']);
+    expect(prisma.$transaction).toHaveBeenCalledWith([
+      'departure-op',
+      'delete-op',
+      'event-op',
+      'period-op',
+    ]);
     expect(e2ee.afterDeparture).toHaveBeenCalledWith(GROUP, TARGET, false);
   });
 

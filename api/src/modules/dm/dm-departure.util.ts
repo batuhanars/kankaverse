@@ -133,6 +133,8 @@ export async function loadDepartedGroupItems(
           lastReaction: null,
           receiptsEnabled: false,
           groupAllReadAt: null,
+          // C67: eski grupta görüldü avatarı yok.
+          seenBy: [],
           departed: { leftAt: d.leftAt.toISOString(), reason: d.reason },
         },
       };

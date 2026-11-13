@@ -39,6 +39,7 @@ import {
   buildGroupEventPayload,
   groupEventCreateOp,
 } from './dm-group-event.util';
+import { seenReadersDecision } from './dm-seen.util';
 
 /**
  * 🫀 C12 §3.2 — okundu bilgisi görünürlük kararı. **T&S karar fonksiyonu (R7), satır satır insan
@@ -290,6 +291,21 @@ export class DmService {
         otherReadReceipts: otherMember?.user.readReceipts ?? false,
         otherLastReadAt: otherMember?.lastReadAt ?? null,
       });
+      // C67: görüldü avatarları; eski alanlar geriye uyum için aynen kalır.
+      const seen = seenReadersDecision({
+        requestPending: false,
+        viewerReadReceipts: selfMember?.user.readReceipts ?? false,
+        members: otherMember
+          ? [
+              {
+                userId: otherMember.userId,
+                readReceipts: otherMember.user.readReceipts,
+                blockedEitherWay: anyBlock,
+                lastReadAt: otherMember.lastReadAt,
+              },
+            ]
+          : [],
+      });
 
       result.push({
         id: m.channel.id,
@@ -323,6 +339,7 @@ export class DmService {
         selfBlocked,
         receiptsEnabled: receipt.visible,
         otherReadAt: receipt.readAt ? receipt.readAt.toISOString() : null,
+        seenBy: seen.readers,
       });
     }
 
@@ -373,6 +390,20 @@ export class DmService {
           })),
       });
 
+      const groupSeen = seenReadersDecision({
+        requestPending: false,
+        viewerReadReceipts:
+          m.channel.members.find((cm) => cm.userId === userId)?.user.readReceipts ?? false,
+        members: m.channel.members
+          .filter((cm) => cm.userId !== userId)
+          .map((cm) => ({
+            userId: cm.userId,
+            readReceipts: cm.user.readReceipts,
+            blockedEitherWay: selfBlockedSet.has(cm.userId) || blockedMeSet.has(cm.userId),
+            lastReadAt: cm.lastReadAt,
+          })),
+      });
+
       result.push({
         id: m.channel.id,
         type: 'GROUP_DM' as const,
@@ -405,6 +436,7 @@ export class DmService {
         lastReaction,
         receiptsEnabled: groupReceipt.visible,
         groupAllReadAt: groupReceipt.allReadAt ? groupReceipt.allReadAt.toISOString() : null,
+        seenBy: groupSeen.readers,
         departed: null,
       });
     }
@@ -956,6 +988,7 @@ export class DmService {
     // C20: kendi diğer cihazlarım (yalnız okuyan; karşı tarafa GİTMEZ).
     this.emitReadSelf(userId, { channelId, guildId: null, readAt });
     await this.emitReadReceipt(channelId, userId, readAt);
+    await this.emitSeen(channelId, userId);
     return null;
   }
 
@@ -1040,6 +1073,61 @@ export class DmService {
     } catch {
       // Yayın kozmetiktir: okuma zaten yazıldı, bir sonraki `GET /dm/channels` doğru değeri taşır.
       // Kullanıcının okuma işlemini bir soket hatası yüzünden 500'e çevirmek orantısız olurdu.
+    }
+  }
+
+  /**
+   * C67 §2 — `dm:seen { channelId, userId, readAt }`. Okuyan bir üye `markRead` yaptığında, onu karar
+   * fonksiyonuyla (`seenReadersDecision`) GÖREBİLEN her izleyiciye gider; görmeye hakkı olmayana (ayarı
+   * kapalı, engelli, izleyicinin kendi ayarı kapalı, PENDING) hiç gönderilmez. Okuyanın kendisine gitmez.
+   * Mevcut `dm:read` / `dm:groupRead` yayınları geriye uyum için AYNEN kalır. Hata okumayı bozmaz.
+   */
+  private async emitSeen(channelId: string, readerId: string): Promise<void> {
+    try {
+      const channel = await this.prisma.channel.findUnique({
+        where: { id: channelId },
+        select: { type: true, dmRequestStatus: true },
+      });
+      if (!channel || (channel.type !== 'DM' && channel.type !== 'GROUP_DM')) return;
+      const members = await this.prisma.channelMember.findMany({
+        where: { channelId },
+        select: { userId: true, lastReadAt: true, user: { select: { readReceipts: true } } },
+      });
+      const ids = members.map((m) => m.userId);
+      const blocks = await this.prisma.userBlock.findMany({
+        where: { blockerId: { in: ids }, blockedId: { in: ids } },
+        select: { blockerId: true, blockedId: true },
+      });
+      const isBlocked = (a: string, b: string) =>
+        blocks.some(
+          (x) =>
+            (x.blockerId === a && x.blockedId === b) || (x.blockerId === b && x.blockedId === a),
+        );
+
+      for (const viewer of members) {
+        if (viewer.userId === readerId) continue;
+        const decision = seenReadersDecision({
+          requestPending: channel.dmRequestStatus === 'PENDING',
+          viewerReadReceipts: viewer.user.readReceipts,
+          members: members
+            .filter((m) => m.userId !== viewer.userId)
+            .map((m) => ({
+              userId: m.userId,
+              readReceipts: m.user.readReceipts,
+              blockedEitherWay: isBlocked(viewer.userId, m.userId),
+              lastReadAt: m.lastReadAt,
+            })),
+        });
+        const reader = decision.readers.find((r) => r.userId === readerId);
+        if (!reader) continue;
+        this.realtime.emitToUser(viewer.userId, 'dm:seen', {
+          channelId,
+          userId: readerId,
+          readAt: reader.readAt,
+        });
+      }
+    } catch {
+      // Kozmetik: bir sonraki liste çekimi doğru `seenBy`yi taşır.
     }
   }
 
@@ -1213,6 +1301,21 @@ export class DmService {
       otherReadReceipts: otherMember?.user.readReceipts ?? false,
       otherLastReadAt: otherMember?.lastReadAt ?? null,
     });
+    // C67: görüldü avatarları (aynı kapı: PENDING/engel/ayar karar fonksiyonunda).
+    const seen = seenReadersDecision({
+      requestPending: channelRow?.dmRequestStatus === 'PENDING',
+      viewerReadReceipts: membership?.user.readReceipts ?? false,
+      members: otherMember
+        ? [
+            {
+              userId: otherMember.userId,
+              readReceipts: otherMember.user.readReceipts,
+              blockedEitherWay: !!selfBlockRecord || !!otherBlockRecord,
+              lastReadAt: otherMember.lastReadAt,
+            },
+          ]
+        : [],
+    });
 
     return {
       id: channelId,
@@ -1250,6 +1353,7 @@ export class DmService {
       //   otherReadAt   : karşı tarafın okuma anı; null = henüz hiç okumamış (tek tik).
       receiptsEnabled: receipt.visible,
       otherReadAt: receipt.readAt ? receipt.readAt.toISOString() : null,
+      seenBy: seen.readers,
     };
   }
 
