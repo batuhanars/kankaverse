@@ -24,6 +24,12 @@ export interface DmDepartedDto {
   reason: 'LEFT' | 'REMOVED';
 }
 
+/** C67 — bir üyenin bu kanalı okuduğu an. Sunucu kimin görülebileceğine karar verir (R7); istemci süzmez. */
+export interface SeenByDto {
+  userId: string;
+  readAt: string;
+}
+
 export type DmChannelDto =
   | {
       type: 'DM';
@@ -42,6 +48,8 @@ export type DmChannelDto =
       //   otherReadAt    : karşı tarafın okuma anı; null = henüz hiç okumamış → TEK tik.
       receiptsEnabled?: boolean;
       otherReadAt?: string | null;
+      /** C67 — okuyucu avatarları. Eski alanlar geriye uyum için durur, tik çiziminde KULLANILMAZ. */
+      seenBy?: SeenByDto[];
     }
   | {
       type: 'GROUP_DM';
@@ -58,6 +66,7 @@ export type DmChannelDto =
       // en az bu ana kadar okudu (biri hiç okumadıysa null → tek tik). Bireysel okuma anı yoktur.
       receiptsEnabled?: boolean;
       groupAllReadAt?: string | null;
+      seenBy?: SeenByDto[];
       /** C62 — null/yok = aktif grup; dolu = eski grup (salt okunur, yalnız "Sohbeti sil"). */
       departed?: DmDepartedDto | null;
     };

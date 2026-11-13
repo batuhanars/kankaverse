@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ViewProps,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useFocusEffect } from 'expo-router';
@@ -15,6 +16,7 @@ import { extractErrorMessage } from '@/api/errors';
 import type { MessageAuthorDto, MessageDto } from '@/api/messages';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { MessageBubble } from './MessageBubble';
+import { SeenAvatars, type SeenReader } from './message/SeenAvatars';
 import { SwipeToReply } from './message/SwipeToReply';
 import { EditMessageOverlay } from './message/EditMessageOverlay';
 import { ProfileSheet } from './profile/ProfileSheet';
@@ -49,6 +51,42 @@ import { theme } from '@/theme';
 
 type LoadState = 'loading' | 'error' | 'ready';
 
+/** Inverted listede veri sırası yeniden→eskiye: indeksi küçük (alttaki) hücre daha üstte çizilir. */
+function StackedCell({ index, style, onLayout, children }: ViewProps & { index: number }) {
+  return (
+    <View style={[style, { zIndex: 100000 - index }]} onLayout={onLayout}>
+      {children}
+    </View>
+  );
+}
+
+/**
+ * C67 §4: avatarın önceki hedef hücresinden yenisine dikey uzaklık (dp). Alttaki hücrenin ölçülmüş yüksekliği +
+ * aradaki hücrelerin toplamı. + = önceki konum aşağıda (yeni hücre üstte), - = yukarıda. Ölçü yoksa undefined.
+ */
+function slideFrom(
+  prevId: string | undefined,
+  nextId: string,
+  indexOf: Map<string, number>,
+  items: { message: { id: string } }[],
+  heights: Map<string, number>,
+): number | undefined {
+  if (!prevId || prevId === nextId) return undefined;
+  const ip = indexOf.get(prevId);
+  const inx = indexOf.get(nextId);
+  if (ip === undefined || inx === undefined) return undefined;
+  const lower = Math.max(ip, inx); // büyük indeks = daha yeni = ekranda daha aşağıda
+  const upper = Math.min(ip, inx);
+  let sum = heights.get(items[lower].message.id);
+  if (sum === undefined) return undefined;
+  for (let i = upper + 1; i < lower; i++) {
+    const h = heights.get(items[i].message.id);
+    if (h === undefined) return undefined;
+    sum += h;
+  }
+  return inx > ip ? -sum : sum; // yeni hücre aşağıdaysa avatar yukarıdan (negatif) iner
+}
+
 
 interface Props {
   channelId: string;
@@ -59,6 +97,8 @@ interface Props {
    * bu prop'u geçmiyor. Kararı ekran veriyor çünkü gizlilik kuralı kanal türüne bağlı (1-1 DM).
    */
   receiptFor?: (message: MessageDto) => 'sent' | 'seen' | null;
+  /** C67 — okuyucu avatarları (yalnız DM/grup DM verir); yerleşim burada: her okuyucu `createdAt <= readAt` olan SON mesajın altında. */
+  seenReaders?: SeenReader[];
   typingMode: 'named' | 'simple';
   // T&S — DM engelli/izinsizse sunucu göndermede 403 döner; ama giriş kutusunu baştan devre dışı
   // bırakmak için sidebar'dan taşınan bilgi (contract §6 — sessizce gizlenmez, neden gösterilir).
@@ -132,6 +172,7 @@ export function MessageScreen({
   placeholder,
   markRead,
   receiptFor,
+  seenReaders,
   typingMode,
   disabledNotice,
   disabledAction,
@@ -293,6 +334,32 @@ export function MessageScreen({
   }, [lastMessageId, isFocused]);
 
   const { items, inverted } = list;
+  // C67 §3: mesaj kimliği → o mesajı "en son okunan" yapan okuyucular. Geçici (gönderilmemiş) mesaj sayılmaz.
+  // §4 (FLIP): okuyucunun önceki hedef hücresi biliniyorsa `fromY` = önceki konuma dikey uzaklık (arada kalan
+  // hücrelerin ölçülmüş yükseklikleri + alttaki hücrenin yüksekliği); ölçü eksikse (sanallaştırma) animasyonsuz belirir.
+  const cellHeights = useRef(new Map<string, number>());
+  const prevTarget = useRef(new Map<string, string>());
+  const seenByMessage = useMemo(() => {
+    const map = new Map<string, SeenReader[]>();
+    if (!seenReaders?.length) return map;
+    const indexOf = new Map(items.map((it, i) => [it.message.id, i] as const));
+    for (const r of seenReaders) {
+      for (let i = items.length - 1; i >= 0; i--) {
+        const m = items[i].message;
+        if (m.localStatus || m.id.startsWith('pending:')) continue;
+        if (m.createdAt <= r.readAt) {
+          map.set(m.id, [...(map.get(m.id) ?? []), { ...r, fromY: slideFrom(prevTarget.current.get(r.userId), m.id, indexOf, items, cellHeights.current) }]);
+          break;
+        }
+      }
+    }
+    return map;
+  }, [seenReaders, items]);
+  useEffect(() => {
+    const next = new Map<string, string>();
+    seenByMessage.forEach((rs, id) => rs.forEach((r) => next.set(r.userId, id)));
+    prevTarget.current = next;
+  }, [seenByMessage]);
   // E1: kilit, uyarı bandı ve "bu noktadan sonra şifreli" ayracı (şifresiz kanalda hiçbiri görünmez).
   const plainMessages = useMemo(() => items.map((it) => it.message), [items]);
   const hasMoreOlder = useMessagesStore((s) => s.byChannel[channelId]?.hasMore ?? false);
@@ -459,6 +526,8 @@ export function MessageScreen({
           data={inverted}
           keyExtractor={(item) => item.message.nonce ?? item.message.id}
           inverted
+          // C67 §4: yeni (alttaki) hücreler üstte çizilir; avatar eski konumdan kayarken aradaki balonların altında kalmaz.
+          CellRendererComponent={StackedCell}
           contentContainerStyle={styles.list}
           onScroll={list.onListScroll}
           scrollEventThrottle={16}
@@ -492,7 +561,7 @@ export function MessageScreen({
             // yüzden hücrenin DOĞRUDAN çocukları ekranda TERS sırada çizilir; fragment
             // kullanılsaydı ayraç mesajın ALTINDA görünürdü. Araya bir View girince iç düzen
             // normal sütun olur ve iki çevirme sadeleşir: ayraç mesajın üstünde.
-            <View>
+            <View onLayout={(e) => cellHeights.current.set(item.message.id, e.nativeEvent.layout.height)}>
               {item.isDayStart && <DateSeparator iso={item.message.createdAt} />}
               {item.message.id === e2eeView.dividerBeforeId && <E2eeDivider />}
               {renderNotices(items.length - 1 - index)}
@@ -533,6 +602,7 @@ export function MessageScreen({
                 }}
               />
               </SwipeToReply>
+              {seenByMessage.has(item.message.id) ? <SeenAvatars readers={seenByMessage.get(item.message.id)!} /> : null}
             </View>
           )}
         />

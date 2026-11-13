@@ -14,6 +14,7 @@ import { usePresenceStore, selectStatus } from '@/stores/presence';
 import { PRESENCE_COLOR } from '@/components/PresenceDot';
 import { OngoingCallBanner } from '@/components/call/OngoingCallBanner';
 import { MessageScreen } from '@/components/MessageScreen';
+import type { SeenReader } from '@/components/message/SeenAvatars';
 import { DeleteDepartedDialog } from '@/components/dm/DeleteDepartedDialog';
 import { ChatBackButton } from '@/components/ChatBackButton';
 import { channelTitle } from '@/utils/channelTitle';
@@ -215,24 +216,29 @@ export default function DmScreen() {
   // 🔴 Kaynak `storeChannel` (zaten reaktif abonelik) — `useDmStore.getState()` DEĞİL: anlık
   // okuma yapan bir sürüm yazılmıştı ve `dm:read` gelince ekran yeniden çizilmediği için tik
   // hiç güncellenmezdi. Store yeni kanal nesnesi ürettiği için buradaki bağımlılık tetikleniyor.
-  const receiptsEnabled = storeChannel ? storeChannel.receiptsEnabled === true : false;
-  const otherReadAt = storeChannel
-    ? ((storeChannel.type === 'DM' ? storeChannel.otherReadAt : storeChannel.groupAllReadAt) ?? null)
-    : null;
-
+  // C67: çift tik kalktı. Kendi mesajımda tek tik "gönderildi" kalır; okuyucular `seenReaders` ile avatar olarak çizilir.
   const receiptFor = useCallback(
-    (m: MessageDto): 'sent' | 'seen' | null => {
+    (m: MessageDto): 'sent' | null => {
       if (!myUserId || m.author.id !== myUserId) return null;
       // C29 iyimser gönderim: henüz sunucuya ulaşmamış mesajda tik yok (soluk görünüm yeterli).
       if (m.id.startsWith('pending:')) return null;
-      // Sahip kararı 2026-10-29: gizlilik kapısı kapalıysa (ayar, engel, istek) gösterge GİZLENMEZ,
-      // tek tik "gönderildi" kalır. Okuma bilgisi sızmaz: otherReadAt zaten sunucudan null gelir.
-      if (!receiptsEnabled) return 'sent';
-      if (!otherReadAt) return 'sent';
-      return m.createdAt <= otherReadAt ? 'seen' : 'sent';
+      return 'sent';
     },
-    [myUserId, receiptsEnabled, otherReadAt],
+    [myUserId],
   );
+
+  // C67 §3: ad/avatar kanal üyelerinden (grup) ya da karşı taraftan (1-1). Kimin görüneceği sunucu kararı (`seenBy`).
+  const seenBy = storeChannel?.seenBy;
+  const seenReaders = useMemo<SeenReader[]>(() => {
+    if (!storeChannel || !seenBy || departed) return [];
+    const people = storeChannel.type === 'DM' ? [storeChannel.otherUser] : storeChannel.members;
+    const out: SeenReader[] = [];
+    for (const r of seenBy) {
+      const p = people.find((x) => x.id === r.userId);
+      if (p && p.id !== myUserId) out.push({ userId: p.id, name: p.username, avatarUrl: p.avatarUrl, readAt: r.readAt });
+    }
+    return out;
+  }, [storeChannel, seenBy, departed, myUserId]);
 
   if (!channelId) return null;
 
@@ -376,6 +382,7 @@ export default function DmScreen() {
         markRead={departed ? noopMarkRead : dmApi.markRead}
         readOnly={!!departed}
         receiptFor={receiptFor}
+        seenReaders={seenReaders}
         // M6a §2 — 1-1 DM'de avatar/ad yok (karşıdaki tek kişi belli); grup DM'de var.
         showIdentity={isGroupDm}
         typingMode="simple"

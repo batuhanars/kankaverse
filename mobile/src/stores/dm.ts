@@ -76,6 +76,8 @@ interface DmState {
   applyReaction: (channelId: string, lastReaction: DmLastReactionDto | null) => void;
   /** C12 §4.1 — WS `dm:read`: karşı taraf bu kanalı okudu, kanal başına tek tarih güncellenir. */
   applyReadReceipt: (payload: { channelId: string; readAt: string }) => void;
+  /** C67 — WS `dm:seen`: bir üye okudu; kanalın `seenBy` listesinde o üyenin satırı yazılır/ilerler. */
+  applySeen: (payload: { channelId: string; userId: string; readAt: string }) => void;
   applyGroupReadReceipt: (payload: {
     channelId: string;
     receiptsEnabled: boolean;
@@ -282,6 +284,21 @@ export const useDmStore = create<DmState>((set, get) => ({
    * C34 — WS `dm:groupRead`: grup üyesi okudu; sunucu bu izleyicinin gözünden toplu durumu yollar
    * (bireysel okuma anı yok). Kapı ve zaman sunucudan olduğu gibi alınır, burada ikinci süzgeç yok.
    */
+  applySeen({ channelId, userId, readAt }) {
+    set((s) => ({
+      channels: s.channels.map((c) => {
+        if (c.id !== channelId) return c;
+        const list = c.seenBy ?? [];
+        const prev = list.find((r) => r.userId === userId);
+        if (prev && prev.readAt >= readAt) return c; // geriye gitme: eski olay yeniyi ezmesin
+        const next = prev
+          ? list.map((r) => (r.userId === userId ? { userId, readAt } : r))
+          : [...list, { userId, readAt }];
+        return { ...c, seenBy: next } as DmChannelDto;
+      }),
+    }));
+  },
+
   applyGroupReadReceipt({ channelId, receiptsEnabled, groupAllReadAt }) {
     set((s) => ({
       channels: s.channels.map((c) => {

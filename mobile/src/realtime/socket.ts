@@ -326,6 +326,11 @@ function ensureSocket(): Socket {
     useDmStore.getState().applyReadReceipt(data);
   });
 
+  // C67 — görüldü avatarları: bir üye okudu (sunucu yalnız görebilen izleyicilere yollar; burada ikinci süzgeç yok).
+  socket.on('dm:seen', (data: { channelId: string; userId: string; readAt: string }) => {
+    useDmStore.getState().applySeen(data);
+  });
+
   // C34 — grup DM'de bir üye okudu: toplu "herkes okudu" zamanı (sunucu bu izleyicinin gözünden hesaplar)
   socket.on(
     'dm:groupRead',
