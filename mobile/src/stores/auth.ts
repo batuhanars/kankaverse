@@ -14,7 +14,7 @@ import { isDefinitiveRefreshRejection, retryTransient } from '@/api/refreshRejec
 import { resetSocket } from '@/realtime/socket';
 import { clearPushToken } from '@/notifications/push';
 import { clearResume } from '@/utils/resumeLastScreen';
-import { wipeE2ee } from '@/stores/e2ee';
+import { dropOtherE2eeUsers, releaseE2ee, wipeE2ee } from '@/stores/e2ee';
 
 export type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated';
 export type LoginResult = 'ok' | 'challenge' | 'error';
@@ -38,7 +38,8 @@ interface AuthState {
    * Yaş kararını burada yeniden yorumlamak/yumuşatmak YASAK.
    */
   register: (payload: RegisterPayload) => Promise<'ok' | 'error'>;
-  logout: () => Promise<void>;
+  /** `wipeE2ee` yalnız hesap silmede true: yerel şifreli depo da silinir. Aksi hâlde cihaz park edilir (C69). */
+  logout: (opts?: { wipeE2ee?: boolean }) => Promise<void>;
   /** 2FA ekranından girişe geri dönerken challenge + hata state'ini temizler. */
   clearChallenge: () => void;
   /** Sunucudan dönen güncel kullanıcıyı store'a yazar (profil/ayar kaydı sonrası). */
@@ -90,7 +91,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (isDefinitiveRefreshRejection(e)) {
           clearAccessToken();
           await clearRefreshToken();
-          await wipeE2ee(); // oturum yok: yerel şifreli depo kimseye ait değil
+          // C69: yerel şifreli depo SİLİNMEZ (cihaz sunucuda park edilmiş olabilir). Sonraki girişte rebind
+          // denenir; reddedilirse motor depoyu kendisi siler, başka kullanıcınınkini giriş siler.
         }
         set({ user: null, status: 'unauthenticated' });
       }
@@ -106,9 +108,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ challenge: { challengeToken: result.challengeToken } });
         return 'challenge';
       }
-      // E1: yeni giriş = yeni oturum zinciri = yeni şifreleme cihazı. Eski oturumdan kalan yerel şifreli
-      // depo bu oturuma ait değildir (cihaz kimliği/anahtarı uyuşmaz) ve başka hesaba ait olabilir: silinir.
-      await wipeE2ee();
+      // C69: yeni giriş: yalnız BAŞKA kullanıcının yerel şifreli deposu silinir; aynı kullanıcınınki kalır
+      // (motor park edilmiş cihazı imzayla yeniden bağlar, reddedilirse depoyu kendisi siler).
+      await dropOtherE2eeUsers(result.user.id);
       setAccessToken(result.accessToken);
       if (result.refreshToken) {
         await setRefreshToken(result.refreshToken);
@@ -127,9 +129,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ errorMessage: null });
     try {
       const result = await authApi.loginTwoFa(challenge.challengeToken, code);
-      // E1: yeni giriş = yeni oturum zinciri = yeni şifreleme cihazı. Eski oturumdan kalan yerel şifreli
-      // depo bu oturuma ait değildir (cihaz kimliği/anahtarı uyuşmaz) ve başka hesaba ait olabilir: silinir.
-      await wipeE2ee();
+      // C69: yeni giriş: yalnız BAŞKA kullanıcının yerel şifreli deposu silinir; aynı kullanıcınınki kalır
+      // (motor park edilmiş cihazı imzayla yeniden bağlar, reddedilirse depoyu kendisi siler).
+      await dropOtherE2eeUsers(result.user.id);
       setAccessToken(result.accessToken);
       if (result.refreshToken) {
         await setRefreshToken(result.refreshToken);
@@ -146,9 +148,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ errorMessage: null });
     try {
       const result = await authApi.register(payload);
-      // E1: yeni giriş = yeni oturum zinciri = yeni şifreleme cihazı. Eski oturumdan kalan yerel şifreli
-      // depo bu oturuma ait değildir (cihaz kimliği/anahtarı uyuşmaz) ve başka hesaba ait olabilir: silinir.
-      await wipeE2ee();
+      // C69: yeni giriş: yalnız BAŞKA kullanıcının yerel şifreli deposu silinir; aynı kullanıcınınki kalır
+      // (motor park edilmiş cihazı imzayla yeniden bağlar, reddedilirse depoyu kendisi siler).
+      await dropOtherE2eeUsers(result.user.id);
       setAccessToken(result.accessToken);
       if (result.refreshToken) {
         await setRefreshToken(result.refreshToken);
@@ -162,9 +164,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   // Contract §4 — sunucu hata verse bile yerel temizlik yapılır.
-  async logout() {
+  async logout(opts) {
+    const wipe = opts?.wipeE2ee === true;
     try {
-      await authApi.logout();
+      await authApi.logout({ keepE2eeDevice: !wipe });
     } catch {
       // yerel temizlik yine de yapılır
     } finally {
@@ -177,7 +180,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       clearAccessToken();
       await clearRefreshToken();
       resetSocket();
-      await wipeE2ee(); // çıkışta tüm yerel şifreli depo silinir (E1 §5)
+      // C69: çıkışta motor düşer, yerel depo kalır (cihaz park). Hesap silmede her şey silinir.
+      if (wipe) await wipeE2ee();
+      else releaseE2ee();
       set({ user: null, status: 'unauthenticated', challenge: null, errorMessage: null });
     }
   },
@@ -199,6 +204,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 // olarak kaydediyor; http.ts yalnız bu callback'i tetikliyor.
 setSessionExpiredHandler(() => {
   resetSocket();
-  void wipeE2ee(); // oturum zinciri bitti: cihaz sunucuda iptal edildi, yerel depo artık geçersiz
+  // C69: oturum sunucuda düştü; cihaz park EDİLMEMİŞ (iptal) olabilir ama yerel depo SİLİNMEZ: sonraki girişte
+  // ensureDevice rebind dener, sunucu reddederse depoyu kendisi siler. Motor yalnız bellekten düşer.
+  releaseE2ee();
   useAuthStore.setState({ user: null, status: 'unauthenticated', challenge: null, errorMessage: null });
 });

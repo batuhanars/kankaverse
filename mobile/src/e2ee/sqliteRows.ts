@@ -94,7 +94,12 @@ export async function openMobileVault(userId: string): Promise<SealedVault> {
   return SealedVault.open(userId, sqliteRows, secureKeys, random)
 }
 
-/** Çıkış / yeni giriş / oturum düşüşü: bu cihazdaki TÜM kullanıcıların şifreli depoları silinir. */
+/** C69 giriş: yalnız BAŞKA kullanıcıların depoları silinir; girişteki kullanıcınınki kalır (rebind için). */
+export function dropOtherMobileVaults(userId: string): Promise<void> {
+  return destroyOtherVaults(userId, sqliteRows, secureKeys)
+}
+
+/** Hesap silme: bu cihazdaki TÜM kullanıcıların şifreli depoları silinir. */
 export function wipeMobileVaults(): Promise<void> {
   return destroyAllVaults(sqliteRows, secureKeys)
 }

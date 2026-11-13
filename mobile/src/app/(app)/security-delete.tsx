@@ -36,7 +36,7 @@ export default function SecurityDeleteScreen() {
     setErrorMessage('');
     try {
       await authApi.deleteAccount(reauth);
-      await logout();
+      await logout({ wipeE2ee: true }); // hesap silme: yerel şifreli depo da silinir (C69)
       router.replace('/login');
     } catch (e) {
       setErrorMessage(extractErrorMessage(e));

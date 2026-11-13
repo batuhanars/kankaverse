@@ -134,8 +134,9 @@ export const authApi = {
     const res = await http.get<UserDto>('/auth/me');
     return res.data;
   },
-  async logout(): Promise<null> {
-    const res = await http.post<null>('/auth/logout');
+  /** C69: mobil çıkışta şifreleme cihazı iptal edilmez, park edilir (`keepE2eeDevice`). Hesap silmede false. */
+  async logout(opts?: { keepE2eeDevice?: boolean }): Promise<null> {
+    const res = await http.post<null>('/auth/logout', opts?.keepE2eeDevice ? { keepE2eeDevice: true } : undefined);
     return res.data;
   },
   // Sprint M1c — auth YOK (public meta), kayıt formunun davet alanını göstermeden ÖNCE çağrılır.

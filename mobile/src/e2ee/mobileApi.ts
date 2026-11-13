@@ -20,6 +20,9 @@ export const mobileE2eeApi: E2eeApi = {
   registerDevice: (signatureKey) =>
     http.post<{ deviceId: string }>('/e2ee/devices', { platform: 'android', signatureKey }),
   available: () => http.get<{ available: number }>('/e2ee/devices/me'),
+  // C69: çıkışta park edilen cihazı yeni oturuma bağla (hata kodu `response.data.error`).
+  rebindChallenge: () => http.post<{ nonce: string }>('/e2ee/devices/rebind/challenge'),
+  rebind: (deviceId, signature) => http.post<{ deviceId: string }>('/e2ee/devices/rebind', { deviceId, signature }),
   uploadKeyPackages: (keyPackages, lastResort) =>
     http.post<{ available: number }>('/e2ee/devices/me/key-packages', {
       keyPackages,
@@ -65,4 +68,17 @@ export const mobileE2eeApi: E2eeApi = {
   transferBlob: (id) => http.get<{ url: string; size: number; sha256: string }>(`/e2ee/transfer/${id}/blob`),
   transferDone: (id) => http.post<TransferStep>(`/e2ee/transfer/${id}/done`),
   transferCancel: (id) => http.post<TransferStep>(`/e2ee/transfer/${id}/cancel`),
+}
+
+/** C69 Oturumlarım: çıkış yapılmış (park) cihazlar. Motor portunun parçası değil (yalnız ayarlar ekranı kullanır). */
+export interface ParkedDevice {
+  id: string
+  platform: string
+  lastSeenAt: string
+  parkedAt: string
+}
+
+export const mobileParkedApi = {
+  list: () => http.get<ParkedDevice[]>('/e2ee/devices/parked'),
+  remove: (id: string) => http.delete<null>(`/e2ee/devices/parked/${id}`),
 }

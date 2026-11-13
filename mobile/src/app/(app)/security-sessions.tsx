@@ -4,6 +4,7 @@ import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { authApi, type SessionDto } from '@/api/auth';
 import { extractErrorMessage } from '@/api/errors';
+import { mobileParkedApi, type ParkedDevice } from '@/e2ee/mobileApi';
 import { useAuthStore } from '@/stores/auth';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { t } from '@/i18n';
@@ -18,6 +19,9 @@ function formatSeen(iso: string): string {
     d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).replace(':', '.')
   );
 }
+
+const platformLabel = (p: string) =>
+  p === 'android' ? t('security.sessions.parkedAndroid') : t('security.sessions.parkedDesktop');
 
 /**
  * Sprint M1f §2.4 — Oturumlarım.
@@ -36,6 +40,19 @@ export default function SecuritySessionsScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmOthers, setConfirmOthers] = useState(false);
+  // C69: çıkış yapılmış (park) şifreleme cihazları. E2EE kapalıysa (404 E2EE_DISABLED) ya da yükleme
+  // başarısızsa bölüm görünmez; ekranın asıl işi (oturumlar) bundan etkilenmez.
+  const [parked, setParked] = useState<ParkedDevice[]>([]);
+  const [parkedToRemove, setParkedToRemove] = useState<ParkedDevice | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState('');
+
+  const loadParked = useCallback(() => {
+    mobileParkedApi
+      .list()
+      .then((res) => setParked(res.data))
+      .catch(() => setParked([]));
+  }, []);
 
   const load = useCallback(() => {
     setState('loading');
@@ -52,6 +69,23 @@ export default function SecuritySessionsScreen() {
   }, []);
 
   useFocusEffect(load);
+  useFocusEffect(loadParked);
+
+  async function onRemoveParked() {
+    const target = parkedToRemove;
+    if (!target) return;
+    setRemoving(true);
+    setRemoveError('');
+    try {
+      await mobileParkedApi.remove(target.id);
+      setParked((prev) => prev.filter((d) => d.id !== target.id));
+      setParkedToRemove(null);
+    } catch (e) {
+      setRemoveError(extractErrorMessage(e));
+    } finally {
+      setRemoving(false);
+    }
+  }
 
   async function onRevoke(session: SessionDto) {
     if (busy) return;
@@ -109,15 +143,36 @@ export default function SecuritySessionsScreen() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={<Text style={styles.empty}>{t('security.sessions.noSessions')}</Text>}
           ListFooterComponent={
-            hasOthers ? (
-              <Pressable
-                onPress={() => setConfirmOthers(true)}
-                disabled={busy}
-                style={[styles.othersButton, busy && styles.disabled]}
-              >
-                <Text style={styles.othersText}>{t('security.sessions.terminateOthers')}</Text>
-              </Pressable>
-            ) : null
+            <>
+              {hasOthers ? (
+                <Pressable
+                  onPress={() => setConfirmOthers(true)}
+                  disabled={busy}
+                  style={[styles.othersButton, busy && styles.disabled]}
+                >
+                  <Text style={styles.othersText}>{t('security.sessions.terminateOthers')}</Text>
+                </Pressable>
+              ) : null}
+              {parked.map((device) => (
+                <View key={device.id} style={[styles.row, styles.parkedRow]}>
+                  <Text style={styles.parkedText}>
+                    {t('security.sessions.parkedRow', {
+                      platform: platformLabel(device.platform),
+                      date: formatSeen(device.lastSeenAt),
+                    })}
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setRemoveError('');
+                      setParkedToRemove(device);
+                    }}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.terminate}>{t('security.sessions.parkedRemove')}</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </>
           }
           renderItem={({ item }) => (
             <View style={styles.row}>
@@ -159,6 +214,16 @@ export default function SecuritySessionsScreen() {
           onCancel={() => setConfirmOthers(false)}
         />
       ) : null}
+      {parkedToRemove ? (
+        <ConfirmDialog
+          title={t('security.sessions.parkedRemoveTitle')}
+          message={removeError || t('security.sessions.parkedRemoveConfirm')}
+          confirmLabel={t('security.sessions.parkedRemove')}
+          loading={removing}
+          onConfirm={onRemoveParked}
+          onCancel={() => setParkedToRemove(null)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -188,6 +253,8 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     fontWeight: '700',
   },
+  parkedRow: { marginTop: 0 },
+  parkedText: { flex: 1, color: theme.colors.textSecondary, fontSize: theme.fontSize.sm },
   disabled: { opacity: 0.5 },
   othersButton: {
     marginTop: 6,
