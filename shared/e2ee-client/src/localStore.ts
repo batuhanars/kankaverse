@@ -11,7 +11,7 @@ import {
   utf8,
 } from '@kankaverse/e2ee-core'
 import { fromB64, toB64 } from './b64'
-import type { E2eeChannelState, Vault } from './ports'
+import type { E2eeViewSnapshot, Vault } from './ports'
 
 /**
  * Çözme sonucu: ok = metin var; unverified = v2 parmak izi tutmadı ya da yok (gövde yerelde saklanır, tag gelince yeniden doğrulanır; hiçbir yerde gösterilmez); unsupported = bilinmeyen yük sürümü; undecryptable = cihaz gruba
@@ -30,6 +30,17 @@ export interface StoredMessage {
   fk?: string
   /** E4: yükteki gönderim zamanı (ms). Parmak izi `canon`'unda bu değer var (createdAt DEĞİL). */
   sentAt?: number
+}
+
+/** Grupta görülen üye → görüldüğü andaki katılım zamanı (ISO; 1-1'de ''). Yeniden eklenen üye farklı değer taşır. */
+export type SeenMembers = Record<string, string>
+
+/** Sohbette gri bilgi satırı: `userId` kullanıcısı bu grupta yeni bir cihaz ekledi (E2 §3.3). `at` = ms. */
+export interface DeviceNotice {
+  userId: string
+  at: number
+  /** Aynı commit'te eklenen cihaz sayısı. */
+  count: number
 }
 
 export interface Flags {
@@ -140,23 +151,48 @@ export class LocalStore {
   }
 
   /**
-   * Kanalın son bilinen cihaz görünümü (kayıtlı cihazlar, imza anahtarları, iptal zamanları). Çevrimiçi
-   * yolda her `channelState` sonrası yazılır; ağsız (bildirim) çözme yalnız bunu kullanır (E3 §9.1).
+   * Kanalın son bilinen cihaz görünümü (kayıtlı cihazlar, imza anahtarları, iptal zamanları, eski üyeler).
+   * Çevrimiçi yolda her `channelState` sonrası yazılır; ağsız (bildirim) çözme yalnız bunu kullanır (E3 §9.1).
    * Anahtar `groups` bölümünde (joinedAt gibi): cihaz durumu sıfırlanınca birlikte gider, yeni vault bölümü gerekmez.
+   * E2'den önce yazılan kayıt yalnız `members` dizisidir; o da okunur.
    */
-  async loadView(channelId: string): Promise<E2eeChannelState['members'] | null> {
+  async loadView(channelId: string): Promise<E2eeViewSnapshot | null> {
     const bytes = await this.vault.get('groups', `${channelId}:view`)
-    return bytes ? (JSON.parse(fromUtf8(bytes)) as E2eeChannelState['members']) : null
+    if (!bytes) return null
+    const raw = JSON.parse(fromUtf8(bytes)) as E2eeViewSnapshot['members'] | E2eeViewSnapshot
+    return Array.isArray(raw) ? { members: raw, createdAt: null } : raw
   }
 
-  saveView(channelId: string, members: E2eeChannelState['members']): Promise<void> {
-    return this.vault.put('groups', `${channelId}:view`, utf8(JSON.stringify(members)))
+  saveView(channelId: string, view: E2eeViewSnapshot): Promise<void> {
+    const { members, formerMembers, createdAt } = view
+    return this.vault.put('groups', `${channelId}:view`, utf8(JSON.stringify({ members, formerMembers, createdAt })))
+  }
+
+  /** E2 §3.3: bu grupta gördüğümüz üyeler (üye → görüldüğü andaki katılım zamanı). Yeni üye / yeni cihaz ayrımı. */
+  async loadSeen(channelId: string): Promise<SeenMembers> {
+    const bytes = await this.vault.get('groups', `${channelId}:seen`)
+    return bytes ? (JSON.parse(fromUtf8(bytes)) as SeenMembers) : {}
+  }
+
+  saveSeen(channelId: string, seen: SeenMembers): Promise<void> {
+    return this.vault.put('groups', `${channelId}:seen`, utf8(JSON.stringify(seen)))
+  }
+
+  /** E2 §3.3 "yeni cihaz eklendi" satırları: mesaj DEĞİL, `groups` bölümünde (yedeğe girmez, sunucuya gitmez). */
+  async loadNotices(channelId: string): Promise<DeviceNotice[]> {
+    const bytes = await this.vault.get('groups', `${channelId}:notices`)
+    return bytes ? (JSON.parse(fromUtf8(bytes)) as DeviceNotice[]) : []
+  }
+
+  saveNotices(channelId: string, notices: DeviceNotice[]): Promise<void> {
+    return this.vault.put('groups', `${channelId}:notices`, utf8(JSON.stringify(notices)))
   }
 
   /** Yalnız grup durumunu düşer; çözülmüş mesaj kayıtlarına dokunmaz. */
   async deleteGroup(channelId: string): Promise<void> {
     await this.vault.delete('groups', channelId)
     await this.vault.delete('groups', `${channelId}:joinedAt`)
+    await this.vault.delete('groups', `${channelId}:seen`) // bayat grubun üye geçmişi yeni gruba taşınmaz
   }
 
   async loadMessage(id: string): Promise<StoredMessage | null> {

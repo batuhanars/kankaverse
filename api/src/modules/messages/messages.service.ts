@@ -492,6 +492,24 @@ export class MessagesService {
     return { mentions: validIds.slice(0, 10), mentionsEveryone, mentionRoles };
   }
 
+  /**
+   * 🔴 R7 — E2 Rev.2 §4.2: şifreli mesajda bahsetme. İçerik sunucuya görünmez; istemci kimlik listesini düz üst veri
+   * olarak bildirir. Kimlikler `<@id>` token'ına çevrilip BUGÜNKÜ `resolveMentions` kapısından geçer (kanal üyeliği +
+   * yaş kapısı/minör süzgeci + ≤10 sınırı): yeni bir erişim kararı YOK, kestirme yol YOK. Üye olmayan kimlik ve
+   * gönderenin kendisi sessizce düşer. Rol/@everyone şifreli mesajda yok (token üretilmez).
+   */
+  private async resolveEncryptedMentions(
+    channel: Parameters<MessagesService['resolveMentions']>[0],
+    ids: string[] | undefined,
+    senderId: string,
+  ) {
+    const wanted = [...new Set(ids ?? [])].filter((id) => id !== senderId);
+    if (wanted.length === 0) return { mentions: [], mentionsEveryone: false, mentionRoles: [] };
+    return this.resolveMentions(channel, wanted.map((id) => `<@${id}>`).join(' '), senderId, {
+      plainEveryone: false,
+    });
+  }
+
   async findMessages(userId: string, channelId: string, before?: string) {
     const channel = await this.membership.requireChannelAccess(userId, channelId);
 
@@ -722,9 +740,9 @@ export class MessagesService {
     }
 
     // §3: mention token parse + erişim doğrulaması (§4 T&S) — create'ten önce
-    // E1: şifreli mesajda içerik sunucuya görünmez → bahsetme çözümü yok (mentions=[]).
+    // E1: şifreli mesajda içerik sunucuya görünmez → bahsetme istemcinin bildirdiği kimlik listesinden (E2 Rev.2 §4.2).
     const { mentions, mentionsEveryone, mentionRoles } = e2ee.encrypted
-      ? { mentions: [], mentionsEveryone: false, mentionRoles: [] }
+      ? await this.resolveEncryptedMentions(channel, dto.mentionUserIds, userId)
       : await this.resolveMentions(channel, dto.content ?? '', userId);
 
     const message = await this.prisma.message.create({
@@ -902,7 +920,12 @@ export class MessagesService {
     if (e2ee.encrypted) {
       const encUpdated = await this.prisma.message.update({
         where: { id: messageId },
-        data: { editedAt: new Date(), ...this.e2eeMessageData(e2ee) },
+        data: {
+          editedAt: new Date(),
+          mentions: (await this.resolveEncryptedMentions(channel, dto.mentionUserIds, userId))
+            .mentions,
+          ...this.e2eeMessageData(e2ee),
+        },
         include: this.messageInclude(),
       });
       return (await this.withRoleEmojis(channel.guildId, [toMessageDto(encUpdated, userId)]))[0];

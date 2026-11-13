@@ -55,7 +55,7 @@ export const useE2eeTransferStore = defineStore('e2eeTransfer', () => {
 
   const dmIds = () =>
     useDmStore()
-      .channels.filter((c) => c.type === 'DM')
+      .channels.filter((c) => c.type === 'DM' || c.type === 'GROUP_DM')
       .map((c) => c.id)
 
   const log = (e: unknown) =>

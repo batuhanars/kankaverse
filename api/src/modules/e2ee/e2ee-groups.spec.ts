@@ -214,7 +214,12 @@ describe('E2eeGroupsService okuma uçları', () => {
   it('listCommits since dahil, epoch sırasıyla, en çok 100', async () => {
     const { prisma, svc } = setup();
     prisma.e2eeHandshake.findMany.mockResolvedValue([
-      { epoch: 2, commit: new Uint8Array([1]), senderDeviceId: 'd1' },
+      {
+        epoch: 2,
+        commit: new Uint8Array([1]),
+        senderDeviceId: 'd1',
+        createdAt: new Date('2026-11-13T10:00:00.000Z'),
+      },
     ]);
     const res = await svc.listCommits('u1', 'ch', 2);
     expect(prisma.e2eeHandshake.findMany).toHaveBeenCalledWith({
@@ -222,7 +227,14 @@ describe('E2eeGroupsService okuma uçları', () => {
       orderBy: { epoch: 'asc' },
       take: 100,
     });
-    expect(res).toEqual([{ epoch: 2, commit: toB64(new Uint8Array([1])), senderDeviceId: 'd1' }]);
+    expect(res).toEqual([
+      {
+        epoch: 2,
+        commit: toB64(new Uint8Array([1])),
+        senderDeviceId: 'd1',
+        createdAt: '2026-11-13T10:00:00.000Z',
+      },
+    ]);
   });
 
   it('welcome listesi yalnız çağıran cihazın bekleyenleri; ack başkasının welcome unu kabul etmez (404)', async () => {

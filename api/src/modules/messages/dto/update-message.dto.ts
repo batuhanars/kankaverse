@@ -7,10 +7,16 @@ import {
   IsInt,
   Matches,
   Min,
+  IsArray,
+  ArrayMaxSize,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MESSAGE_CONTENT_MAX } from '../messages.constants';
-import { E2EE_CIPHERTEXT_MAX_B64, FRANKING_TAG_B64_RE } from '../../e2ee/e2ee.constants';
+import {
+  E2EE_CIPHERTEXT_MAX_B64,
+  E2EE_MENTION_IDS_MAX,
+  FRANKING_TAG_B64_RE,
+} from '../../e2ee/e2ee.constants';
 
 export class UpdateMessageDto {
   @ApiProperty({
@@ -51,4 +57,16 @@ export class UpdateMessageDto {
     message: 'Parmak izi, 32 baytlık geçerli bir base64 değeri olmalı.',
   })
   frankingTag?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'E2 Rev.2: şifreli mesajda bahsedilen kullanıcı kimlikleri (düz üst veri, en çok 20). Üye olmayan ve gönderenin kendisi sessizce atılır. Şifresiz mesajda 422 E2EE_NOT_ENCRYPTED.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(E2EE_MENTION_IDS_MAX, { message: 'En fazla 20 kişi etiketlenebilir.' })
+  @IsString({ each: true })
+  @Matches(/^[a-zA-Z0-9_-]{1,64}$/, { each: true, message: 'Geçersiz kullanıcı kimliği.' })
+  mentionUserIds?: string[];
 }

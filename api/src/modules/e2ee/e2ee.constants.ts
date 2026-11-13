@@ -28,6 +28,9 @@ export const REPORT_EVIDENCE_MAX = 6;
 /** E4 §3.4: kanıt, şikâyet kapandıktan bu kadar gün sonra silinir. TEK yer. */
 export const REPORT_EVIDENCE_RETENTION_DAYS = 90;
 
+/** E2 Rev.2 §4.2: şifreli mesajda düz üst veri olarak gelen bahsetme kimliği sayısı üst sınırı. */
+export const E2EE_MENTION_IDS_MAX = 20;
+
 export const E2EE_GROUP_ID_BYTES = 32;
 export const E2EE_SIGNATURE_KEY_BYTES = 32;
 

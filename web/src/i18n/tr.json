@@ -1489,6 +1489,8 @@
   "e2ee": {
     "lockTitle": "Uçtan uca şifreli",
     "divider": "Bu noktadan sonra mesajlar uçtan uca şifreli",
+    "deviceAdded": "{name} yeni bir cihaz ekledi",
+    "deviceAddedUnknown": "Bir üye yeni bir cihaz ekledi",
     "beforeDevice": "Bu mesaj bu cihaz eklenmeden önce gönderildi",
     "undecryptable": "Bu mesaj çözülemedi",
     "unsupported": "Görmek için uygulamayı güncelle",

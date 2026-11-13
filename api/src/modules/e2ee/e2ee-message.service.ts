@@ -15,7 +15,16 @@ export type E2eeSendPlan =
     };
 
 type CallerRef = Pick<RequestUser, 'id' | 'tokenFamily'>;
-type Payload = { content?: string; ciphertext?: string; frankingTag?: string };
+type Payload = {
+  content?: string;
+  ciphertext?: string;
+  frankingTag?: string;
+  mentionUserIds?: string[];
+};
+
+/** Yalnız şifreli gönderimde anlamlı alanlar: şifresiz kanalda/mesajda gelirse 422. */
+const hasE2eeOnlyField = (dto: Payload): boolean =>
+  dto.ciphertext !== undefined || dto.frankingTag !== undefined || dto.mentionUserIds !== undefined;
 
 /**
  * Mesaj uçlarının E2EE kuralları (§2.5). Kanal şifreli ⇔ `E2eeGroup` satırı var (bayrağa BAKILMAZ:
@@ -39,9 +48,7 @@ export class E2eeMessageService {
       select: { channelId: true },
     });
     if (!group) {
-      if (dto.ciphertext !== undefined || dto.frankingTag !== undefined) {
-        throw E2EE_ERRORS.notEncrypted();
-      }
+      if (hasE2eeOnlyField(dto)) throw E2EE_ERRORS.notEncrypted();
       return { encrypted: false };
     }
     return this.encryptedPlan(caller, dto);
@@ -54,9 +61,7 @@ export class E2eeMessageService {
     dto: Payload,
   ): Promise<E2eeSendPlan> {
     if (!message.encrypted) {
-      if (dto.ciphertext !== undefined || dto.frankingTag !== undefined) {
-        throw E2EE_ERRORS.notEncrypted();
-      }
+      if (hasE2eeOnlyField(dto)) throw E2EE_ERRORS.notEncrypted();
       return { encrypted: false };
     }
     return this.encryptedPlan(caller, dto);

@@ -5,6 +5,7 @@ import type { E2eeWelcomeRow } from './ports'
 import { fromB64, toB64 } from './b64'
 import { guardUntrusted } from './commitSync'
 import type { E2eeContext } from './context'
+import { observeLeaves } from './deviceNotices'
 import { topUpKeyPackages } from './deviceSetup'
 import { devicesOf } from './registry'
 import { isStaleGroup } from './staleGroup'
@@ -18,7 +19,8 @@ async function joinOne(ctx: E2eeContext, device: Device, row: E2eeWelcomeRow): P
   const { data } = await ctx.api.channelState(row.channelId)
   const local = await ctx.store.loadGroup(row.channelId)
   if (local && local.isActive && !isStaleGroup(local, data)) return false
-  const { registered } = devicesOf(data) // iptaller dahil: ağaçta geçmişten kalan yaprak olabilir
+  const devices = devicesOf(data)
+  const { registered } = devices // iptaller ve eski üyeler dahil: ağaçta geçmişten kalan yaprak olabilir
   const group = await guardUntrusted(ctx, row.channelId, () =>
     joinFromWelcome(device, fromB64(row.welcome), registered),
   )
@@ -28,6 +30,7 @@ async function joinOne(ctx: E2eeContext, device: Device, row: E2eeWelcomeRow): P
   await ctx.store.saveDevice(device)
   await ctx.store.saveGroup(row.channelId, group)
   await ctx.store.saveJoinedAt(row.channelId, Date.now())
+  await observeLeaves(ctx, row.channelId, group, devices) // E2 §3.3: bu andan sonraki eklemeler "yeni cihaz"
   return true
 }
 

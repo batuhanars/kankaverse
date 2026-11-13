@@ -29,11 +29,13 @@ import ReportModal from '@/components/shared/ReportModal.vue'
 import ComposerBar from '@/components/shared/ComposerBar.vue'
 import MessageRow from '@/components/shared/MessageRow.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
+import E2eeDeviceNotice from '@/components/shared/E2eeDeviceNotice.vue'
 import E2eeDivider from '@/components/shared/E2eeDivider.vue'
 import E2eeLockIcon from '@/components/shared/E2eeLockIcon.vue'
 import E2eeWarningBanner from '@/components/shared/E2eeWarningBanner.vue'
 import { useE2eeChannelView } from '@/composables/useE2eeChannelView'
 import { useE2eeStore } from '@/stores/e2ee'
+import { useE2eeNoticesStore } from '@/stores/e2eeNotices'
 import { useE2eeBackupStore } from '@/stores/e2eeBackup'
 import MessageEditModal from '@/components/shared/MessageEditModal.vue'
 import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
@@ -127,6 +129,7 @@ const optimistic = useOptimisticSend()
 const messagesStore = useMessagesStore()
 const dmStore = useDmStore()
 const e2eeStore = useE2eeStore()
+const noticesStore = useE2eeNoticesStore()
 const backupStore = useE2eeBackupStore()
 const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
@@ -162,8 +165,11 @@ function dmMentionResolver(userId: string): string {
 }
 
 // Sprint V2: kendi-bahsedilme vurgusu (DM bağlamı)
+// Şifreli grup mesajında sunucu bahsetme listesini bilmez (mentions = []): vurgu çözülen metindeki token'dan çıkar (E2 §0).
 function isDmMentioned(msg: MessageDto): boolean {
-  return !!(msg.mentions?.includes(authStore.user?.id ?? ''))
+  const me = authStore.user?.id ?? ''
+  if (msg.mentions?.includes(me)) return true
+  return msg.encrypted === true && msg.e2eeStatus === 'ok' && msg.content.includes(`<@${me}>`)
 }
 
 // Sprint V2: mention autocomplete
@@ -366,6 +372,11 @@ const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channel.id] 
 // E5b Parça C: cihaz öncesi mesajlar gizlendiyse (daha eskisi yokken) listenin başında tek satır.
 const hiddenBefore = computed(() => messagesStore.hiddenBeforeDevice[props.channel.id] ?? false)
 const e2eeView = useE2eeChannelView(() => props.channel.id, messages, hasMore)
+/** "{ad} yeni bir cihaz ekledi" satırındaki ad: grup üyesi ya da 1-1'de karşı taraf; bilinmiyorsa null. */
+function noticeName(userId: string): string | null {
+  if (props.channel.type === 'GROUP_DM') return props.channel.members.find((m) => m.id === userId)?.username ?? null
+  return props.channel.otherUser.id === userId ? props.channel.otherUser.username : null
+}
 
 // E5a §4.4-1: şifreli DM açıldığında (bu cihazda ilk kez) yedek kurulum sorusu; tek seferlik bayrak store'da.
 // Yedek durumu motor açılışında asenkron gelir; ikisi de izlenir ki hangisi geç gelirse soru yine çıksın.
@@ -383,6 +394,7 @@ watch(
     realtimeError.value = !ack.ok
     // E1: şifreli DM'de önce Welcome/commit'ler işlenir ki mesajlar doğru epoch'ta çözülsün.
     await e2eeStore.openChannel(id)
+    void noticesStore.load(id) // E2 §3.3: yerel depodan "yeni cihaz eklendi" satırları
     await messagesStore.fetchMessages(id)
     void e2eeStore.syncChannel(id) // E1: mesajlar çözüldükten SONRA commit senkronu (sıra önemli)
     await dmStore.markRead(id)
@@ -1033,6 +1045,7 @@ const dayLabels = computed<(string | null)[]>(() =>
         <!-- C11: gün değişiminde ayraç (Bugün · Dün · 25 Ekim 2026) -->
         <DateDivider v-if="dayLabels[index]" :label="dayLabels[index] || ''" />
         <E2eeDivider v-if="e2eeView.dividerIndex.value === index" />
+        <E2eeDeviceNotice v-for="n in e2eeView.deviceNotices.value.get(index)" :key="`${n.userId}-${n.at}`" :name="noticeName(n.userId)" />
         <MessageRow
           :message="msg"
           :is-mine="isMine(msg)"
@@ -1069,6 +1082,7 @@ const dayLabels = computed<(string | null)[]>(() =>
         </MessageRow>
         </template>
         <E2eeDivider v-if="e2eeView.dividerIndex.value === messages.length" />
+        <E2eeDeviceNotice v-for="n in e2eeView.deviceNotices.value.get(messages.length)" :key="`${n.userId}-${n.at}`" :name="noticeName(n.userId)" />
       </div>
 
       <!-- En alta in: yukarı kaydırınca görünür; yukarıdayken gelen mesaj sayısı rozette (REV-9) -->

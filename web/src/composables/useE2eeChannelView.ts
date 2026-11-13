@@ -1,10 +1,12 @@
 import { computed, type Ref } from 'vue'
 import { useE2eeStore } from '@/stores/e2ee'
+import { useE2eeNoticesStore } from '@/stores/e2eeNotices'
+import { noticeSlots } from '@/utils/deviceNoticeSlots'
 import type { MessageDto } from '@/types'
 
 /**
- * E1 §4 — bir DM'in şifreleme görünümü: kilit, uyarı bandı ve "bu noktadan sonra şifreli" ayracının
- * yeri. Ayraç ilk şifreli mesajın önüne konur; ama liste başında (daha eski sayfa yüklenmemişken)
+ * E1 §4 — bir DM'in şifreleme görünümü: kilit, uyarı bandı, "bu noktadan sonra şifreli" ayracının
+ * yeri ve "yeni cihaz eklendi" satırlarının yeri. Ayraç ilk şifreli mesajın önüne konur; ama liste başında (daha eski sayfa yüklenmemişken)
  * konursa yanlış yeri gösterirdi, bu yüzden o durumda çizilmez.
  */
 export function useE2eeChannelView(
@@ -24,5 +26,11 @@ export function useE2eeChannelView(
     return i === 0 && hasMore.value ? -1 : i
   })
 
-  return { encrypted, warning, dividerIndex }
+  // E2 §3.3: "yeni cihaz eklendi" satırlarının mesaj listesindeki yerleri (indeks → satırlar).
+  const notices = useE2eeNoticesStore()
+  const deviceNotices = computed(() =>
+    noticeSlots(notices.byChannel[channelId()] ?? [], messages.value, hasMore.value),
+  )
+
+  return { encrypted, warning, dividerIndex, deviceNotices }
 }

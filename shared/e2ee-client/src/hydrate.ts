@@ -70,8 +70,8 @@ export class Hydrator {
     this.group = await this.step('group-load', () => this.ctx.store.loadGroup(this.channelId))
     this.joinedAt = await this.ctx.store.loadJoinedAt(this.channelId)
     this.ownDeviceId = (await this.step('device-load', () => this.ctx.getDevice())).deviceId
-    const members = state ? state.members : await this.step('view-load', () => this.ctx.store.loadView(this.channelId))
-    this.view = members ? { devices: devicesOf({ members }) } : undefined
+    const snapshot = state ?? (await this.step('view-load', () => this.ctx.store.loadView(this.channelId)))
+    this.view = snapshot ? { devices: devicesOf(snapshot) } : undefined
   }
 
   /** Çevrimdışı (bildirim) yolunda adım süresi ölçümü (E3 Rev.3 k.5): yalnız ad + süre, içerik yok. */
@@ -93,11 +93,15 @@ export class Hydrator {
   }
 
   private isHidden(m: WireMessage): boolean {
-    const revoked = m.senderDeviceId
-      ? this.view?.devices.revokedAt.get(m.senderDeviceId)
-      : undefined
-    // Gönderen cihaz iptal edildikten SONRA oluşan mesaj gösterilmez (§3.3); öncesi meşrudur, kalır.
-    return revoked !== undefined && Date.parse(m.createdAt) >= revoked
+    const devices = this.view?.devices
+    if (!m.senderDeviceId || !devices) return false
+    // Gönderen cihaz iptal edildikten ya da sahibi gruptan çıktıktan SONRA oluşan mesaj gösterilmez
+    // (§3.3, E2 §3.2); öncesi meşrudur, kalır.
+    const cutoff = Math.min(
+      devices.revokedAt.get(m.senderDeviceId) ?? Infinity,
+      devices.former.get(m.senderDeviceId) ?? Infinity,
+    )
+    return Date.parse(m.createdAt) >= cutoff
   }
 
   private async resolveOne(m: WireMessage, final: boolean): Promise<Resolution> {

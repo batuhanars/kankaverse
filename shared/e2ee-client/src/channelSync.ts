@@ -3,7 +3,7 @@ import type { Group } from '@kankaverse/e2ee-core'
 import { catchUp, guardUntrusted, type ChannelView } from './commitSync'
 import { GroupNotReadyError, type E2eeContext } from './context'
 import { createChannelGroup } from './groupCreate'
-import { reconcile } from './reconcile'
+import { plan, reconcile } from './reconcile'
 import { devicesOf } from './registry'
 import { dropStaleGroup } from './staleGroup'
 import { processWelcomes } from './welcomes'
@@ -79,6 +79,27 @@ export async function groupForSend(ctx: E2eeContext, channelId: string): Promise
     group = await ctx.store.loadGroup(channelId)
   }
   if (!group) throw new GroupNotReadyError()
+  await closeRemovalGap(ctx, channelId, group, { devices: devicesOf(state) })
   if (!group.isActive) throw new DeviceRemovedError()
   return group
+}
+
+/**
+ * 🔴 R7 — gönderim kapısı (E2 §3.2). Gruptaki iptal edilmiş ya da eski üyeye ait yaprak varsa, şifrelemeden ÖNCE
+ * çıkarma commit'i senkronlanır. Hâlâ çıkarılmamışsa (commit kabul edilemedi, ağ) mesaj ŞİFRELENMEZ:
+ * eski üyeye yeni mesaj sızmaz. Çıkarma gerekmiyorsa ağa ek çağrı yok.
+ */
+async function closeRemovalGap(ctx: E2eeContext, channelId: string, group: Group, view: ChannelView) {
+  if (!group.isActive || plan(group, view).remove.length === 0) return
+  await syncGroup(ctx, channelId, group, view)
+  if (group.isActive && plan(group, view).remove.length > 0) throw new GroupNotReadyError()
+}
+
+/**
+ * Ağsız şifreleme (hızlı cevap) kapısı: ağa çıkılamadığı için yalnız ÖNBELLEKTEKİ görünüme bakılır. Çıkarılması
+ * gereken yaprak biliniyorsa şifrelenmez (kullanıcı uygulamayı açıp senkron bekler); görünüm yoksa bilgi yok, geçer.
+ */
+export async function assertNoStaleLeavesOffline(ctx: E2eeContext, channelId: string, group: Group) {
+  const snapshot = await ctx.store.loadView(channelId)
+  if (snapshot && plan(group, { devices: devicesOf(snapshot) }).remove.length > 0) throw new GroupNotReadyError()
 }

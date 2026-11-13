@@ -33,6 +33,7 @@ export {
 export { BackupScheduler, BACKUP_FIRST_DELAY_MS, BACKUP_MAX_DELAY_MS, type Timers } from './backupScheduler'
 export { buildSnapshot, parseSnapshot, pickCandidates, shouldWrite, type SnapshotContent, type SnapshotMessage } from './backupSnapshot'
 export { fromB64, toB64 } from './b64'
-export type { StoredStatus, StoredMessage } from './localStore'
+export { MAX_MENTION_IDS, mentionIdsOf } from './mentionIds'
+export type { DeviceNotice, StoredStatus, StoredMessage } from './localStore'
 export type { WireMessage } from './hydrate'
 export type * from './ports'

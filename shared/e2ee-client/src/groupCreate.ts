@@ -4,15 +4,36 @@ import { e2eeErrorCode } from './errors'
 import { fromB64, toB64 } from './b64'
 import type { E2eeContext } from './context'
 import type { E2eeChannelState } from './ports'
+import { observeLeaves } from './deviceNotices'
+import { MAX_ADD_PER_COMMIT } from './reconcile'
 import { devicesOf } from './registry'
 
 export type CreateOutcome = 'created' | 'exists' | 'ineligible'
 
 const GROUP_ID_BYTES = 32
 
-/** Her üyenin en az bir etkin cihazı var mı (§2.2 uygunluk). */
-export const everyMemberHasDevice = (state: E2eeChannelState): boolean =>
-  state.members.length > 0 && state.members.every((m) => m.devices.some((d) => !d.revokedAt))
+const hasActiveDevice = (m: E2eeChannelState['members'][number]): boolean => m.devices.some((d) => !d.revokedAt)
+
+/**
+ * Uygunluk (E2 §2.2): 1-1'de (2 üye) iki üyenin de, grupta (3+) GÖNDEREN DAHİL en az iki üyenin etkin cihazı var.
+ * Cihazsız üye grubu engellemez: cihaz kaydedince devices-changed ile eklenir, öncesini görmez (§0).
+ */
+export function enoughMembersHaveDevice(state: E2eeChannelState): boolean {
+  const withDevice = state.members.filter(hasActiveDevice).length
+  return state.members.length <= 2 ? withDevice > 0 && withDevice === state.members.length : withDevice >= 2
+}
+
+/** Hedef cihazlar üyeler arasında sırayla dizilir: tek claim 20 cihazı geçemez, her üyenin ilk cihazı önce girer. */
+function claimTargets(state: E2eeChannelState, ownDeviceId: string | null): string[] {
+  const lists = state.members.map((m) =>
+    m.devices.filter((d) => !d.revokedAt && d.deviceId !== ownDeviceId).map((d) => d.deviceId),
+  )
+  const out: string[] = []
+  for (let i = 0; out.length < MAX_ADD_PER_COMMIT && lists.some((l) => i < l.length); i++) {
+    for (const l of lists) if (i < l.length && out.length < MAX_ADD_PER_COMMIT) out.push(l[i])
+  }
+  return out
+}
 
 /**
  * Grubu bu cihaz kurar. 'exists': yarışı başkası kazandı, onun Welcome'ı beklenir (pending atılır, yerel
@@ -24,11 +45,11 @@ export async function createChannelGroup(
   channelId: string,
   state: E2eeChannelState,
 ): Promise<CreateOutcome> {
-  if (!everyMemberHasDevice(state)) return 'ineligible'
+  if (!enoughMembersHaveDevice(state)) return 'ineligible'
   const device = await ctx.getDevice()
-  const { active } = devicesOf(state)
-  const targets = active.map((d) => d.deviceId).filter((id) => id !== device.deviceId)
-  const { data: claimed } = await ctx.api.claim(channelId, targets)
+  const devices = devicesOf(state)
+  const { active } = devices
+  const { data: claimed } = await ctx.api.claim(channelId, claimTargets(state, device.deviceId))
   if (
     !otherMembersCovered(
       state,
@@ -59,18 +80,21 @@ export async function createChannelGroup(
   group.confirmCommit(pending)
   await ctx.store.saveGroup(channelId, group)
   await ctx.store.saveJoinedAt(channelId, Date.now())
+  await observeLeaves(ctx, channelId, group, devices)
   return 'created'
 }
 
-/** Kendimiz dışındaki her üyenin en az bir cihazı için KeyPackage alındı mı. */
+/**
+ * KeyPackage'ı alınan cihazlar yeterli mi: 1-1'de karşı tarafın, grupta kendimiz dışında en az bir üyenin
+ * cihazı kapsandı. Kapsanamayan üye sonradan reconcile ile eklenir (o cihaz paket yükleyince).
+ */
 function otherMembersCovered(
   state: E2eeChannelState,
   claimedIds: string[],
   ownDeviceId: string | null,
 ): boolean {
   const got = new Set(claimedIds)
-  return state.members.every((m) => {
-    const mine = m.devices.some((d) => d.deviceId === ownDeviceId)
-    return mine || m.devices.some((d) => got.has(d.deviceId))
-  })
+  const others = state.members.filter((m) => !m.devices.some((d) => d.deviceId === ownDeviceId))
+  const covered = others.filter((m) => m.devices.some((d) => got.has(d.deviceId)))
+  return state.members.length <= 2 ? covered.length === others.length : covered.length >= 1
 }

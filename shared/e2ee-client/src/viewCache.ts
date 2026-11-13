@@ -10,7 +10,7 @@ export function withViewCache(api: E2eeApi, store: LocalStore): E2eeApi {
   const cached = Object.create(api) as E2eeApi
   cached.channelState = async (channelId) => {
     const reply = await api.channelState(channelId)
-    await store.saveView(channelId, reply.data.members)
+    await store.saveView(channelId, reply.data)
     return reply
   }
   return cached

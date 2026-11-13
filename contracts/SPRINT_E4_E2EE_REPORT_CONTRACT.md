@@ -129,6 +129,7 @@ PM taslağı sahibe sunar, sahip onaylar. İçerik: (a) ortam dışı 1-1 DM met
 - `s3Item3` (yeni): "[Birebir DM'lerdeki] mesaj metinleri uçtan uca şifrelidir: yalnız sen ve konuştuğun kişinin cihazları okuyabilir, Kankaverse okuyamaz. DM'de paylaşılan görsel, dosya, ses ve videolar şu an bu şifrelemenin kapsamında değildir."
 - `s3Item4` (yeni): "Web ve masaüstü uygulamasının kodu her açılışta sunucumuzdan yüklenir. Bu yüzden şifreleme güvencesi orada mobil uygulamaya göre daha zayıftır."
 - `s5Body` sonuna: "Bir mesajı şikâyet ettiğinde, o mesaj ve sohbetteki önceki 5 mesaj moderasyon ekibine iletilir. Şifreli bir sohbette bu mesajları senin cihazın iletir, platform onları başka bir yolla okuyamaz. Her mesaj gönderilirken bir parmak izi taşır. Böylece iletilen mesajların değiştirilmediği doğrulanabilir. Şikâyet kanıtı, şikâyet kapandıktan 90 gün sonra silinir."
+- `s3Item4` (yeni, sahip onaylı 2026-11-13, E2 Rev.2): "Şifreleme mesajın içeriğini korur. Kimlerle konuştuğun, mesajın zamanı, grup adı ve üyeleri, tepkiler ve bir mesajda kimden bahsedildiği gibi bilgiler hizmetin çalışması için sunucuda kalır."
 - E2 sonrası: `s3Item1`'den "ve grup DM'lerdeki" çıkar, `s3Item3`'te "Birebir DM'lerdeki" → "Ortam dışı tüm DM'lerdeki".
 
 ## §6 Uygulama sırası

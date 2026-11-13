@@ -9,18 +9,39 @@ export interface E2eeDeviceInfo {
   revokedAt: string | null
 }
 
+/** Kanal üyesi: cihazları (iptaller dahil) ve katılım zamanı (E2 §2.3; yalnız GROUP_DM'de dolu, 1-1'de null). */
+export interface E2eeMemberInfo {
+  userId: string
+  joinedAt?: string | null
+  devices: E2eeDeviceInfo[]
+}
+
+/** Gruptan ayrılmış/çıkarılmış üye: yaprakları hâlâ gruptayken doğrulama onları tanımalı (E2 §2.3). */
+export interface E2eeFormerMemberInfo {
+  userId: string
+  leftAt: string
+  devices: E2eeDeviceInfo[]
+}
+
 export interface E2eeChannelState {
   encrypted: boolean
   epoch: number | null
   groupId: string | null
   createdAt: string | null
-  members: { userId: string; devices: E2eeDeviceInfo[] }[]
+  members: E2eeMemberInfo[]
+  /** E2 §2.3: 1-1'de hep []. Eski sunucu yanıtında/önbelleğinde yok sayılır. */
+  formerMembers?: E2eeFormerMemberInfo[]
 }
+
+/** Cihaz görünümünün çıkarıldığı alt küme (önbelleğe de bu yazılır, E3 §9.1). */
+export type E2eeViewSnapshot = Pick<E2eeChannelState, 'members' | 'formerMembers' | 'createdAt'>
 
 export interface E2eeCommitRow {
   epoch: number
   commit: string
   senderDeviceId: string
+  /** Commit'in sunucuca kabul zamanı (ISO). Eski sunucuda yok: "yeni cihaz" satırı yerel saatle yazılır. */
+  createdAt?: string
 }
 
 export interface E2eeWelcomeRow {

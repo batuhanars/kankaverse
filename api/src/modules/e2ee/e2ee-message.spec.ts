@@ -1,3 +1,6 @@
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { CreateMessageDto } from '../messages/dto/create-message.dto';
 import { E2eeMessageService } from './e2ee-message.service';
 import { toB64 } from './e2ee.util';
 
@@ -142,5 +145,46 @@ describe('E2eeMessageService.planEdit', () => {
     await expect(
       svc.planEdit(CALLER, { encrypted: true }, { ciphertext: CT }),
     ).resolves.toMatchObject({ encrypted: true, senderDeviceId: 'dev-1' });
+  });
+});
+
+describe('E2 Rev.2 mentionUserIds', () => {
+  it('şifresiz kanalda / şifresiz mesajda mentionUserIds → 422 E2EE_NOT_ENCRYPTED (boş liste de)', async () => {
+    const { prisma, svc } = setup();
+    prisma.e2eeGroup.findUnique.mockResolvedValue(null);
+    for (const ids of [['u2'], []]) {
+      await expect(
+        svc.planSend(CALLER, 'ch', { content: 'x', mentionUserIds: ids }),
+      ).rejects.toMatchObject({
+        status: 422,
+        response: { error: 'E2EE_NOT_ENCRYPTED' },
+      });
+    }
+    await expect(
+      svc.planEdit(CALLER, { encrypted: false }, { content: 'x', mentionUserIds: ['u2'] }),
+    ).rejects.toMatchObject({ status: 422, response: { error: 'E2EE_NOT_ENCRYPTED' } });
+  });
+
+  it('şifreli kanalda/mesajda plan kabul eder (liste servis katmanında çözülür)', async () => {
+    const { prisma, svc } = setup();
+    prisma.e2eeGroup.findUnique.mockResolvedValue({ channelId: 'ch' });
+    await expect(
+      svc.planSend(CALLER, 'ch', { ciphertext: CT, mentionUserIds: ['u2'] }),
+    ).resolves.toMatchObject({ encrypted: true });
+    await expect(
+      svc.planEdit(CALLER, { encrypted: true }, { ciphertext: CT, mentionUserIds: ['u2'] }),
+    ).resolves.toMatchObject({ encrypted: true });
+  });
+});
+
+describe('E2 Rev.2 mentionUserIds DTO sınırı', () => {
+  const errorsFor = (ids: unknown) =>
+    validate(plainToInstance(CreateMessageDto, { ciphertext: 'AQIDBA==', mentionUserIds: ids }));
+
+  it('20 kimlik geçer, 21 reddedilir; biçimsiz kimlik reddedilir', async () => {
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => `u${i}`);
+    expect(await errorsFor(ids(20))).toHaveLength(0);
+    expect(await errorsFor(ids(21))).not.toHaveLength(0);
+    expect(await errorsFor(['<@x>'])).not.toHaveLength(0);
   });
 });

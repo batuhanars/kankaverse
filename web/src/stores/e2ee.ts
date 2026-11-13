@@ -4,6 +4,7 @@ import { e2eeApi } from '@/api/e2ee'
 import { messagesApi } from '@/api/messages'
 import { useDmStore } from '@/stores/dm'
 import { useE2eeBackupStore } from '@/stores/e2eeBackup'
+import { useE2eeNoticesStore } from '@/stores/e2eeNotices'
 import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
 import type {
   ChannelInfo,
@@ -63,6 +64,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
   async function wipe(): Promise<void> {
     const current = engine.value
     useE2eeBackupStore().stop()
+    useE2eeNoticesStore().clear()
     engine.value = null
     channels.value = {}
     warnings.value = {}
@@ -75,12 +77,15 @@ export const useE2eeStore = defineStore('e2ee', () => {
     }
   }
 
-  const isOneToOneDm = (channelId: string) =>
-    useDmStore().channels.some((c) => c.id === channelId && c.type === 'DM')
+  /** Şifrelenebilen sohbet: 1-1 DM ya da grup DM (E2 §3.1). Ortam kanalları şifrelenmez. */
+  const isEncryptableDm = (channelId: string) =>
+    useDmStore().channels.some(
+      (c) => c.id === channelId && (c.type === 'DM' || c.type === 'GROUP_DM'),
+    )
 
   async function openChannel(channelId: string): Promise<void> {
     await ready
-    if (!engine.value || !isOneToOneDm(channelId)) return
+    if (!engine.value || !isEncryptableDm(channelId)) return
     try {
       channels.value[channelId] = await engine.value.open(channelId)
     } catch (e) {
@@ -91,8 +96,9 @@ export const useE2eeStore = defineStore('e2ee', () => {
   /** Mesajlar çözüldükten sonra: eksik commit'leri işle, üyelik farkını kapat (yerel grup yoksa no-op). */
   async function syncChannel(channelId: string): Promise<void> {
     await ready
-    if (!engine.value || !isOneToOneDm(channelId)) return
+    if (!engine.value || !isEncryptableDm(channelId)) return
     await engine.value.onGroupChanged(channelId).catch((e) => console.error('[e2ee] senkron', e))
+    await useE2eeNoticesStore().load(channelId) // commit "yeni cihaz eklendi" satırı üretmiş olabilir (E2 §3.3)
   }
 
   /** Şifreli mesaj çözülemiyorsa (motor yok/hata) ekranda "çözülemedi" durumu çıksın, boş balon değil. */
@@ -201,7 +207,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
   /** Gönderim öncesi: şifreli yük, ya da `null` (şifresiz DM / E2EE kapalı: çağıran düz gönderir). */
   async function prepareSend(channelId: string, text: string): Promise<SentCipher | null> {
     await ready
-    if (!engine.value || !isOneToOneDm(channelId)) return null
+    if (!engine.value || !isEncryptableDm(channelId)) return null
     return engine.value.encrypt(channelId, text)
   }
 
@@ -251,7 +257,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
    */
   async function forgetMessage(channelId: string, messageId: string): Promise<void> {
     await ready
-    if (!engine.value || !isOneToOneDm(channelId)) return
+    if (!engine.value || !isEncryptableDm(channelId)) return
     await engine.value
       .forgetMessage(messageId)
       .catch((e) => console.error('[e2ee] yerel kayıt silinemedi', e))

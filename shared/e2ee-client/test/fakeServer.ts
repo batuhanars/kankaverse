@@ -22,12 +22,17 @@ const fail = (status: number, error: string, extra: object = {}) =>
 export class FakeServer {
   devices = new Map<string, Dev>()
   members = new Map<string, string[]>()
+  /** GROUP_DM (E2 §2.3): üyenin katılım zamanı (ISO) ve eski üyelerin ayrılma zamanı. Yoksa 1-1 gibi davranır. */
+  joined = new Map<string, Map<string, string>>()
+  former = new Map<string, Map<string, string>>()
   groups = new Map<string, { epoch: number; groupId: string; createdAt: string }>()
   handshakes: {
     channelId: string
     epoch: number
     sender: string
     commit: string
+    /** Sunucu kabul zamanı (ISO); testler geçmişe çekebilir. */
+    at?: string
   }[] = []
   welcomes: {
     id: string
@@ -41,6 +46,10 @@ export class FakeServer {
   hidden = new Map<string, Set<string>>()
   /** true ise bir sonraki commit gönderimi 409 ile reddedilir (çakışma yeniden deneme testi). */
   conflictOnce = false
+  /** true ise TÜM commit gönderimleri 409 ile reddedilir (çıkarma commit'i kabul edilemiyor: gönderim kapısı testi). */
+  rejectCommits = false
+  /** true ise commit satırlarında createdAt yok (eski sunucu). */
+  legacyCommits = false
   /** `/e2ee/status.franking` (E4 §2.2): istemcinin v2 gönderip göndermeyeceği. */
   franking = false
   /** E5a yedek uçları (bayrak, anahtar kayıtları, görüntü satırları, nesne deposu). */
@@ -60,6 +69,26 @@ export class FakeServer {
     const d = this.devices.get(deviceId)!
     d.revokedAt = at
     d.kps = []
+  }
+
+  /** Kanalı grup yapar: üyelerin katılım zamanı bildirilir (E2 §2.3). */
+  makeGroup(channelId: string, userIds: string[], at: string) {
+    this.members.set(channelId, [...userIds])
+    this.joined.set(channelId, new Map(userIds.map((u) => [u, at])))
+    this.former.set(channelId, new Map())
+  }
+
+  addMember(channelId: string, userId: string, at: string) {
+    this.members.get(channelId)!.push(userId)
+    this.joined.get(channelId)!.set(userId, at)
+    this.former.get(channelId)!.delete(userId)
+  }
+
+  /** Ayrılma/çıkarma: üyelik biter, eski üye kaydı yazılır (grupta E2eeGroup varsa; test hep yazar). */
+  removeMember(channelId: string, userId: string, at: string) {
+    this.members.set(channelId, this.members.get(channelId)!.filter((u) => u !== userId))
+    this.joined.get(channelId)!.delete(userId)
+    this.former.get(channelId)!.set(userId, at)
   }
 
   /** Geri alma temizliği (§6.4): kanalın grubu, commit'leri ve Welcome'ları silinir; cihazlara dokunulmaz. */
@@ -113,6 +142,7 @@ export class FakeServer {
       },
       claim: (channelId: string, ids: string[]) => {
         active()
+        if (ids.length > 20) throw fail(400, 'VALIDATION_ERROR') // E2EE_CLAIM_MAX_DEVICES
         const out = ids.flatMap((id) => {
           const d = this.devices.get(id)
           if (!d || d.revokedAt || !this.members.get(channelId)?.includes(d.userId)) return []
@@ -128,6 +158,7 @@ export class FakeServer {
         welcomes: { deviceId: string; welcome: string }[],
       ) => {
         const me = active()
+        if (welcomes.length > 20) throw fail(400, 'VALIDATION_ERROR') // E2EE_WELCOMES_PER_REQUEST
         if (this.groups.has(channelId)) throw fail(409, 'E2EE_GROUP_EXISTS')
         this.groups.set(channelId, {
           epoch: 1,
@@ -145,8 +176,9 @@ export class FakeServer {
         welcomes: { deviceId: string; welcome: string }[],
       ) => {
         const me = active()
+        if (welcomes.length > 20) throw fail(400, 'VALIDATION_ERROR')
         const g = this.groups.get(channelId)!
-        if (this.conflictOnce) {
+        if (this.conflictOnce || this.rejectCommits) {
           this.conflictOnce = false
           throw fail(409, 'E2EE_EPOCH_CONFLICT', { currentEpoch: g.epoch })
         }
@@ -165,6 +197,7 @@ export class FakeServer {
             epoch: h.epoch,
             commit: h.commit,
             senderDeviceId: h.sender,
+            ...(!this.legacyCommits && { createdAt: h.at ?? new Date().toISOString() }),
           }))
         return ok(rows)
       },
@@ -215,9 +248,20 @@ export class FakeServer {
     }
   }
 
+  private devicesOfUser(userId: string, hide: Set<string>) {
+    return [...this.devices.values()]
+      .filter((d) => d.userId === userId && !hide.has(d.id))
+      .map((d) => ({
+        deviceId: d.id,
+        signatureKey: d.key,
+        revokedAt: d.revokedAt?.toISOString() ?? null,
+      }))
+  }
+
   private state(channelId: string, viewer: string): E2eeChannelState {
     const hide = this.hidden.get(viewer) ?? new Set<string>()
     const g = this.groups.get(channelId)
+    const joined = this.joined.get(channelId)
     return {
       encrypted: !!g,
       epoch: g?.epoch ?? null,
@@ -225,13 +269,13 @@ export class FakeServer {
       createdAt: g?.createdAt ?? null,
       members: (this.members.get(channelId) ?? []).map((userId) => ({
         userId,
-        devices: [...this.devices.values()]
-          .filter((d) => d.userId === userId && !hide.has(d.id))
-          .map((d) => ({
-            deviceId: d.id,
-            signatureKey: d.key,
-            revokedAt: d.revokedAt?.toISOString() ?? null,
-          })),
+        joinedAt: joined?.get(userId) ?? null,
+        devices: this.devicesOfUser(userId, hide),
+      })),
+      formerMembers: [...(this.former.get(channelId) ?? [])].map(([userId, leftAt]) => ({
+        userId,
+        leftAt,
+        devices: this.devicesOfUser(userId, hide),
       })),
     }
   }

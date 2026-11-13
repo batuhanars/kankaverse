@@ -1,5 +1,6 @@
 import type { Socket } from 'socket.io-client'
 import { useE2eeStore } from '@/stores/e2ee'
+import { useE2eeNoticesStore } from '@/stores/e2eeNotices'
 import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
 
 /**
@@ -19,8 +20,13 @@ export function bindE2eeSocket(socket: Socket): void {
   })
 
   // Başka cihaz commit gönderdi ya da kanaldaki bir cihaz eklendi/iptal edildi: eksikleri işle, farkı kapat.
+  // İşlenen commit "yeni cihaz eklendi" satırı üretmiş olabilir (E2 §3.3): satırlar tazelenir.
+  const notices = useE2eeNoticesStore()
   const sync = ({ channelId }: { channelId: string }) => {
-    void store.engine?.onGroupChanged(channelId).catch(log)
+    void store.engine
+      ?.onGroupChanged(channelId)
+      .then(() => notices.load(channelId))
+      .catch(log)
   }
   socket.on('e2ee:commit', sync)
   socket.on('e2ee:devices-changed', sync)

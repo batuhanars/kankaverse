@@ -91,12 +91,15 @@ export async function send(p: Profile, id: string, text: string, createdAt = T0)
 
 export const show = async (p: Profile, msgs: Msg[]) => as(p, (e) => e.hydrate(CH, msgs))
 
+/** Her testten önce: yeni sahte sunucu, kanal CH = A,B (1-1), seçilen sağlayıcı. Ölçüm testleri de kullanır. */
+export function flowSetup(p: CryptoProvider) {
+  provider = p
+  server = new FakeServer()
+  server.members.set(CH, ['A', 'B'])
+}
+
 export function flowSuite(label: string, p: CryptoProvider) {
-  beforeEach(() => {
-    provider = p
-    server = new FakeServer()
-    server.members.set(CH, ['A', 'B'])
-  })
+  beforeEach(() => flowSetup(p))
 
   describe(`[${label}] 1-1 akış: grup kurma, karşılıklı mesaj`, () => {
     it('A grup kurar, B Welcome ile katılıp çözer, B cevaplar, A çözer; kendi mesajı yerelden gelir', async () => {

@@ -161,6 +161,7 @@ export class E2eeGroupsService {
       epoch: r.epoch,
       commit: toB64(r.commit),
       senderDeviceId: r.senderDeviceId,
+      createdAt: r.createdAt.toISOString(),
     }));
   }
 

@@ -8,6 +8,7 @@ import {
 import type { E2eeCommitRow } from './ports'
 import { fromB64 } from './b64'
 import type { E2eeContext } from './context'
+import { observeLeaves } from './deviceNotices'
 import { devicesOf, type ChannelDevices } from './registry'
 
 /** Çalışan işlemin elindeki kanal cihaz listesi; conflict/yenileme sonrası tazelenir. */
@@ -59,6 +60,12 @@ async function applyRow(
   }
 }
 
+/** Commit'in sunucu saati (ms); eski sunucuda ya da bozuk değerde undefined (yerel saate düşülür). */
+const serverTime = (row: E2eeCommitRow): number | undefined => {
+  const t = row.createdAt ? Date.parse(row.createdAt) : NaN
+  return Number.isNaN(t) ? undefined : t
+}
+
 /** Grubu sunucunun epoch'una getirir; her adım sonrası durum diske yazılır. */
 export async function catchUp(
   ctx: E2eeContext,
@@ -72,9 +79,11 @@ export async function catchUp(
     if (data.length === 0 || data[0].epoch !== group.epoch) return
     for (const row of data) {
       if (row.epoch !== group.epoch) break
+      const before = new Set(group.memberDeviceIds())
       const { removed } = await applyRow(ctx, channelId, group, row, view)
       await ctx.store.saveGroup(channelId, group)
       if (removed) return ctx.warn(channelId, 'removed')
+      await observeLeaves(ctx, channelId, group, view.devices, before, serverTime(row)) // E2 §3.3 "yeni cihaz eklendi"
     }
   }
 }

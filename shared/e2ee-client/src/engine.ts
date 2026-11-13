@@ -10,13 +10,21 @@ import {
   type Group,
 } from '@kankaverse/e2ee-core'
 import { fromB64, toB64 } from './b64'
-import { DeviceRemovedError, groupForSend, openChannel, syncChannel, type ChannelInfo } from './channelSync'
+import {
+  assertNoStaleLeavesOffline,
+  DeviceRemovedError,
+  groupForSend,
+  openChannel,
+  syncChannel,
+  type ChannelInfo,
+} from './channelSync'
 import { BackupManager } from './backup'
 import { TransferManager } from './transfer'
 import type { E2eeContext } from './context'
+import { mentionIdsOf } from './mentionIds'
 import { DeviceBrokenError, ensureDevice } from './deviceSetup'
 import { Hydrator, type OwnEntry, type OwnPlain, type Resolution, type WireMessage } from './hydrate'
-import { digestOf, LocalStore, type StoredStatus } from './localStore'
+import { type DeviceNotice, digestOf, LocalStore, type StoredStatus } from './localStore'
 import type { E2eeApi, EngineDeps, Vault, WarningHandler, WithLock } from './ports'
 import { OFFLINE_API, withViewCache } from './viewCache'
 import { processWelcomes } from './welcomes'
@@ -60,6 +68,8 @@ export interface SentCipher {
   epoch: number
   /** E4: base64 (32 bayt) mesaj taahhüdü. Yalnız `franking` bayrağı açıkken (v2 yük); API'ye `frankingTag` olarak gider. */
   frankingTag?: string
+  /** E2 Rev.2: metindeki `<@id>` token'larından bahsedilenler (düz üst veri, en çok 20); yoksa alan yok. */
+  mentionUserIds?: string[]
 }
 
 /** Şikâyet kanıtı öğesi (E4 §3.3 `evidence`): yalnız yerelde çözülmüş (`ok`) mesajlar. */
@@ -214,6 +224,8 @@ export class E2eeEngine {
     const entry: OwnEntry = { body: text, sentAt, fk: fkB64 }
     this.own.set(digestOf(sealed.ciphertext), entry)
     const out: SentCipher = { ciphertext: toB64(sealed.ciphertext), epoch: sealed.epoch }
+    const mentionUserIds = mentionIdsOf(text)
+    if (mentionUserIds.length > 0) out.mentionUserIds = mentionUserIds
     if (fk) {
       const senderDeviceId = (await ctx.getDevice()).deviceId ?? ''
       out.frankingTag = toBase64(frank(fk, { channelId, senderDeviceId, body: text, sentAt }))
@@ -285,6 +297,7 @@ export class E2eeEngine {
       const group = await ctx.store.loadGroup(channelId)
       if (!group) return null
       if (!group.isActive) throw new DeviceRemovedError()
+      await assertNoStaleLeavesOffline(ctx, channelId, group)
       return this.seal(ctx, group, channelId, text)
     })
   }
@@ -428,6 +441,11 @@ export class E2eeEngine {
   async quoteText(messageId: string): Promise<string | null> {
     const rec = await this.run((ctx) => ctx.store.loadMessage(messageId))
     return rec?.status === 'ok' ? rec.body : null
+  }
+
+  /** E2 §3.3: sohbetteki "yeni cihaz eklendi" satırları (yerel depo; mesaj değil, yedeğe girmez). */
+  deviceNotices(channelId: string): Promise<DeviceNotice[]> {
+    return this.run((ctx) => ctx.store.loadNotices(channelId))
   }
 
   /**

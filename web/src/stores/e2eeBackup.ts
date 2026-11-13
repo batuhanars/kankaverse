@@ -124,7 +124,7 @@ export const useE2eeBackupStore = defineStore('e2eeBackup', () => {
     if (!e || historyEvaluated) return
     if (e.backup && state.value === null) return // yedek durumu henüz okunmadı
     const hasEncryptedDm = useDmStore().channels.some(
-      (c) => c.type === 'DM' && c.lastMessage?.encrypted,
+      (c) => (c.type === 'DM' || c.type === 'GROUP_DM') && c.lastMessage?.encrypted,
     )
     if (!hasEncryptedDm) return
     historyEvaluated = true
@@ -154,7 +154,7 @@ export const useE2eeBackupStore = defineStore('e2eeBackup', () => {
 
   /**
    * Anahtarı bu cihazda açar (yeni mesajlar yedeklenir). `restoreHistory` (Rev.3: ayrı seçim) ise eski görüntüler
-   * erişilebilir 1-1 DM'lere birleştirilir ve açık sohbet yeniden yüklenir.
+   * erişilebilir DM'lere (1-1 + grup) birleştirilir ve açık sohbet yeniden yüklenir.
    */
   async function unlockAndRestore(
     password: string,
@@ -178,7 +178,7 @@ export const useE2eeBackupStore = defineStore('e2eeBackup', () => {
   > {
     try {
       const ids = useDmStore()
-        .channels.filter((c) => c.type === 'DM')
+        .channels.filter((c) => c.type === 'DM' || c.type === 'GROUP_DM')
         .map((c) => c.id)
       const res = await engine.value!.backup!.restoreBackup(ids)
       await refresh()

@@ -227,6 +227,7 @@ görünürlük ayarları, şikâyet/audit) çekirdeğin birinci sınıf parças�
 | D101 | **Grup okundu bilgisi üyelik değişince yeniden hesaplanmıyor** — üye eklenince/çıkınca `dm:groupRead` yayını yok; çıkan üye 'herkes okudu' hesabında kalabilir, yeni üye tiki bozabilir | api | E2 adım 1 dev bulgusu / 2026-11-13 | düşük | açık, C58 ile birlikte |
 | D102 | **Çıkarılan grup üyesi `voice:` odasında kalıyor** — ses katılım/presence olayları bağlantı kopana dek ona gider (içerik değil, üst veri) | api | E2 adım 1 dev bulgusu / 2026-11-13 | düşük | açık, E8'de |
 | D103 | **`E2eeFormerMember` temizliği yok** — eski üye satırları süresiz birikir (kanal silinse de) | api | E2 adım 1 / 2026-11-13 | düşük | açık |
+| D104 | **Şifreli DM'de bahsetme listesi düz üst veri (GEÇİCİ)** — E2 Rev.2: `mentionUserIds` sunucuya düz gidiyor ki zil/push çalışsın. Hedef WhatsApp modeli: liste şifreli içerikte, bildirim kararı cihazda | api + web + mobile | sahip kararı / 2026-11-13 | düşük | açık, E3 Rev.2 ile |
 
 ---
 

@@ -3911,4 +3911,112 @@ describe('MessagesService — E1 şifreli mesaj', () => {
     ).where;
     expect(where.encrypted).toBe(false);
   });
+
+  // ── E2 Rev.2 §4.2: şifreli mesajda bahsetme (kimlik listesi düz üst veri) ──
+  describe('bahsetme (mentionUserIds)', () => {
+    const ME = USER_ID;
+    const encPlan = { encrypted: true, senderDeviceId: 'dev-1', ciphertext: CT };
+
+    beforeEach(() => {
+      e2eeMock.planSend.mockResolvedValue(encPlan);
+      e2eeMock.planEdit.mockResolvedValue(encPlan);
+      prismaMock.message.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve({ ...makeMsg('m-enc', new Date()), ...data }),
+      );
+    });
+
+    const created = () =>
+      (prismaMock.message.create.mock.calls[0][0] as { data: Record<string, unknown> }).data;
+
+    it('geçerli üye Message.mentions a yazılır; üye olmayan ve gönderenin kendisi atılır (mevcut kapıdan)', async () => {
+      prismaMock.channelMember.findMany.mockResolvedValue([
+        { userId: 'u-ok', user: { isMinor: false } },
+      ]);
+      await service.create(
+        USER_ID,
+        CHANNEL_ID,
+        { ciphertext: 'AQIDBA==', mentionUserIds: ['u-ok', 'u-outsider', ME, 'u-ok'] },
+        'fam-1',
+      );
+      // gönderen ve tekrar sorguya HİÇ girmez; üyelik sorgusu mevcut resolveMentions DM dalı (ChannelMember)
+      const where = (
+        prismaMock.channelMember.findMany.mock.calls[0][0] as {
+          where: { channelId: string; userId: { in: string[] } };
+        }
+      ).where;
+      expect(where.userId.in).toEqual(['u-ok', 'u-outsider']);
+      expect(created().mentions).toEqual(['u-ok']);
+      expect(created().content).toBe('');
+      expect(created().mentionsEveryone).toBe(false);
+      expect(created().mentionRoles).toEqual([]);
+    });
+
+    it('yaş kapılı kanalda minör bahsetmeden elenir (bugünkü T&S kapısı)', async () => {
+      membershipMock.requireChannelAccess.mockResolvedValue({ ...DM_CHANNEL, ageGated: true });
+      prismaMock.channelMember.findMany.mockResolvedValue([
+        { userId: 'u-adult', user: { isMinor: false } },
+        { userId: 'u-minor', user: { isMinor: true } },
+      ]);
+      await service.create(
+        USER_ID,
+        CHANNEL_ID,
+        { ciphertext: 'AQIDBA==', mentionUserIds: ['u-adult', 'u-minor'] },
+        'fam-1',
+      );
+      expect(created().mentions).toEqual(['u-adult']);
+    });
+
+    it('liste yok / yalnız gönderen: üyelik sorgusu açılmaz, mentions []', async () => {
+      await service.create(
+        USER_ID,
+        CHANNEL_ID,
+        { ciphertext: 'AQIDBA==', mentionUserIds: [ME] },
+        'fam-1',
+      );
+      expect(prismaMock.channelMember.findMany).not.toHaveBeenCalled();
+      expect(created().mentions).toEqual([]);
+    });
+
+    it('en çok 10 kişi bahsedilir (bugünkü anti-spam sınırı); DTO 20 den fazlasını reddeder', async () => {
+      const ids = Array.from({ length: 15 }, (_, i) => `u${i}`);
+      prismaMock.channelMember.findMany.mockResolvedValue(
+        ids.map((userId) => ({ userId, user: { isMinor: false } })),
+      );
+      await service.create(
+        USER_ID,
+        CHANNEL_ID,
+        { ciphertext: 'AQIDBA==', mentionUserIds: ids },
+        'fam-1',
+      );
+      expect(created().mentions).toHaveLength(10);
+    });
+
+    it('düzenleme: bahsetme listesi yeni listeyle yeniden hesaplanır (eklenen girer, çıkarılan düşer)', async () => {
+      prismaMock.message.findUnique.mockResolvedValue({
+        id: 'm-enc',
+        authorId: USER_ID,
+        deletedAt: null,
+        webhookId: null,
+        encrypted: true,
+      });
+      prismaMock.channelMember.findMany.mockResolvedValue([
+        { userId: 'u-new', user: { isMinor: false } },
+      ]);
+      prismaMock.message.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve({ ...makeMsg('m-enc', new Date()), ...data }),
+      );
+      await service.editMessage(USER_ID, CHANNEL_ID, 'm-enc', {
+        ciphertext: 'AQIDBA==',
+        mentionUserIds: ['u-new'],
+      });
+      const data = (prismaMock.message.update.mock.calls[0][0] as { data: Record<string, unknown> })
+        .data;
+      expect(data.mentions).toEqual(['u-new']);
+      await service.editMessage(USER_ID, CHANNEL_ID, 'm-enc', { ciphertext: 'AQIDBA==' });
+      const data2 = (
+        prismaMock.message.update.mock.calls[1][0] as { data: Record<string, unknown> }
+      ).data;
+      expect(data2.mentions).toEqual([]); // listesiz düzenleme bahsetmeleri temizler
+    });
+  });
 });

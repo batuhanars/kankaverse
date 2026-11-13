@@ -11,7 +11,7 @@
 
 **Kapsam:** `GROUP_DM` kanallarında mesaj metni; üye ekleme / ayrılma / çıkarma ile MLS grubunun eşitlenmesi; yeni üyeye katılım öncesi şifreli mesajın sunucuda süzülmesi; "yeni cihaz eklendi" satırı (1-1 ve grup); yedek (E5a), aktarım (E5b), şikâyet (E4), push (E1/E3) yollarının grup kanallarını kapsaması.
 
-**Kapsam DIŞI:** grup araması şifreleme (E8), güvenlik kodu (E7), medya (E6), grup adı / üye listesi / tepki gibi üst veriler (düz kalır, sunucu görür; gizlilik metni zaten "mesaj içeriği" der, dev metni grep ile teyit eder, gerekirse PM'e bildirir). Bahsetmeler 1-1'deki gibi `mentions = []` (grup DM'de bildirim tercihi yok, etkisi yalnız vurgu; vurgu istemcide çözülen metinden yapılır, D95 notu geçerli).
+**Kapsam DIŞI:** grup araması şifreleme (E8), güvenlik kodu (E7), medya (E6), grup adı / üye listesi / tepki gibi üst veriler (düz kalır, sunucu görür; gizlilik metni zaten "mesaj içeriği" der, dev metni grep ile teyit eder, gerekirse PM'e bildirir). Bahsetmeler: **Rev.2 §4.2'ye bakın** (kimlik listesi düz üst veri).
 
 ## §1 İlkeler (E1 §1'e ek)
 1. **Grup = kanal.** 1 `GROUP_DM` kanalı = 1 MLS grubu, yapraklar cihazlar (E1 ile aynı model). Yeni tablo yalnız eski üye kaydı için (§2.1).
@@ -122,6 +122,13 @@ Grup başlığında kilit, ayraç, "çözülemedi", "güncelle" metinleri 1-1 il
 - **`message.updated` (R7):** GROUP_DM'de şifreli mesajın düzenleme yayını odaya değil, katılımı mesajdan önce olan üyelerin kişisel odalarına gider. Neden: düzenleme şimdiki epoch'la yeniden şifrelenir, yeni üye çözebilirdi.
 - **Bilinen sınırlar (kabul):** `message.created` yanıt alıntısında katılım öncesi şifreli mesajın yazar adı görünebilir (içerik yok); id tahminiyle şikâyet/tepki kapıları katılıma bakmaz (cuid, listeden görünmez); kriptografik çıkarma istemciye bağlı, sunucu yalnız iletmemeyi garanti eder.
 - **Borçlar (PLAN):** grup okundu bilgisi üyelik değişince yeniden hesaplanmıyor; çıkarılan üye `voice:` odasında kalıyor (E8'de); `E2eeFormerMember` temizliği yok; hesap silmede `devices-changed` yayını yok (E1'den).
+
+## §4.2 Rev.2 (2026-11-13, adım 2 bulguları)
+- **Bahsetme (sahip kararı):** şifreli mesajda bahsedilen kullanıcı kimlikleri **düz üst veri** olarak gider (`mentionUserIds?: string[]`, yalnız şifreli gönderim/düzenlemede; içerik şifreli kalır). Sunucu her kimliğin kanal üyesi olduğunu doğrular (değilse sessizce atar), gönderenin kendisini atar, en çok 20; sonra bugünkü bahsetme yolu (zil kaydı + "senden bahsetti" push) aynen çalışır. Şifresiz mesajda alan gelirse 422 (sunucu içerikten çıkarır, bugünkü gibi). İstemci listeyi gönderdiği düz metindeki `<@id>` token'larından üretir. 1-1 DM'de de gönderilebilir, etkisi bugünkü 1-1 kuralı. §0'daki "`mentions = []`" maddesinin yerine geçer. Bilinen bedel: sunucu içeriği değil, "kim anıldı" bilgisini görür; kurcalanmış istemci metinde anmadığı bir grup üyesine etiket bildirimi gönderebilir (yalnız üyelere, mevcut kapılarla); mevcut anti-spam sınırıyla en çok 10 kişiye bildirim. **GEÇİCİ (sahip, 2026-11-13):** E3 Rev.2 (bildirimde cihazda çözme) gelince liste şifreli içeriğe taşınır, bildirim kararı cihazda verilir (WhatsApp modeli), düz alan kalkar.
+- **Gizlilik metni (sahip onaylı, 2026-11-13):** E4 §5.1 metnine herkese açılışla aynı deploy'da eklenir: "Şifreleme mesajın içeriğini korur. Kimlerle konuştuğun, mesajın zamanı, grup adı ve üyeleri, tepkiler ve bir mesajda kimden bahsedildiği gibi bilgiler hizmetin çalışması için sunucuda kalır."
+- **Sapmalar kabul:** (a) "yeni cihaz eklendi" satırı commit'i gönderen cihazda da çıkar (yoksa 1-1'de ekleyen taraf hiç görmezdi); (b) grup kurulurken üye olan ama cihazı olmayan kullanıcının ilk cihazı da satır üretir (sahte cihaz sessiz geçmesin); (c) gönderim kapısı 1-1'i de kapsar (iptal yaprağı çıkarılmadan gönderim yok); (d) claim ve Welcome sunucuda 20 ile sınırlı, istemci 20'lik parçalarla ekler.
+- **Satır zamanı:** commit listesi `createdAt` döner; "yeni cihaz eklendi" satırı sunucu zamanıyla yerleşir.
+- **Bilinen sınırlar:** yeni üye kanala katıldığı an ile MLS grubuna eklendiği an arasındaki (saniyeler; KeyPackage'ı yoksa daha uzun) mesajları görmez. Satır geçmişi yerel, yeni girişte sıfırlanır.
 
 ## §5 Açık sorular (PM önerisiyle, sahip itiraz etmezse geçerli)
 - **Grup boyutu:** üye sınırı 10, cihaz sınırı kullanıcı başı 10 → en çok 100 yaprak. Ölçüm 20 yaprakla; 100 yaprak teorik, gerçek kullanımda beklenmez. Ölçüm kötü çıkarsa cihaz sınırı tartışılır.
