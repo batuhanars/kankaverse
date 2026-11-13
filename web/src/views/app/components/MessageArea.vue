@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from 'vue'
+import { useStickToBottom } from '@/composables/useStickToBottom'
 import { useI18n } from 'vue-i18n'
 import { useMessagesStore } from '@/stores/messages'
 import { useChannelsStore } from '@/stores/channels'
@@ -224,11 +225,13 @@ watch(
 
     // Önce room'a join et (§7: channel:join olmadan message.created gelmez)
     const ack = await joinChannel(id)
+    stickToBottom = true // (let, ilk await'ten sonra: TDZ) yükleme sırasında içerik büyürse dibe yapışsın
     // Ack yok sayılırsa join sessizce başarısız olur → realtime ölü, kullanıcı bilmez
     realtimeError.value = !ack.ok
     // Sonra REST'ten geçmiş yükle
     await messagesStore.fetchMessages(id)
     stickToBottom = true
+    await nextTick() // liste çizilmeden scrollHeight eski; önce DOM güncellensin
     scrollToBottom()
     // Önceki kanaldan kalan "en alta in" düğmesi yeni kanalda asılı kalmasın
     showScrollDown.value = false
@@ -262,6 +265,9 @@ function onListScroll() {
   if (stickToBottom) newMessageCount.value = 0
   showScrollDown.value = distance > SCROLL_DOWN_THRESHOLD
 }
+
+// Sonradan büyüyen içerik (görsel, önizleme, avatar) için dibe yapışma
+useStickToBottom(listEl, () => stickToBottom, () => isJumping.value || loadingOlder)
 
 watch(
   () => messages.value.length,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed, onUnmounted } from 'vue'
+import { useStickToBottom } from '@/composables/useStickToBottom'
 import { useI18n } from 'vue-i18n'
 import { useMessagesStore } from '@/stores/messages'
 import { useDmStore } from '@/stores/dm'
@@ -391,6 +392,7 @@ watch(
     if (oldId) { leaveChannel(oldId); voiceUnsubscribe(oldId) }
     if (!id) return
     const ack = await joinChannel(id)
+    stickToBottom = true // (let, ilk await'ten sonra: TDZ) yükleme/çözme sırasında büyüyen içerik dibe yapışsın
     realtimeError.value = !ack.ok
     // E1: şifreli DM'de önce Welcome/commit'ler işlenir ki mesajlar doğru epoch'ta çözülsün.
     await e2eeStore.openChannel(id)
@@ -404,6 +406,7 @@ watch(
     voiceStore.loadParticipants(id)
     voiceSubscribe(id)
     stickToBottom = true
+    await nextTick() // liste çizilmeden scrollHeight eski; önce DOM güncellensin
     scrollToBottom()
     // Önceki kanaldan kalan "en alta in" düğmesi yeni kanalda asılı kalmasın
     showScrollDown.value = false
@@ -472,6 +475,9 @@ function onListScroll() {
   if (stickToBottom) newMessageCount.value = 0
   showScrollDown.value = distance > SCROLL_DOWN_THRESHOLD
 }
+
+// Sonradan büyüyen içerik (şifre çözme, görsel, ayraç/cihaz satırı) için dibe yapışma
+useStickToBottom(listEl, () => stickToBottom, () => isJumping.value || loadingOlder)
 
 watch(() => messages.value.length, async (n, o) => {
   if (isJumping.value || n <= o || loadingOlder) return
