@@ -62,7 +62,14 @@ export const useDmStore = defineStore('dm', () => {
     return channel
   }
 
+  /** C62 — ayrıldığım/çıkarıldığım grup: sunucu bu kanalda okundu/gönderme/tepki kapılarını kapatır (403). */
+  function isDeparted(channelId: string): boolean {
+    const ch = channels.value.find((c) => c.id === channelId)
+    return ch?.type === 'GROUP_DM' && !!ch.departed
+  }
+
   async function markRead(channelId: string) {
+    if (isDeparted(channelId)) return
     await dmApi.markRead(channelId)
     const ch = channels.value.find((c) => c.id === channelId)
     if (ch) {
@@ -88,7 +95,7 @@ export const useDmStore = defineStore('dm', () => {
    */
   function applyReaction(channelId: string, lastReaction: DmLastReactionDto | null) {
     const ch = channels.value.find((c) => c.id === channelId)
-    if (!ch) return
+    if (!ch || isDeparted(channelId)) return
     if (lastReaction === null) {
       ch.lastReaction = null
       return
@@ -162,6 +169,38 @@ export const useDmStore = defineStore('dm', () => {
     return !!ch && ch.receiptsEnabled === true
   }
 
+  /**
+   * C62 — WS `dm.group_departed` (yalnız ayrılan kullanıcının soketlerine): kanal listeden düşmez, yerinde
+   * `departed` olur; açık sohbet aynı anda kilitlenir (band çıkar, composer gider). Eski üye öğesinin şekli
+   * sunucunun liste yanıtıyla aynı tutulur: yönetici/okundu/rozet alanları sıfırlanır, üyeler diğerleri kalır.
+   * Listede yoksa sunucudan çekilir.
+   */
+  async function applyGroupDeparted(payload: {
+    channelId: string
+    reason: 'LEFT' | 'REMOVED'
+    leftAt: string
+  }) {
+    const ch = channels.value.find((c) => c.id === payload.channelId)
+    if (!ch || ch.type !== 'GROUP_DM') {
+      await fetchChannels()
+      return
+    }
+    const myId = useAuthStore().user?.id
+    ch.departed = { leftAt: payload.leftAt, reason: payload.reason }
+    ch.members = ch.members.filter((m) => m.id !== myId)
+    ch.adminIds = []
+    ch.unread = false
+    ch.lastReaction = null
+    ch.receiptsEnabled = false
+    ch.groupAllReadAt = null
+  }
+
+  /** C62 — eski grup sohbetini listemden sil (yalnız benim kaydım; grup diğer üyelerde durur). */
+  async function deleteDeparture(groupId: string) {
+    await dmApi.deleteDeparture(groupId)
+    removeChannel(groupId)
+  }
+
   function removeChannel(channelId: string) {
     channels.value = channels.value.filter((c) => c.id !== channelId)
     if (activeDmChannelId.value === channelId) activeDmChannelId.value = null
@@ -196,6 +235,7 @@ export const useDmStore = defineStore('dm', () => {
 
     if (idx !== -1) {
       const ch = channels.value[idx]
+      if (isDeparted(ch.id)) return // C62: eski üyeye mesaj akmaz; yine de listeyi kirletme
       // Yeni mesaj tepki göstergesinin yerini alır (§4b.5)
       ch.lastReaction = null
       // lastMessage alanlarını güncelle (MessageDto uyumlu — eksik alanlar korunur)
@@ -324,6 +364,9 @@ export const useDmStore = defineStore('dm', () => {
     applyReadSelf,
     applyReaction,
     removeChannel,
+    isDeparted,
+    applyGroupDeparted,
+    deleteDeparture,
     setActiveChannel,
     activeChannel,
     applyActivity,

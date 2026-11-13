@@ -116,6 +116,13 @@ export interface DmLastReactionDto {
   at: string
 }
 
+// C62 — gruptan ayrılan/çıkarılan kullanıcının grup satırı: sohbet listede kalır, yalnız ayrılma anına kadarki
+// mesajlar okunur. null/yok = aktif üye.
+export interface GroupDmDeparture {
+  leftAt: string
+  reason: 'LEFT' | 'REMOVED'
+}
+
 // Sprint 12 §3 — DmChannelDto discriminated union: 1-1 DM | GROUP_DM
 export type DmChannelDto =
   | {
@@ -154,6 +161,8 @@ export type DmChannelDto =
       // en az bu ana kadar okudu (biri hiç okumadıysa null → tek tik). Bireysel okuma anı yoktur.
       receiptsEnabled?: boolean
       groupAllReadAt?: string | null
+      // C62 — doluysa ben bu gruptan ayrıldım/çıkarıldım: salt okunur sohbet (üyeler = ayrılma anındaki DİĞER üyeler)
+      departed?: GroupDmDeparture | null
     }
 
 // C9 — Mesaj İsteği (arkadaş olmayan birinin gönderdiği bekleyen DM isteği)
@@ -377,6 +386,8 @@ export interface ReplyPreviewDto {
   attachment?: ReplyAttachmentDto | null // eski önbellek/olayda alan yok → yalnız metin
   // E1 — YALNIZ yerel: alıntılanan mesaj şifreli ve düz metni bu cihazda yok ("Şifreli mesaj" gösterilir).
   e2eeUnknown?: boolean
+  // C62 §2.3.b — eski üye penceresinde: alıntılanan mesaj ayrıldıktan sonra düzenlendi (content '').
+  editedAfterLeave?: boolean
 }
 
 // C35 §2.5 - webhook mesajındaki embed (yalniz izinli alanlar; gorsel alani yok)
@@ -444,6 +455,9 @@ export interface MessageDto {
   // E1 — YALNIZ yerel: çözme sonucu. 'ok' dışı = metin yok, arayüz durum metni gösterir.
   // E4: 'unverified' = parmak izi tutmadı/yok, gövde gösterilmez.
   e2eeStatus?: 'ok' | 'unsupported' | 'undecryptable' | 'failed' | 'unverified'
+  // C62 §2.3.b — YALNIZ eski üye penceresinde: mesaj ayrıldıktan sonra düzenlendi; içerik/şifre yok (content '').
+  // Aktif üyede alan hiç gelmez. Varsa gövde yerine sabit cümle çıkar, e2eeStatus etiketinden ÖNCE bakılır.
+  editedAfterLeave?: boolean
 }
 
 // Sprint V2 — Özel kanal üye DTO (GET/POST /channels/:id/members)

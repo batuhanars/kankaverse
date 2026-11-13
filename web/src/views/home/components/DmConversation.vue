@@ -2,6 +2,8 @@
 import { ref, watch, nextTick, computed, onUnmounted } from 'vue'
 import { useStickToBottom } from '@/composables/useStickToBottom'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
+import { useToastStore } from '@/stores/toast'
 import { useMessagesStore } from '@/stores/messages'
 import { useDmStore } from '@/stores/dm'
 import { useAuthStore } from '@/stores/auth'
@@ -96,6 +98,7 @@ const composerEl = ref<{ textarea: HTMLTextAreaElement | null } | null>(null)
 const dmTextareaEl = computed(() => composerEl.value?.textarea ?? null)
 
 async function pickDmEmoji(msg: MessageDto, emoji: string) {
+  if (isDeparted.value) return
   try {
     await messagesApi.addReaction(props.channel.id, msg.id, emoji)
     // Store güncellemesi useSocket reaction.added handler'ından gelir (çift-sayım önleme)
@@ -105,6 +108,7 @@ async function pickDmEmoji(msg: MessageDto, emoji: string) {
 }
 
 async function toggleDmReaction(msg: MessageDto, emoji: string, reactedByMe: boolean) {
+  if (isDeparted.value) return // C62: eski üye tepki veremez (sunucu 403)
   try {
     if (reactedByMe) {
       await messagesApi.removeReaction(props.channel.id, msg.id, emoji)
@@ -126,6 +130,8 @@ const props = defineProps<{
 const emit = defineEmits<{ toggleProfile: [] }>()
 
 const { t } = useI18n()
+const router = useRouter()
+const toast = useToastStore()
 const optimistic = useOptimisticSend()
 const messagesStore = useMessagesStore()
 const dmStore = useDmStore()
@@ -215,6 +221,9 @@ const dmPresence = computed<PresenceStatus | null>(() =>
 )
 const dmPresenceColor = computed(() => (dmPresence.value ? PRESENCE_COLOR[dmPresence.value] : null))
 const groupChannel = computed(() => props.channel.type === 'GROUP_DM' ? props.channel : null)
+// C62: ayrıldığım/çıkarıldığım grup = salt okunur (composer yerine band; yanıt/tepki/düzenle/sil/sabitle/arama/üye paneli kapalı)
+const departure = computed(() => groupChannel.value?.departed ?? null)
+const isDeparted = computed(() => !!departure.value)
 // Grup DM: kurucu/yönetici başkasının mesajını silebilir (hiyerarşi groupRoles'ta; kapı sunucuda).
 // 1-1 DM'de hep false.
 const myGroupRole = computed(() =>
@@ -391,20 +400,28 @@ watch(
   async (id, oldId) => {
     if (oldId) { leaveChannel(oldId); voiceUnsubscribe(oldId) }
     if (!id) return
-    const ack = await joinChannel(id)
+    // C62: eski üye soket odasına girmez, okundu yazmaz, sese abone olmaz (sunucuda hepsi 403); yalnız geçmişi okur.
+    const departedNow = dmStore.isDeparted(id)
+    if (!departedNow) {
+      const ack = await joinChannel(id)
+      realtimeError.value = !ack.ok
+    } else {
+      realtimeError.value = false
+    }
     stickToBottom = true // (let, ilk await'ten sonra: TDZ) yükleme/çözme sırasında büyüyen içerik dibe yapışsın
-    realtimeError.value = !ack.ok
     // E1: şifreli DM'de önce Welcome/commit'ler işlenir ki mesajlar doğru epoch'ta çözülsün.
-    await e2eeStore.openChannel(id)
+    await e2eeStore.openChannel(id) // eski grupta no-op (depo kapısı)
     void noticesStore.load(id) // E2 §3.3: yerel depodan "yeni cihaz eklendi" satırları
     await messagesStore.fetchMessages(id)
-    void e2eeStore.syncChannel(id) // E1: mesajlar çözüldükten SONRA commit senkronu (sıra önemli)
-    await dmStore.markRead(id)
+    void e2eeStore.syncChannel(id) // E1: mesajlar çözüldükten SONRA commit senkronu (sıra önemli); eski grupta no-op
+    await dmStore.markRead(id) // eski grupta store'da no-op
     // REV-11: bu kanalda devam eden çağrı var mı (snapshot) → "Sese Katıl" göster.
     // Ayrıca canlı presence'a abone ol → biri çıkınca voice.participant_left ile liste
     // güncellenir ("Sese katıl" takılı kalmaz). Guild'de VoiceParticipantList yapar; DM'de burada.
-    voiceStore.loadParticipants(id)
-    voiceSubscribe(id)
+    if (!departedNow) {
+      voiceStore.loadParticipants(id)
+      voiceSubscribe(id)
+    }
     stickToBottom = true
     await nextTick() // liste çizilmeden scrollHeight eski; önce DOM güncellensin
     scrollToBottom()
@@ -428,7 +445,7 @@ watch(
   (lastId) => {
     if (!lastId) return
     const last = messages.value[messages.value.length - 1]
-    if (!last || isMine(last)) return
+    if (!last || isMine(last) || isDeparted.value) return
     if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
     dmStore.markRead(props.channel.id).catch(() => {})
   },
@@ -550,7 +567,7 @@ async function onAttachmentSent({ attachmentId, caption }: { attachmentId: strin
 function send() {
   const hasText = content.value.trim()
   // Grup kanallarında canMessage kontrolü yok (backend kontrol eder)
-  const canSend = isGroup.value || dmChannel.value?.canMessage
+  const canSend = !isDeparted.value && (isGroup.value || dmChannel.value?.canMessage)
   if (!hasText || !canSend) return
   stopTyping()
   sendError.value = ''
@@ -679,8 +696,29 @@ const inputPlaceholder = computed(() => {
 })
 
 // 1-1 DM: mesaj gönderme aktif mi?
-const canMessage = computed(() => isGroup.value || (dmChannel.value?.canMessage ?? false))
+const canMessage = computed(
+  () => !isDeparted.value && (isGroup.value || (dmChannel.value?.canMessage ?? false)),
+)
 const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
+
+// C62: ayrılma bandı metni + "Sohbeti sil" (onaylı). Silince store'dan düşer, ana DM ekranına dönülür.
+const departedNotice = computed(() =>
+  departure.value ? t(`group.departed.${departure.value.reason}`) : '',
+)
+const showDeleteDeparted = ref(false)
+const deletingDeparted = ref(false)
+async function confirmDeleteDeparted() {
+  deletingDeparted.value = true
+  try {
+    await dmStore.deleteDeparture(props.channel.id)
+    void router.push({ name: 'app' })
+  } catch {
+    toast.error(t('group.departed.deleteError'))
+  } finally {
+    deletingDeparted.value = false
+    showDeleteDeparted.value = false
+  }
+}
 
 // Compose emoji picker (aç/kapa ComposerBar'da; imlece yerleştirme burada)
 function onDmComposeEmojiSelect(emoji: string) {
@@ -933,7 +971,7 @@ const dayLabels = computed<(string | null)[]>(() =>
           </div>
           <!-- Grup sesli sohbet: sese katıl (zaten bağlıysa gizli — kontrol barda) -->
           <button
-            v-if="!voiceStore.isConnectedTo(channel.id)"
+            v-if="!voiceStore.isConnectedTo(channel.id) && !isDeparted"
             class="flex items-center gap-1.5 text-[13px] px-2.5 py-1.5 rounded-[var(--kv-radius-sm)] cursor-pointer transition-colors"
             style="color: var(--kv-online, #3DB46E);"
             :title="t('call.joinGroup')"
@@ -948,8 +986,8 @@ const dayLabels = computed<(string | null)[]>(() =>
             </svg>
             {{ t('call.joinGroup') }}
           </button>
-          <!-- Sabitlenen mesajlar butonu (GROUP_DM) -->
-          <div class="relative">
+          <!-- Sabitlenen mesajlar butonu (GROUP_DM; eski üyede yok: C62) -->
+          <div v-if="!isDeparted" class="relative">
             <button
               class="w-8 h-8 flex items-center justify-center text-[16px] rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
               :class="showDmPins ? 'bg-[var(--kv-accent-subtle)]' : ''"
@@ -967,8 +1005,8 @@ const dayLabels = computed<(string | null)[]>(() =>
               @close="showDmPins = false"
             />
           </div>
-          <!-- Mesajlarda Ara butonu (GROUP_DM) -->
-          <div class="relative">
+          <!-- Mesajlarda Ara butonu (GROUP_DM; eski üyede yok: C62) -->
+          <div v-if="!isDeparted" class="relative">
             <button
               class="w-8 h-8 flex items-center justify-center rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer"
               :class="showDmSearch ? 'bg-[var(--kv-accent-subtle)]' : ''"
@@ -989,8 +1027,9 @@ const dayLabels = computed<(string | null)[]>(() =>
               @close="showDmSearch = false"
             />
           </div>
-          <!-- Üye panelini aç/kapat -->
+          <!-- Üye panelini aç/kapat (eski üyede yok: C62) -->
           <button
+            v-if="!isDeparted"
             :class="[
               'px-3 py-1 text-[13px] rounded-[var(--kv-radius-sm)] transition-colors cursor-pointer',
               showGroupPanel
@@ -1014,10 +1053,11 @@ const dayLabels = computed<(string | null)[]>(() =>
       </div>
 
       <!-- E1: tanınmayan cihaz / cihaz çıkarıldı uyarısı (mesajlaşma durur) -->
-      <E2eeWarningBanner v-if="e2eeView.warning.value" :kind="e2eeView.warning.value" />
+      <!-- C62: ayrıldığım grupta cihaz bandı gösterilmez (tek band: aşağıdaki "artık mesaj gönderemezsin") -->
+      <E2eeWarningBanner v-if="e2eeView.warning.value && !isDeparted" :kind="e2eeView.warning.value" />
 
       <!-- Aktif sesli arama kartı (kabul edilince mesajların üstünde) -->
-      <DmCallPanel :channel-id="channel.id" />
+      <DmCallPanel v-if="!isDeparted" :channel-id="channel.id" />
 
       <!-- Mesaj listesi (Discord stili — baloncuk yok, sola yaslı düz liste) -->
       <div class="relative flex-1 min-h-0 flex flex-col">
@@ -1058,8 +1098,10 @@ const dayLabels = computed<(string | null)[]>(() =>
           :is-group-start="isGroupStart(index)"
           :mention-resolver="dmMentionResolver"
           :is-mentioned="isDmMentioned(msg)"
-          :can-pin="true"
-          :can-manage-messages="canDeleteOthers(msg)"
+          :can-pin="!isDeparted"
+          :can-reply="!isDeparted"
+          :read-only="isDeparted"
+          :can-manage-messages="!isDeparted && canDeleteOthers(msg)"
           :receipt="messageReceipt(msg)"
           @reply="startReply"
           @forward="(m) => { forwardMsg = m; showForward = true }"
@@ -1118,9 +1160,25 @@ const dayLabels = computed<(string | null)[]>(() =>
           {{ typingLabel }}
         </div>
 
+        <!-- C62: ayrıldığım/çıkarıldığım grup, composer yerine tek band + "Sohbeti sil" -->
+        <div
+          v-if="isDeparted"
+          class="flex items-center justify-center gap-3 py-3 rounded-[var(--kv-radius-md)] text-[13px]"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+        >
+          <span>{{ departedNotice }}</span>
+          <button
+            class="text-[13px] font-medium underline cursor-pointer transition-opacity hover:opacity-80"
+            style="color: var(--kv-danger);"
+            @click="showDeleteDeparted = true"
+          >
+            {{ t('group.departed.delete') }}
+          </button>
+        </div>
+
         <!-- 1-1 DM: canMessage=false bandı -->
         <div
-          v-if="!canMessage"
+          v-else-if="!canMessage"
           class="flex items-center justify-center gap-3 py-3 rounded-[var(--kv-radius-md)] text-[13px]"
           style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
         >
@@ -1201,7 +1259,7 @@ const dayLabels = computed<(string | null)[]>(() =>
 
     <!-- Grup yönetim paneli (sağ kenar) -->
     <GroupManagePanel
-      v-if="isGroup && showGroupPanel && groupChannel"
+      v-if="isGroup && showGroupPanel && groupChannel && !isDeparted"
       :group-id="groupChannel.id"
       :owner-id="groupChannel.ownerId"
       :admin-ids="groupChannel.adminIds"
@@ -1209,6 +1267,16 @@ const dayLabels = computed<(string | null)[]>(() =>
       @close="closeGroupPanel"
     />
   </div>
+
+  <!-- C62: eski grup sohbetini sil onayı -->
+  <ConfirmDialog
+    v-if="showDeleteDeparted"
+    :message="t('group.departed.deleteConfirm')"
+    :confirm-label="t('group.departed.deleteAction')"
+    :loading="deletingDeparted"
+    @confirm="confirmDeleteDeparted"
+    @cancel="showDeleteDeparted = false"
+  />
 
   <!-- Mesaj silme onayı -->
   <ConfirmDialog

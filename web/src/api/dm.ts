@@ -20,6 +20,8 @@ export const dmApi = {
   addGroupMember: (groupId: string, userId: string) =>
     http.post<null>(`/dm/groups/${groupId}/members`, { userId }),
   leaveGroup: (groupId: string) => http.delete<null>(`/dm/groups/${groupId}/members/me`),
+  // C62 — ayrıldığım/çıkarıldığım grubun sohbetini listemden sil (yalnız kendi kaydım)
+  deleteDeparture: (groupId: string) => http.delete<null>(`/dm/groups/${groupId}/departure`),
   deleteGroup: (groupId: string) => http.delete<null>(`/dm/groups/${groupId}`),
   renameGroup: (groupId: string, name: string) =>
     http.patch<{ id: string; name: string | null }>(`/dm/groups/${groupId}`, { name }),

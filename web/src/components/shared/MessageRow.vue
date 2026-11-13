@@ -56,7 +56,9 @@ const props = withDefaults(defineProps<{
   // C57: false → Yanıtla gizlenir (salt okunur kanal). Verilmezse true: Vue `boolean` prop'u verilmeyince
   // `false`a çevirir, bu yüzden varsayılan açıkça yazılır (DM bu prop'u geçmiyor, Yanıtla gizleniyordu).
   canReply?: boolean
-}>(), { canReply: true })
+  // C62: salt okunur satır (ayrıldığım grup): araç çubuğu ve sağ tık yalnız Kopyala + Şikâyet (T&S). Varsayılan false.
+  readOnly?: boolean
+}>(), { canReply: true, readOnly: false })
 
 const emit = defineEmits<{
   reply: [message: MessageDto]
@@ -121,10 +123,10 @@ const showReceipt = computed(() => !!props.receipt && !isLocal.value)
 
 // Sağ tık menüsü: görünürlük kuralları ⋯ menüsüyle aynı.
 const canCopy = computed(() => !!props.message.content)
-const canEdit = computed(() => props.isMine && !!props.message.content)
-const canDelete = computed(() => props.isMine || !!props.canManageMessages)
+const canEdit = computed(() => !props.readOnly && props.isMine && !!props.message.content)
+const canDelete = computed(() => !props.readOnly && (props.isMine || !!props.canManageMessages))
 // Şikâyet ⋯ menüsüyle aynı kural: yalnız başkasının mesajı (sahip bulgusu 2026-11-12: sağ tıkta aranıyordu).
-const canReport = computed(() => !props.isMine)
+const canReport = computed(() => !props.isMine) // C62 §2.3.c: eski grupta da açık (T&S)
 const ctxMenu = ref<{ x: number; y: number; selection: string } | null>(null)
 
 /** Satır içinde seçili metin; menüye tıklayınca seçim kaybolabildiği için açılışta okunur. */
@@ -195,7 +197,9 @@ function onRowLeave(e: MouseEvent) {
 
 // Yanıt alıntısı: bahsetmeler okunur ada çevrilmiş düz metin + tıklayınca alıntılanan mesaja git.
 const replyText = computed(() =>
-  props.message.replyTo?.e2eeUnknown
+  props.message.replyTo?.editedAfterLeave
+    ? t('message.editedAfterLeave') // C62: eski üye penceresi, alıntılanan mesaj ayrıldıktan sonra düzenlendi
+    : props.message.replyTo?.e2eeUnknown
     ? t('e2ee.encryptedQuote') // E1: alıntılanan şifreli mesajın düz metni bu cihazda yok
     : props.message.replyTo
     ? formatMentionsPlain(
@@ -292,6 +296,7 @@ const renderedContent = computed<string>(() => {
         :can-pin="canPin ?? false"
         :can-manage-messages="canManageMessages ?? false"
         :can-reply="canReply !== false"
+        :read-only="readOnly"
         :has-reactions="!!message.reactions?.length"
         @reply="emit('reply', message)"
         @forward="emit('forward', message)"
@@ -458,9 +463,17 @@ const renderedContent = computed<string>(() => {
               :title="t('message.pinnedMessages')"
             >📌</span></template><ReceiptTick v-if="showReceipt && receipt" :receipt="receipt" />
           </div>
+          <!-- C62: ayrıldıktan sonra düzenlenen mesaj (eski üye penceresi) — e2ee etiketinden ÖNCE -->
+          <p
+            v-if="message.editedAfterLeave"
+            class="text-[14px] italic"
+            style="color: var(--kv-text-muted);"
+          >
+            {{ t('message.editedAfterLeave') }}
+          </p>
           <!-- E1: çözülemeyen / bilinmeyen sürümlü şifreli mesaj (metin yok, durum cümlesi) -->
           <p
-            v-if="!message.content && message.e2eeStatus && message.e2eeStatus !== 'ok'"
+            v-else-if="!message.content && message.e2eeStatus && message.e2eeStatus !== 'ok'"
             class="text-[14px] italic"
             style="color: var(--kv-text-muted);"
           >

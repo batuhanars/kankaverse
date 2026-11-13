@@ -15,10 +15,15 @@ export const useMessagesStore = defineStore('messages', () => {
 
   async function fetchMessages(channelId: string, before?: string) {
     const res = await messagesApi.list(channelId, before)
+    // C62 §2.3.b: ayrıldıktan sonra düzenlenen mesajda sunucu içerik/şifre vermez; şifre çözme ve cihaz öncesi
+    // gizleme bu mesajı yutmasın (yerel depo kaydı da gösterilmez) diye "düz, içeriksiz" işaretlenir.
+    const page = res.data.map((m) =>
+      m.editedAfterLeave ? { ...m, encrypted: false, content: '' } : m,
+    )
     // E1: şifreli mesajlar çözülür (düz metin `content`'e yazılır); şifresiz liste aynen geçer.
     const fetched = await useE2eeStore().hydrateHistory(
       channelId,
-      res.data, // desc sırada gelir, UI için ters çevir
+      page, // desc sırada gelir, UI için ters çevir
       async (olderThan) => (await messagesApi.list(channelId, olderThan)).data,
     )
     // E5b Parça C: cihaz öncesi, yerelde çözümü olmayan şifreli mesaj HİÇ çizilmez (kural e2ee-client'ta).

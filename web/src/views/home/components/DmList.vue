@@ -71,7 +71,7 @@ function truncate(text: string, max = 40) {
 // abonelik sökülüp yeniden kurulurdu.
 const groupDmIdsKey = computed(() =>
   visibleChannels.value
-    .filter((ch) => ch.type === 'GROUP_DM')
+    .filter((ch) => ch.type === 'GROUP_DM' && !ch.departed) // C62: eski grup sese abone olmaz
     .map((ch) => ch.id)
     .sort()
     .join(','),
@@ -123,6 +123,7 @@ function dmSilenced(ch: DmChannelDto): boolean {
 
 /** Rozet + kalın ad yalnız okunmamış VE susturulmamışken. */
 function dmShowUnread(ch: DmChannelDto): boolean {
+  if (ch.type === 'GROUP_DM' && ch.departed) return false // C62: eski grupta rozet yok
   return ch.unread && !dmSilenced(ch)
 }
 
@@ -146,7 +147,8 @@ function formatLastMessage(ch: DmChannelDto, content: string): string {
 
 // Şifreli son mesaj: depoda düz metin varsa o, yoksa sabit "Şifreli mesaj" (E3 §4.1).
 // E5b Parça C: '' = cihaz öncesi mesaj, önizleme boş kalır ("Şifreli mesaj" da yazılmaz).
-function previewText(ch: DmChannelDto, last: { id: string; content: string; encrypted?: boolean }): string {
+function previewText(ch: DmChannelDto, last: { id: string; content: string; encrypted?: boolean; editedAfterLeave?: boolean }): string {
+  if (last.editedAfterLeave) return t('message.editedAfterLeave') // C62: eski üye penceresi
   if (!last.encrypted) return formatLastMessage(ch, last.content)
   const plain = previews.value[last.id]
   if (plain === '') return ''
@@ -173,6 +175,31 @@ const menuDm = computed(() => (menuChannel.value?.type === 'DM' ? menuChannel.va
 // İş 2 (2026-08-03) — grup DM'e özgü menü öğeleri (Üye Ekle / Gruptan Ayrıl), taşındığı yer:
 // `GroupManagePanel.vue` artık bu ikisini göstermiyor.
 const menuGroup = computed(() => (menuChannel.value?.type === 'GROUP_DM' ? menuChannel.value : null))
+
+// C62: ayrıldığım/çıkarıldığım grup — menüde yalnız "Sohbeti sil"
+const menuDeparted = computed(() => !!menuGroup.value?.departed)
+const deleteDepartedTarget = ref<GroupDmChannel | null>(null)
+const deletingDeparted = ref(false)
+
+function askDeleteDeparted() {
+  deleteDepartedTarget.value = menuGroup.value
+  closeMenu()
+}
+
+async function confirmDeleteDeparted() {
+  const target = deleteDepartedTarget.value
+  if (!target) return
+  deletingDeparted.value = true
+  try {
+    await dmStore.deleteDeparture(target.id)
+    if (props.activeChannelId === target.id) void router.push({ name: 'app' })
+  } catch {
+    toast.error(t('group.departed.deleteError'))
+  } finally {
+    deletingDeparted.value = false
+    deleteDepartedTarget.value = null
+  }
+}
 
 function closeMenu() {
   menuChannel.value = null
@@ -561,6 +588,12 @@ async function confirmDeleteGroup() {
     menu-id="dm-row"
     @close="closeMenu"
   >
+    <!-- C62: eski grupta tek öğe -->
+    <button v-if="menuDeparted" class="kv-ctx__item kv-ctx__item--danger" role="menuitem" @click="askDeleteDeparted">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      <span>{{ t('group.departed.delete') }}</span>
+    </button>
+    <template v-else>
     <!-- 1. Profil (yalnız 1-1) -->
     <button v-if="menuDm" class="kv-ctx__item" role="menuitem" @click="openProfile">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -633,7 +666,18 @@ async function confirmDeleteGroup() {
         <span>{{ t('group.deleteGroup') }}</span>
       </button>
     </template>
+    </template>
   </ContextMenuShell>
+
+  <!-- C62: eski grup sohbetini sil onayı -->
+  <ConfirmDialog
+    v-if="deleteDepartedTarget"
+    :message="t('group.departed.deleteConfirm')"
+    :confirm-label="t('group.departed.deleteAction')"
+    :loading="deletingDeparted"
+    @confirm="confirmDeleteDeparted"
+    @cancel="deleteDepartedTarget = null"
+  />
 
   <!-- Grup ayarları modalı (C51) -->
   <GroupSettingsModal

@@ -79,9 +79,10 @@ export const useE2eeStore = defineStore('e2ee', () => {
   }
 
   /** Şifrelenebilen sohbet: 1-1 DM ya da grup DM (E2 §3.1). Ortam kanalları şifrelenmez. */
+  // C62: ayrıldığım/çıkarıldığım grup şifrelenebilir sayılmaz → Welcome/senkron tetiklenmez, mesajlar yalnız yerel depodan okunur.
   const isEncryptableDm = (channelId: string) =>
     useDmStore().channels.some(
-      (c) => c.id === channelId && (c.type === 'DM' || c.type === 'GROUP_DM'),
+      (c) => c.id === channelId && (c.type === 'DM' || (c.type === 'GROUP_DM' && !c.departed)),
     )
 
   async function openChannel(channelId: string): Promise<void> {
@@ -109,7 +110,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
   /** Yanıt alıntısı şifreli mesaja aitse (sunucu içeriği boş) düz metni yerel depodan getirir. */
   async function fillQuote(m: MessageDto): Promise<MessageDto> {
     const r = m.replyTo
-    if (!r || r.content !== '' || r.attachment || !engine.value) return m
+    if (!r || r.editedAfterLeave || r.content !== '' || r.attachment || !engine.value) return m
     const text = await engine.value.quoteText(r.id)
     return { ...m, replyTo: text === null ? { ...r, e2eeUnknown: true } : { ...r, content: text } }
   }

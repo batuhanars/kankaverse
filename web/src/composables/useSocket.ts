@@ -337,6 +337,14 @@ export function useSocket() {
       },
     )
 
+    // C62 — bu gruptan ayrıldım/çıkarıldım (yalnız benim soketlerime): sohbet listede kalır, band çıkar.
+    socket.on(
+      'dm.group_departed',
+      (data: { channelId: string; reason: 'LEFT' | 'REMOVED'; leftAt: string }) => {
+        void dmStore.applyGroupDeparted(data).catch(() => {})
+      },
+    )
+
     // C9 — bana yeni mesaj isteği geldi (sessiz: masaüstü toast YOK, yalnız "Mesaj İstekleri" rozeti güncellenir)
     socket.on('dm.request', () => {
       dmStore.fetchRequests().catch(() => {})
@@ -533,7 +541,11 @@ export function useSocket() {
       membersStore.removeMember(data.guildId, data.userId)
       // Atılan bensem ortamı listeden düşür (rail anlık güncellenir)
       if (data.userId === authStore.user?.id) {
+        // C62 §5: o ortamın kanal rotasındaysam ana sayfaya dön (rota yoksa `removeGuildLocal`dan sonra boş ekran kalırdı)
+        const route = router.currentRoute.value
+        const inThatGuild = route.name === 'channel' && route.params.guildId === data.guildId
         guildsStore.removeGuildLocal(data.guildId)
+        if (inThatGuild) void router.push({ name: 'app' })
       }
     })
     socket.on('guild.member_updated', (data: { guildId: string; member: GuildMemberDto }) => {

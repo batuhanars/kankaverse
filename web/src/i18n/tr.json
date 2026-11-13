@@ -1124,6 +1124,7 @@
     "copy": "Kopyala",
     "delete": "Sil",
     "edited": "(düzenlendi)",
+    "editedAfterLeave": "Bu mesaj sen ayrıldıktan sonra düzenlendi",
     "botBadge": "BOT",
     "receipt": {
       "sent": "Gönderildi",
@@ -1419,6 +1420,14 @@
     "leaveConfirm": "Gruptan ayrılmak istediğinden emin misin?",
     "leaveAction": "Ayrıl",
     "leaveError": "Gruptan ayrılınamadı.",
+    "departed": {
+      "LEFT": "Bu gruptan ayrıldın, artık mesaj gönderemezsin.",
+      "REMOVED": "Bu gruptan çıkarıldın, artık mesaj gönderemezsin.",
+      "delete": "Sohbeti sil",
+      "deleteConfirm": "Bu sohbet listenden silinir. Grup diğer üyelerde durmaya devam eder.",
+      "deleteAction": "Sil",
+      "deleteError": "Sohbet silinemedi."
+    },
     "deleteGroup": "Grubu Sil",
     "deleteConfirm": "Grubu silmek istediğinden emin misin? Bu işlem geri alınamaz.",
     "deleteAction": "Sil",
@@ -2627,7 +2636,13 @@
     },
     "dm": {
       "muteLabel": "Konuşmayı Sustur",
-      "voiceActive": "Seste {n} kişi var"
+      "voiceActive": "Seste {n} kişi var",
+      "departedRemoved": "Bu gruptan çıkarıldın, artık mesaj gönderemezsin.",
+      "departedLeft": "Bu gruptan ayrıldın, artık mesaj gönderemezsin.",
+      "departedDelete": "Sohbeti sil",
+      "departedDeleteConfirm": "Sohbet yalnız senin listenden silinir. Grup ve diğer üyeler etkilenmez.",
+      "departedDeleteError": "Sohbet silinemedi.",
+      "editedAfterLeave": "Bu mesaj sen ayrıldıktan sonra düzenlendi"
     },
     "notif": {
       "unmute": "Susturmayı Kaldır"

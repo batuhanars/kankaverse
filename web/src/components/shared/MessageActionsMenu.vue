@@ -17,7 +17,7 @@ import EmojiFaceIcon from './EmojiFaceIcon.vue'
 
 defineOptions({ name: 'MessageActionsMenu' })
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   messageId: string
   isMine: boolean
   hasContent: boolean
@@ -29,7 +29,9 @@ const props = defineProps<{
   hasReactions?: boolean
   // C57: salt okunur kanalda yazamayan üyede false
   canReply?: boolean
-}>()
+  // C62: salt okunur (ayrıldığım grup): tepki/yanıt/ilet/düzenle/sil/sabitle yok, yalnız Kopyala + Şikâyet. Varsayılan false.
+  readOnly?: boolean
+}>(), { readOnly: false })
 
 const emit = defineEmits<{
   reply: []
@@ -221,7 +223,7 @@ onUnmounted(() => {
   >
     <!-- Hızlı reaksiyon emoji'leri -->
     <button
-      v-for="emoji in quickEmojis"
+      v-for="emoji in readOnly ? [] : quickEmojis"
       :key="emoji"
       class="w-8 h-8 flex items-center justify-center text-[16px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
       :title="emoji"
@@ -231,7 +233,7 @@ onUnmounted(() => {
     </button>
 
     <!-- Reaksiyon ekle (tam picker) — gri outline SVG ikon, renkli emojilerle karışmaz -->
-    <div ref="emojiEl" class="relative">
+    <div v-if="!readOnly" ref="emojiEl" class="relative">
       <button
         ref="emojiTriggerEl"
         class="w-8 h-8 flex items-center justify-center cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
@@ -252,7 +254,7 @@ onUnmounted(() => {
 
     <!-- ↩ Yanıtla -->
     <button
-      v-if="canReply !== false"
+      v-if="canReply !== false && !readOnly"
       class="w-8 h-8 flex items-center justify-center text-[15px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
       style="color: var(--kv-text-muted);"
       :title="t('reply.button')"
@@ -263,6 +265,7 @@ onUnmounted(() => {
 
     <!-- ↪ İlet (forward — başka bir DM'e gönder) -->
     <button
+      v-if="!readOnly"
       class="w-8 h-8 flex items-center justify-center text-[15px] cursor-pointer rounded-[var(--kv-radius-md)] transition-colors hover:bg-[var(--kv-bg-sidebar)]"
       style="color: var(--kv-text-muted);"
       :title="t('message.forward')"
@@ -293,7 +296,7 @@ onUnmounted(() => {
       >
         <!-- C46: Tepkileri gör (yalnız tepki varsa) -->
         <button
-          v-if="hasReactions"
+          v-if="hasReactions && !readOnly"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
           style="color: var(--kv-text-primary);"
           @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
@@ -319,7 +322,7 @@ onUnmounted(() => {
 
         <!-- Düzenle (yalnız kendi + içerik varsa) -->
         <button
-          v-if="isMine && hasContent"
+          v-if="isMine && hasContent && !readOnly"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
           style="color: var(--kv-text-primary);"
           @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-accent-subtle)'"
@@ -332,7 +335,7 @@ onUnmounted(() => {
 
         <!-- Sil (kendi mesajı VEYA MANAGE_MESSAGES) -->
         <button
-          v-if="isMine || canManageMessages"
+          v-if="(isMine || canManageMessages) && !readOnly"
           class="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] cursor-pointer transition-colors text-left"
           style="color: var(--kv-danger);"
           @mouseenter="($event.currentTarget as HTMLElement).style.backgroundColor = 'rgba(242,59,75,0.1)'"

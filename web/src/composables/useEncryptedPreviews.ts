@@ -11,7 +11,7 @@ export function encryptedLastIds(channels: DmChannelDto[]): string[] {
   const ids: string[] = []
   for (const ch of channels) {
     const m = ch.lastMessage
-    if (m?.encrypted && m.id) ids.push(m.id)
+    if (m?.encrypted && !m.editedAfterLeave && m.id) ids.push(m.id)
   }
   return ids
 }
@@ -35,6 +35,7 @@ export function useEncryptedPreviews(channels: () => DmChannelDto[], trigger: ()
         .filter(
           (ch) =>
             ch.lastMessage?.encrypted &&
+            !ch.lastMessage.editedAfterLeave && // C62: içeriksiz gelir, yerel depo kaydı gösterilmez
             ch.lastMessage.id &&
             !(ch.lastMessage.id in previews.value),
         )
