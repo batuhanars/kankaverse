@@ -1400,6 +1400,16 @@
     "voiceActive": "Seste {n} kişi var",
     "reactionPreview": "{actor} {emoji} tepkisi bıraktı"
   },
+  "groupEvent": {
+    "added": "{actor}, {target} adlı kişiyi gruba ekledi",
+    "addedByMe": "{target} adlı kişiyi gruba ekledin",
+    "addedMe": "{actor} seni gruba ekledi",
+    "removed": "{actor}, {target} adlı kişiyi gruptan çıkardı",
+    "removedByMe": "{target} adlı kişiyi gruptan çıkardın",
+    "removedMe": "{actor} seni gruptan çıkardı",
+    "left": "{target} gruptan ayrıldı",
+    "leftMe": "Gruptan ayrıldın"
+  },
   "group": {
     "createButton": "Grup Oluştur",
     "createTitle": "Grup DM Oluştur",

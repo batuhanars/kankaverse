@@ -10,9 +10,10 @@ import { useChannelsStore } from '@/stores/channels'
 import { useGuildsStore } from '@/stores/guilds'
 import { useMembersStore } from '@/stores/members'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
-import type { GuildMemberDto, ChannelDto, CategoryDto, RoleDto } from '@/types'
+import type { GuildMemberDto, ChannelDto, CategoryDto, RoleDto, GroupDmEventPayload } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useE2eeStore, type SocketE2ee } from '@/stores/e2ee'
+import { useGroupEventsStore } from '@/stores/groupEvents'
 import { bindE2eeSocket } from '@/composables/useE2eeSocket'
 import { useRolesStore } from '@/stores/roles'
 import { useActivityStore } from '@/stores/activity'
@@ -344,6 +345,12 @@ export function useSocket() {
         void dmStore.applyGroupDeparted(data).catch(() => {})
       },
     )
+
+    // C64 — grup üyelik olayı: üye listesi anında güncellenir, açık sohbetin akışına satır eklenir
+    socket.on('dm.group_event', (data: GroupDmEventPayload) => {
+      useGroupEventsStore().add(data.event)
+      void dmStore.applyGroupEvent(data).catch(() => {})
+    })
 
     // C9 — bana yeni mesaj isteği geldi (sessiz: masaüstü toast YOK, yalnız "Mesaj İstekleri" rozeti güncellenir)
     socket.on('dm.request', () => {

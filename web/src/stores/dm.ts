@@ -2,7 +2,13 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { dmApi } from '@/api/dm'
 import { useAuthStore } from '@/stores/auth'
-import type { DmChannelDto, DmLastReactionDto, GroupDmMemberDto, MessageRequestDto } from '@/types'
+import type {
+  DmChannelDto,
+  DmLastReactionDto,
+  GroupDmEventPayload,
+  GroupDmMemberDto,
+  MessageRequestDto,
+} from '@/types'
 
 export const useDmStore = defineStore('dm', () => {
   const channels = ref<DmChannelDto[]>([])
@@ -196,6 +202,27 @@ export const useDmStore = defineStore('dm', () => {
     ch.groupAllReadAt = null
   }
 
+  /**
+   * C64 — WS `dm.group_event`: kalan üyelerde üye listesi yenilemeden güncellenir (ADDED → `member` eklenir,
+   * LEFT/REMOVED → hedef düşer). Olay okunmadı/sıralama/önizleme ÜRETMEZ. Hedef bensem: çıkarılma/ayrılma
+   * `applyGroupDeparted` ile gelir (burada dokunulmaz); geri eklendiysem liste sunucudan tazelenir.
+   */
+  async function applyGroupEvent(payload: GroupDmEventPayload) {
+    const myId = useAuthStore().user?.id
+    const { event, member } = payload
+    const ch = channels.value.find((c) => c.id === payload.channelId)
+    if (event.target.id === myId) {
+      if (event.kind === 'MEMBER_ADDED') await fetchChannels()
+      return
+    }
+    if (!ch || ch.type !== 'GROUP_DM' || ch.departed) return
+    if (event.kind === 'MEMBER_ADDED') {
+      if (member && !ch.members.some((m) => m.id === member.id)) ch.members.push(member)
+    } else {
+      ch.members = ch.members.filter((m) => m.id !== event.target.id)
+    }
+  }
+
   /** C62 — eski grup sohbetini listemden sil (yalnız benim kaydım; grup diğer üyelerde durur). */
   async function deleteDeparture(groupId: string) {
     await dmApi.deleteDeparture(groupId)
@@ -372,6 +399,7 @@ export const useDmStore = defineStore('dm', () => {
     removeChannel,
     isDeparted,
     applyGroupDeparted,
+    applyGroupEvent,
     deleteDeparture,
     setActiveChannel,
     activeChannel,

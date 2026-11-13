@@ -39,6 +39,9 @@ import E2eeWarningBanner from '@/components/shared/E2eeWarningBanner.vue'
 import { useE2eeChannelView } from '@/composables/useE2eeChannelView'
 import { useE2eeStore } from '@/stores/e2ee'
 import { useE2eeNoticesStore } from '@/stores/e2eeNotices'
+import { useGroupEventsStore } from '@/stores/groupEvents'
+import { groupEventSlots } from '@/utils/groupEventSlots'
+import GroupEventNotice from '@/components/shared/GroupEventNotice.vue'
 import { useE2eeBackupStore } from '@/stores/e2eeBackup'
 import MessageEditModal from '@/components/shared/MessageEditModal.vue'
 import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
@@ -137,6 +140,7 @@ const messagesStore = useMessagesStore()
 const dmStore = useDmStore()
 const e2eeStore = useE2eeStore()
 const noticesStore = useE2eeNoticesStore()
+const groupEventsStore = useGroupEventsStore()
 const backupStore = useE2eeBackupStore()
 const authStore = useAuthStore()
 const friendsStore = useFriendsStore()
@@ -382,6 +386,10 @@ const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channel.id] 
 // E5b Parça C: cihaz öncesi mesajlar gizlendiyse (daha eskisi yokken) listenin başında tek satır.
 const hiddenBefore = computed(() => messagesStore.hiddenBeforeDevice[props.channel.id] ?? false)
 const e2eeView = useE2eeChannelView(() => props.channel.id, messages, hasMore)
+// C64: üyelik olay satırlarının akıştaki yerleri (cihaz satırlarıyla aynı kural)
+const groupEventSlotMap = computed(() =>
+  groupEventSlots(groupEventsStore.byChannel[props.channel.id] ?? [], messages.value, hasMore.value),
+)
 /** "{ad} yeni bir cihaz ekledi" satırındaki ad: grup üyesi ya da 1-1'de karşı taraf; bilinmiyorsa null. */
 function noticeName(userId: string): string | null {
   if (props.channel.type === 'GROUP_DM') return props.channel.members.find((m) => m.id === userId)?.username ?? null
@@ -414,6 +422,7 @@ watch(
     // 2026-11-13: eski grupta joinChannel await'i atlanınca atama kurulum sırasında çalıştı, ekran çöktü
     // ("Cannot access before initialization"). openChannel her yolda await eder (`ready`), atama onun arkasında.
     stickToBottom = true // yükleme/çözme sırasında büyüyen içerik dibe yapışsın
+    if (props.channel.type === 'GROUP_DM') void groupEventsStore.load(id) // C64: üyelik olay satırları (eski grupta da)
     void noticesStore.load(id) // E2 §3.3: yerel depodan "yeni cihaz eklendi" satırları
     await messagesStore.fetchMessages(id)
     void e2eeStore.syncChannel(id) // E1: mesajlar çözüldükten SONRA commit senkronu (sıra önemli); eski grupta no-op
@@ -1095,6 +1104,7 @@ const dayLabels = computed<(string | null)[]>(() =>
         <DateDivider v-if="dayLabels[index]" :label="dayLabels[index] || ''" />
         <E2eeDivider v-if="e2eeView.dividerIndex.value === index" />
         <E2eeDeviceNotice v-for="n in e2eeView.deviceNotices.value.get(index)" :key="`${n.userId}-${n.at}`" :name="noticeName(n.userId)" />
+        <GroupEventNotice v-for="ev in groupEventSlotMap.get(index)" :key="ev.id" :event="ev" />
         <MessageRow
           :message="msg"
           :is-mine="isMine(msg)"
@@ -1134,6 +1144,7 @@ const dayLabels = computed<(string | null)[]>(() =>
         </template>
         <E2eeDivider v-if="e2eeView.dividerIndex.value === messages.length" />
         <E2eeDeviceNotice v-for="n in e2eeView.deviceNotices.value.get(messages.length)" :key="`${n.userId}-${n.at}`" :name="noticeName(n.userId)" />
+        <GroupEventNotice v-for="ev in groupEventSlotMap.get(messages.length)" :key="ev.id" :event="ev" />
       </div>
 
       <!-- En alta in: yukarı kaydırınca görünür; yukarıdayken gelen mesaj sayısı rozette (REV-9) -->

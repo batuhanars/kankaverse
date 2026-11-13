@@ -1,5 +1,5 @@
 import http from './axios'
-import type { DmChannelDto, MessageRequestDto } from '@/types'
+import type { DmChannelDto, GroupDmEventDto, MessageRequestDto } from '@/types'
 
 export const dmApi = {
   // 1-1 DM
@@ -19,6 +19,8 @@ export const dmApi = {
     http.post<DmChannelDto>('/dm/groups', { memberIds, ...(name ? { name } : {}) }),
   addGroupMember: (groupId: string, userId: string) =>
     http.post<null>(`/dm/groups/${groupId}/members`, { userId }),
+  // C64 — üyelik olay satırları (eskiden yeniye, son 200); eski üyede de çalışır (pencere sunucuda)
+  getGroupEvents: (groupId: string) => http.get<GroupDmEventDto[]>(`/dm/groups/${groupId}/events`),
   leaveGroup: (groupId: string) => http.delete<null>(`/dm/groups/${groupId}/members/me`),
   // C62 — ayrıldığım/çıkarıldığım grubun sohbetini listemden sil (yalnız kendi kaydım)
   deleteDeparture: (groupId: string) => http.delete<null>(`/dm/groups/${groupId}/departure`),

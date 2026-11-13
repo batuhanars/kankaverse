@@ -116,6 +116,22 @@ export interface DmLastReactionDto {
   at: string
 }
 
+// C64 — grup DM üyelik olayı satırı (mesaj DEĞİL; ayrı akış)
+export type GroupDmEventKind = 'MEMBER_ADDED' | 'MEMBER_LEFT' | 'MEMBER_REMOVED'
+export interface GroupDmEventDto {
+  id: string
+  channelId: string
+  kind: GroupDmEventKind
+  actor: { id: string; username: string } | null
+  target: { id: string; username: string }
+  createdAt: string
+}
+export interface GroupDmEventPayload {
+  channelId: string
+  event: GroupDmEventDto
+  member?: GroupDmMemberDto // yalnız MEMBER_ADDED
+}
+
 // C62 — gruptan ayrılan/çıkarılan kullanıcının grup satırı: sohbet listede kalır, yalnız ayrılma anına kadarki
 // mesajlar okunur. null/yok = aktif üye.
 export interface GroupDmDeparture {
