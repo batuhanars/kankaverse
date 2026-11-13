@@ -3,8 +3,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useDmStore } from '@/stores/dm'
 import { useAuthStore } from '@/stores/auth'
+import { useToastStore } from '@/stores/toast'
+import { useRouter } from 'vue-router'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import UserCardPopover from '@/components/shared/UserCardPopover.vue'
+import ContextMenuShell from '@/components/shared/ContextMenuShell.vue'
+import { canMentionUser, mentionUser } from '@/composables/useComposerMentionBridge'
 import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import { canModerateGroupTarget, groupRoleOf } from '@/utils/groupRoles'
 import type { GroupDmMemberDto } from '@/types'
@@ -15,18 +19,22 @@ const props = defineProps<{
   adminIds?: string[]
   members: GroupDmMemberDto[]
 }>()
-// Üye Ekle, Ayrıl, Düzenle (ad) ve Grubu Sil DM satırı sağ-tık menüsünde (`DmList.vue`,
-// C51); panel üye listesi + üye çıkarma (kurucu/yönetici) + yönetici atama (kurucu) tutuyor.
-// Düğmeler yalnız gizleme amaçlı; kapı sunucuda (group-roles, R7).
+// Üye Ekle, Düzenle (ad) ve Grubu Sil DM satırı sağ-tık menüsünde (`DmList.vue`, C51).
+// C60: üye eylemleri (profil, mesaj, bahset, ID kopyala, yönetici ver/al, çıkar, ayrıl)
+// satır sağ-tık menüsünde; hover düğmeleri kalktı. Görünürlük yalnız gizleme amaçlı;
+// kapı sunucuda (group-roles, R7).
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
 const dmStore = useDmStore()
 const authStore = useAuthStore()
+const toast = useToastStore()
+const router = useRouter()
 
 const isOwner = computed(() => authStore.user?.id === props.ownerId)
 const myRole = computed(() => groupRoleOf(props, authStore.user?.id))
 const isAdmin = (memberId: string) => groupRoleOf(props, memberId) === 'admin'
+const isSelf = (memberId: string) => memberId === authStore.user?.id
 const canRemove = (memberId: string) =>
   memberId !== authStore.user?.id &&
   canModerateGroupTarget(myRole.value, groupRoleOf(props, memberId))
@@ -63,6 +71,88 @@ function openCard(userId: string, e: MouseEvent) {
 
 function closeCard() {
   showCard.value = false
+}
+
+// ── Sağ-tık menüsü (C60) ────────────────────────────────────────────────────
+const menuMember = ref<GroupDmMemberDto | null>(null)
+const menuX = ref(0)
+const menuY = ref(0)
+
+function openMenu(member: GroupDmMemberDto, e: MouseEvent) {
+  closeCard()
+  menuX.value = e.clientX
+  menuY.value = e.clientY
+  menuMember.value = member
+}
+function closeMenu() {
+  menuMember.value = null
+}
+function menuProfile() {
+  const m = menuMember.value
+  if (!m) return
+  closeMenu()
+  cardUserId.value = m.id
+  cardX.value = menuX.value
+  cardY.value = menuY.value
+  showCard.value = true
+}
+async function menuMessage() {
+  const m = menuMember.value
+  closeMenu()
+  if (!m) return
+  try {
+    const channel = await dmStore.openChannel(m.id)
+    await router.push({ name: 'dm', params: { channelId: channel.id } })
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message ?? t('common.error'))
+  }
+}
+function menuMention() {
+  const m = menuMember.value
+  closeMenu()
+  if (m) mentionUser(m.id, m.username)
+}
+async function menuCopyId() {
+  const m = menuMember.value
+  closeMenu()
+  if (!m) return
+  try {
+    await navigator.clipboard.writeText(m.id)
+    toast.success(t('userCard.idCopied'))
+  } catch {
+    // sessizce geç
+  }
+}
+function menuToggleAdmin() {
+  const m = menuMember.value
+  closeMenu()
+  if (m) void toggleAdmin(m)
+}
+function menuRemove() {
+  removeMemberTarget.value = menuMember.value
+  closeMenu()
+}
+
+// Gruptan ayrıl (kendi satırı): DmList'teki akışın aynısı (`dmStore.leaveGroup` + ana sayfa)
+const leaveOpen = ref(false)
+const leaving = ref(false)
+function menuLeave() {
+  closeMenu()
+  leaveOpen.value = true
+}
+async function confirmLeave() {
+  if (leaving.value) return
+  leaving.value = true
+  try {
+    await dmStore.leaveGroup(props.groupId)
+    await router.push({ name: 'app' })
+  } catch {
+    toast.error(t('group.leaveError'))
+  } finally {
+    leaving.value = false
+    leaveOpen.value = false
+  }
 }
 
 onMounted(() => window.addEventListener('kv:close-user-cards', closeCard))
@@ -128,6 +218,7 @@ async function removeMember() {
         @mouseenter="hoveredMemberId = member.id; ($event.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'"
         @mouseleave="hoveredMemberId = null; ($event.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
         @click="openCard(member.id, $event)"
+        @contextmenu.prevent="openMenu(member, $event)"
       >
         <div
           class="w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[14px] font-semibold text-white"
@@ -159,34 +250,66 @@ async function removeMember() {
         >
           {{ t('group.admin') }}
         </span>
-        <!-- Yönetici ver/al: yalnız kurucu, kurucu olmayan üyede -->
-        <button
-          v-if="isOwner && member.id !== ownerId"
-          class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 w-5 h-5 flex items-center justify-center rounded cursor-pointer"
-          :style="{ color: isAdmin(member.id) ? 'var(--kv-accent-500)' : 'var(--kv-text-muted)' }"
-          :title="isAdmin(member.id) ? t('group.removeAdmin') : t('group.makeAdmin')"
-          :disabled="togglingAdminId === member.id"
-          @click.stop="toggleAdmin(member)"
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-        </button>
-        <!-- Çıkar: kurucu herkesi, yönetici yalnız normal üyeyi -->
-        <button
-          v-if="canRemove(member.id)"
-          class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 w-5 h-5 flex items-center justify-center rounded cursor-pointer"
-          style="color: var(--kv-danger);"
-          :title="t('group.removeMember')"
-          @click.stop="removeMemberTarget = member"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
       </div>
     </div>
   </aside>
+
+  <!-- Üye sağ-tık menüsü (C60) -->
+  <ContextMenuShell
+    v-if="menuMember"
+    :x="menuX"
+    :y="menuY"
+    menu-id="group-member"
+    @close="closeMenu"
+  >
+    <button class="kv-ctx__item" role="menuitem" @click="menuProfile">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span>{{ t('member.actions.profile') }}</span>
+    </button>
+    <button v-if="!isSelf(menuMember.id)" class="kv-ctx__item" role="menuitem" @click="menuMessage">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>{{ t('member.actions.sendMessage') }}</span>
+    </button>
+    <button v-if="canMentionUser(menuMember.id)" class="kv-ctx__item" role="menuitem" @click="menuMention">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"/></svg>
+      <span>{{ t('member.actions.mention') }}</span>
+    </button>
+    <button class="kv-ctx__item" role="menuitem" @click="menuCopyId">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      <span>{{ t('member.actions.copyId') }}</span>
+    </button>
+    <button
+      v-if="isOwner && menuMember.id !== ownerId"
+      class="kv-ctx__item"
+      role="menuitem"
+      :disabled="togglingAdminId === menuMember.id"
+      @click="menuToggleAdmin"
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>{{ isAdmin(menuMember.id) ? t('group.removeAdmin') : t('group.makeAdmin') }}</span>
+    </button>
+    <template v-if="canRemove(menuMember.id) || isSelf(menuMember.id)">
+      <div class="kv-ctx__divider" />
+      <button v-if="canRemove(menuMember.id)" class="kv-ctx__item kv-ctx__item--danger" role="menuitem" @click="menuRemove">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        <span>{{ t('group.removeMember') }}</span>
+      </button>
+      <button v-if="isSelf(menuMember.id)" class="kv-ctx__item kv-ctx__item--danger" role="menuitem" @click="menuLeave">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="kv-ctx__icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span>{{ t('group.leaveGroup') }}</span>
+      </button>
+    </template>
+  </ContextMenuShell>
+
+  <!-- Gruptan ayrıl onayı (kendi satırı) -->
+  <ConfirmDialog
+    v-if="leaveOpen"
+    :message="t('group.leaveConfirm')"
+    :confirm-label="t('group.leaveAction')"
+    :loading="leaving"
+    @confirm="confirmLeave"
+    @cancel="leaveOpen = false"
+  />
 
   <!-- Üye çıkar onayı (owner) -->
   <ConfirmDialog
