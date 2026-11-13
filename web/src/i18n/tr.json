@@ -23,6 +23,7 @@
     "birthDateHelp": "Güvenli bir platform için doğum tarihiniz zorunludur.",
     "loginTitle": "Tekrar hoş geldin!",
     "loginSubtitle": "Hesabına giriş yap",
+    "sessionExpired": "Oturumun sona erdi, tekrar giriş yap.",
     "registerTitle": "Hesap Oluştur",
     "registerSubtitle": "Kankaverse'e katıl",
     "noAccount": "Hesabın yok mu?",

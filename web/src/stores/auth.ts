@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { authApi, type LoginPayload, type RegisterPayload } from '@/api/auth'
-import { setAccessToken, clearAccessToken } from '@/api/axios'
+import { setAccessToken, clearAccessToken, announceSignedOut } from '@/api/axios'
 import { clearResume } from '@/lib/resumeLastScreen'
 import { useE2eeStore } from '@/stores/e2ee'
 import type { UserDto, LoginChallengeDto } from '@/types'
@@ -61,6 +61,7 @@ export const useAuthStore = defineStore('auth', () => {
       clearAccessToken()
       user.value = null
       await wipeE2ee() // çıkışta tüm yerel şifreli depo silinir (E1 §4)
+      announceSignedOut() // D108: aynı tarayıcıdaki diğer sekmeler giriş ekranına gider
     }
   }
 

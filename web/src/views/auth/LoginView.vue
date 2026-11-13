@@ -25,6 +25,7 @@ const redirectTo = safeInternalPath(route.query.redirect)
 const auth = useAuthStore()
 const toast = useToastStore()
 
+const sessionExpired = route.query.expired === '1' // D108: oturum kendiliğinden bittiyse bilgi
 const apiError = ref('')
 const loading = ref(false)
 
@@ -87,6 +88,14 @@ function getError(field: string): string | undefined {
           {{ t('auth.loginTitle') }}
         </h1>
         <p class="mt-1 text-[13px]" style="color: var(--kv-text-muted);">{{ t('auth.loginSubtitle') }}</p>
+        <p
+          v-if="sessionExpired"
+          class="mt-3 text-[13px]"
+          role="status"
+          style="color: var(--kv-text-secondary);"
+        >
+          {{ t('auth.sessionExpired') }}
+        </p>
       </div>
 
       <form class="flex flex-col gap-4" @submit.prevent="onSubmit">

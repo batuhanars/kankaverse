@@ -40,16 +40,21 @@ const emailServiceMock = {
 };
 
 function makePrismaMock() {
-  return {
+  const mock: any = {
     session: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
       create: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
     },
-    $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
+    // D108: dizi (revokeWithDevices) ve etkileşimli (refresh rotasyonu) transaction biçimleri
+    $transaction: jest.fn((arg: unknown) =>
+      typeof arg === 'function' ? arg(mock) : Promise.all(arg as Promise<unknown>[]),
+    ),
   };
+  return mock;
 }
 
 // E1: cihaz iptali bağımlılığı (davranış testleri e2ee-revocation.spec.ts ve aşağıdaki E1 bloğunda)
@@ -294,7 +299,8 @@ describe('AuthService — E1 E2EE cihaz iptali', () => {
 
     expect(e2eeMock.revokeOps).not.toHaveBeenCalled();
     expect(e2eeMock.announce).not.toHaveBeenCalled();
-    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    // D108: rotasyon claim+create için TEK etkileşimli transaction (cihaz iptali yine yok)
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
     expect(prismaMock.session.create.mock.calls[0][0].data.tokenFamily).toBe('fam-1');
   });
 
@@ -382,5 +388,131 @@ describe('AuthService — E1 E2EE cihaz iptali', () => {
     await service.deleteAccount('u1', { currentPassword: 'sifre-12345' } as never);
     expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ userId: 'u1' });
     expect(e2eeMock.announce).toHaveBeenCalledWith({ userId: 'u1' });
+  });
+});
+
+// ── D108: oturum yenileme yarışı (R7) ────────────────────────────────────────
+
+describe('AuthService.refresh — D108 yarış / grace', () => {
+  const ARGON = { type: argon2.argon2id, memoryCost: 19456, timeCost: 2 };
+
+  /** Bellekte tek tablo: updateMany/create/findFirst gerçek koşullara göre davranır. */
+  async function setup() {
+    const prismaMock = makePrismaMock();
+    const jwt = new JwtService();
+    const raw = signRefreshToken(jwt, { sub: 'u1', sessionId: 's1', family: 'fam-1' });
+    const rows: any[] = [
+      {
+        id: 's1',
+        userId: 'u1',
+        tokenFamily: 'fam-1',
+        refreshTokenHash: await argon2.hash(raw, ARGON),
+        clientType: null,
+        device: 'Opera',
+        revokedAt: null,
+      },
+    ];
+    prismaMock.session.findUnique.mockImplementation(({ where }: any) =>
+      Promise.resolve(rows.find((r) => r.id === where.id) ?? null),
+    );
+    prismaMock.session.updateMany.mockImplementation(({ where, data }: any) => {
+      const hit = rows.filter(
+        (r) =>
+          (!where.id || r.id === where.id) &&
+          (!where.tokenFamily || r.tokenFamily === where.tokenFamily) &&
+          (where.revokedAt !== null || true) &&
+          (where.revokedAt === null ? r.revokedAt === null : true),
+      );
+      hit.forEach((r) => (r.revokedAt = data.revokedAt));
+      return Promise.resolve({ count: hit.length });
+    });
+    prismaMock.session.findFirst.mockImplementation(({ where }: any) =>
+      Promise.resolve(
+        rows.find((r) => r.tokenFamily === where.tokenFamily && r.revokedAt === null) ?? null,
+      ),
+    );
+    prismaMock.session.create.mockImplementation(({ data }: any) => {
+      rows.push({ ...data, revokedAt: null });
+      return Promise.resolve(data);
+    });
+    return { prismaMock, service: makeService(prismaMock as any), raw, rows };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    e2eeMock.revokeOps.mockResolvedValue([]);
+  });
+
+  it('iki eşzamanlı refresh (aynı token) → ikisi de başarılı, aile canlı, aynı ailede iki canlı oturum', async () => {
+    const { service, raw, rows } = await setup();
+    const [a, b] = await Promise.all([
+      service.refresh(raw, '1.1.1.1', true),
+      service.refresh(raw, '1.1.1.1', true),
+    ]);
+    expect(a.accessToken).toBeDefined();
+    expect(b.refreshToken).toBeDefined();
+    expect(a.refreshToken).not.toBe(b.refreshToken);
+    const alive = rows.filter((r) => r.revokedAt === null);
+    expect(alive).toHaveLength(2);
+    expect(alive.every((r) => r.tokenFamily === 'fam-1')).toBe(true);
+    expect(e2eeMock.revokeOps).not.toHaveBeenCalled();
+  });
+
+  it('grace içi ikinci kullanım → 200 + aynı aileye yeni çocuk oturum (cihaz iptali yok)', async () => {
+    const { service, raw, rows } = await setup();
+    await service.refresh(raw, '1.1.1.1', true);
+    const second = await service.refresh(raw, '1.1.1.1', true);
+    expect(second.refreshToken).toBeDefined();
+    expect(rows.filter((r) => r.revokedAt === null && r.tokenFamily === 'fam-1')).toHaveLength(2);
+    expect(rows.find((r) => r.id !== 's1' && r.device === 'Opera')).toBeDefined(); // cihaz adı taşınır
+    expect(e2eeMock.revokeOps).not.toHaveBeenCalled();
+  });
+
+  it('grace içinde ama aile ölü (çıkış yapılmış) → 401 INVALID_REFRESH, oturum diriltilmez', async () => {
+    const { service, raw, rows } = await setup();
+    rows[0].revokedAt = new Date(); // çıkış: tüm aile kapalı
+    await expect(service.refresh(raw, '1.1.1.1', true)).rejects.toMatchObject({
+      response: { error: 'INVALID_REFRESH' },
+    });
+    expect(rows).toHaveLength(1);
+    expect(e2eeMock.revokeOps).not.toHaveBeenCalled();
+  });
+
+  it('grace DIŞI reuse → REFRESH_REUSE_DETECTED + aile ve E2EE cihaz iptali', async () => {
+    const { service, raw, rows } = await setup();
+    rows[0].revokedAt = new Date(Date.now() - 20_000);
+    await expect(service.refresh(raw, '1.1.1.1', true)).rejects.toMatchObject({
+      response: { error: 'REFRESH_REUSE_DETECTED' },
+    });
+    expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ families: ['fam-1'] });
+  });
+
+  it('claim sonrası create hatası → transaction geri alınır, eski oturum AÇIK kalır', async () => {
+    const { prismaMock, service, raw, rows } = await setup();
+    // Gerçek rollback taklidi: tx hata verirse satır durumu geri sarılır.
+    prismaMock.$transaction.mockImplementation(async (fn: any) => {
+      const snapshot = rows.map((r) => ({ ...r }));
+      try {
+        return await fn(prismaMock);
+      } catch (e) {
+        rows.splice(0, rows.length, ...snapshot);
+        throw e;
+      }
+    });
+    prismaMock.session.create.mockRejectedValueOnce(new Error('db düştü'));
+    await expect(service.refresh(raw, '1.1.1.1', true)).rejects.toThrow('db düştü');
+    expect(rows[0].revokedAt).toBeNull();
+    // Aynı token tekrar denenebilir
+    await expect(service.refresh(raw, '1.1.1.1', true)).resolves.toBeDefined();
+  });
+
+  it('çıkış aileyi bütünüyle kapatır (grace kardeş oturum açık kalmaz)', async () => {
+    const { service, raw, rows } = await setup();
+    await service.refresh(raw, '1.1.1.1', true);
+    await service.refresh(raw, '1.1.1.1', true); // iki canlı çocuk
+    const child = rows.find((r) => r.id !== 's1')!;
+    await service.logout(child.id);
+    expect(rows.filter((r) => r.revokedAt === null)).toHaveLength(0);
+    expect(e2eeMock.revokeOps).toHaveBeenCalledWith({ sessionId: child.id });
   });
 });

@@ -131,10 +131,6 @@ function onRecheckUnread(e: Event) {
   const { guildId } = (e as CustomEvent<{ guildId: string }>).detail
   recheckGuildUnread(guildId)
 }
-async function onAuthExpired() {
-  await router.push({ name: 'login' })
-}
-
 async function logout() {
   await authStore.logout()
   disconnect()
@@ -154,7 +150,6 @@ onMounted(async () => {
   void friendsStore.fetchFriends()
   // Bildirim tercihlerini bir kez hidrate et (sustur/seviye menüleri için temel)
   void notificationPrefsStore.load()
-  window.addEventListener('kv:auth:expired', onAuthExpired)
   window.addEventListener('kv:guild:recheck-unread', onRecheckUnread)
   window.addEventListener('keydown', onKeydown)
 })
@@ -162,7 +157,6 @@ onMounted(async () => {
 onUnmounted(() => {
   disconnect()
   document.body.style.overflow = ''
-  window.removeEventListener('kv:auth:expired', onAuthExpired)
   window.removeEventListener('kv:guild:recheck-unread', onRecheckUnread)
   window.removeEventListener('keydown', onKeydown)
 })

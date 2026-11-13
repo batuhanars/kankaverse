@@ -1,6 +1,12 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiResponse } from '@/types'
-import { isDefinitiveRefreshRejection } from '@/api/refreshRejection'
+import { isDefinitiveRefreshRejection, refreshWithAmbiguityRetry } from '@/api/refreshRejection'
+import {
+  SIGNED_OUT_EVENT,
+  browserChannel,
+  browserLocks,
+  createTabRefresher,
+} from '@/api/tabRefresh'
 
 // Prod: VITE_API_URL = https://api.<domain> (api kök'ten servis eder: /auth, /channels …).
 // Dev: tanımsız → '/api' (vite proxy 127.0.0.1:3001'e rewrite eder). Tek değişken iki ortamı kapsar.
@@ -38,13 +44,28 @@ async function doRefresh(): Promise<string> {
   return token
 }
 
+// D108: sekmeler arası tek yenileme (Web Locks + BroadcastChannel 'kv-auth'); yoksa sekme-içi davranış.
+const tabRefresher = createTabRefresher({
+  getToken: getAccessToken,
+  setToken: setAccessToken, // başka sekmenin yayınladığı token'ı bu sekme KENDİ sessionStorage'ına yazar
+  doRefresh: () => refreshWithAmbiguityRetry(doRefresh),
+  onSignedOut: () => window.dispatchEvent(new CustomEvent(SIGNED_OUT_EVENT)),
+  locks: browserLocks(),
+  channel: browserChannel(),
+})
+
+/** Çıkış yapan sekme diğer sekmelere bildirir (onlar giriş ekranına gider). */
+export function announceSignedOut(): void {
+  tabRefresher.announceSignedOut()
+}
+
 /**
  * Access token'ı tazele (in-flight dedup'lı). Hem 401 interceptor'ı hem de WS
  * reconnect (useSocket auth_error) bunu kullanır → tek refresh çağrısı paylaşılır.
  */
 export function refreshAccessToken(): Promise<string> {
   if (!refreshPromise) {
-    refreshPromise = doRefresh().finally(() => {
+    refreshPromise = tabRefresher.refresh(getAccessToken()).finally(() => {
       refreshPromise = null
     })
   }
@@ -74,7 +95,10 @@ http.interceptors.response.use(
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true
       try {
-        const newToken = await refreshAccessToken()
+        // Biz beklerken başka sekme token'ı yayınladıysa (sessionStorage güncel) yenilemeye gerek yok.
+        const sent = String(original.headers?.Authorization ?? '').replace(/^Bearer /, '')
+        const current = getAccessToken()
+        const newToken = current && current !== sent ? current : await refreshAccessToken()
         original.headers.Authorization = `Bearer ${newToken}`
         return http(original)
       } catch (refreshError) {

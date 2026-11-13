@@ -59,6 +59,15 @@ const REFRESH_RACE_GRACE_MS = 10_000;
 const TOTP_OPTS = { algorithm: 'sha1' as const, digits: 6, period: 30 };
 const TOTP_VERIFY_OPTS = { ...TOTP_OPTS, epochTolerance: 30 };
 
+/** Refresh rotasyonunda eski oturumdan gereken alanlar. */
+type RefreshableSession = {
+  id: string;
+  userId: string;
+  tokenFamily: string;
+  clientType: string | null;
+  device: string | null;
+};
+
 // ─── Dönüş tipleri ──────────────────────────────────────────────────────────
 
 type LoginResult =
@@ -455,12 +464,7 @@ export class AuthService implements OnModuleInit {
 
     if (session.revokedAt !== null) {
       const withinGrace = Date.now() - session.revokedAt.getTime() < REFRESH_RACE_GRACE_MS;
-      if (tokenValid && withinGrace) {
-        throw new UnauthorizedException({
-          message: 'Oturum az önce yenilendi, tekrar dene.',
-          error: 'INVALID_REFRESH',
-        });
-      }
+      if (tokenValid && withinGrace) return this.refreshInGrace(session, ip, device);
       await this.revokeWithDevices(
         { families: [session.tokenFamily] },
         this.prisma.session.updateMany({
@@ -485,33 +489,100 @@ export class AuthService implements OnModuleInit {
       });
     }
 
-    const claim = await this.prisma.session.updateMany({
-      where: { id: session.id, revokedAt: null },
-      data: { revokedAt: new Date() },
+    return this.rotateSession(session, ip, device);
+  }
+
+  /**
+   * 🔴 R7 / D108 — normal rotasyon: eski oturumun kapatılması (claim) + yenisinin açılması TEK transaction.
+   * Arada hata/süreç ölümü → claim geri alınır, eski oturum açık kalır (cevap yolda kaybolursa tekrar denenebilir).
+   * Claim'i başka istek az önce aldıysa (eşzamanlı yarış) grace yoluna düşer.
+   */
+  private async rotateSession(
+    session: RefreshableSession,
+    ip: string | undefined,
+    device: string | null | undefined,
+  ) {
+    const issued = await this.prepareSession(
+      session.userId,
+      session.tokenFamily,
+      session,
+      ip,
+      device,
+    );
+    const claimed = await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.session.updateMany({
+        where: { id: session.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      if (claim.count === 0) return false;
+      await tx.session.create({ data: issued.data });
+      return true;
     });
-    if (claim.count === 0) {
+    if (!claimed) return this.refreshInGrace(session, ip, device);
+    return { accessToken: issued.accessToken, refreshToken: issued.refreshToken };
+  }
+
+  /**
+   * 🔴 R7 / D108 — grace içi (geçerli imza + oturum son 10 sn içinde kapanmış) refresh: reddetmek yerine AYNI
+   * aileye bağlı yeni çocuk oturum açılır. Güvenlik bedeli kabul edildi: çalınmış token pencere içinde ek oturum
+   * açabilir; pencere dışı reuse tespiti zayıflamaz. Aile ölüyse (çıkış/iptal grace içinde olduysa) oturum
+   * DİRİLTİLMEZ: eski davranış (401, ek iptal yok). Canlılık kontrolü ve create aynı transaction'da.
+   */
+  private async refreshInGrace(
+    session: RefreshableSession,
+    ip: string | undefined,
+    device: string | null | undefined,
+  ) {
+    const issued = await this.prepareSession(
+      session.userId,
+      session.tokenFamily,
+      session,
+      ip,
+      device,
+    );
+    const created = await this.prisma.$transaction(async (tx) => {
+      const alive = await tx.session.findFirst({
+        where: { tokenFamily: session.tokenFamily, revokedAt: null },
+        select: { id: true },
+      });
+      if (!alive) return false;
+      await tx.session.create({ data: issued.data });
+      return true;
+    });
+    if (!created) {
       throw new UnauthorizedException({
         message: 'Oturum az önce yenilendi, tekrar dene.',
         error: 'INVALID_REFRESH',
       });
     }
-
-    const { accessToken, refreshToken } = await this.createSession(
-      session.userId,
-      ip,
-      session.tokenFamily,
-      undefined,
-      session.clientType as 'mobile' | null,
-      session.device ?? device,
+    this.logger.warn(
+      `Refresh grace kullanımı: yeni çocuk oturum açıldı (userId=${session.userId}, family=${session.tokenFamily})`,
     );
-    return { accessToken, refreshToken };
+    return { accessToken: issued.accessToken, refreshToken: issued.refreshToken };
   }
 
   async logout(sessionId: string) {
+    const family = await this.familyOf(sessionId);
     await this.revokeWithDevices(
       { sessionId },
-      this.prisma.session.update({ where: { id: sessionId }, data: { revokedAt: new Date() } }),
+      this.prisma.session.updateMany({
+        where: family ? { tokenFamily: family, revokedAt: null } : { id: sessionId },
+        data: { revokedAt: new Date() },
+      }),
     );
+  }
+
+  /**
+   * D108: grace çocuk oturumu aynı aileyi paylaşır → çıkış/oturum kapatma E2EE cihazını (aile bazlı) zaten
+   * düşürür; aynı ailenin canlı kardeş oturumu açık KALMASIN diye aile bazlı kapatılır. Tek oturumlu
+   * ailede davranış eskisiyle aynı (yalnız o oturum kapanır).
+   */
+  private async familyOf(sessionId: string): Promise<string | null> {
+    const row = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { tokenFamily: true },
+    });
+    return row?.tokenFamily ?? null;
   }
 
   async me(userId: string) {
@@ -730,7 +801,10 @@ export class AuthService implements OnModuleInit {
 
     await this.revokeWithDevices(
       { families: [session.tokenFamily] },
-      this.prisma.session.update({ where: { id: sessionId }, data: { revokedAt: new Date() } }),
+      this.prisma.session.updateMany({
+        where: { tokenFamily: session.tokenFamily, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
     );
     return null;
   }
@@ -1037,7 +1111,25 @@ export class AuthService implements OnModuleInit {
       }
     }
 
-    const family = existingFamily ?? randomUUID();
+    const issued = await this.prepareSession(
+      userId,
+      existingFamily ?? randomUUID(),
+      { clientType: clientType ?? null },
+      ip,
+      device,
+    );
+    await this.prisma.session.create({ data: issued.data });
+    return { accessToken: issued.accessToken, refreshToken: issued.refreshToken };
+  }
+
+  /** Token çiftini imzalar + Session satırını hazırlar; DB'ye YAZMAZ (çağıran tx içinde yazabilsin). */
+  private async prepareSession(
+    userId: string,
+    family: string,
+    prev: { clientType: string | null; device?: string | null },
+    ip?: string,
+    device?: string | null,
+  ) {
     const sessionId = randomUUID();
 
     const accessToken = this.jwtService.sign(
@@ -1052,20 +1144,17 @@ export class AuthService implements OnModuleInit {
 
     const refreshTokenHash = await argon2.hash(refreshToken, ARGON2_OPTIONS);
 
-    await this.prisma.session.create({
-      data: {
-        id: sessionId,
-        userId,
-        refreshTokenHash,
-        tokenFamily: family,
-        ip,
-        clientType: clientType ?? null,
-        device: device ?? null,
-        lastActiveAt: new Date(),
-      },
-    });
-
-    return { accessToken, refreshToken };
+    const data: Prisma.SessionUncheckedCreateInput = {
+      id: sessionId,
+      userId,
+      refreshTokenHash,
+      tokenFamily: family,
+      ip,
+      clientType: prev.clientType ?? null,
+      device: prev.device ?? device ?? null,
+      lastActiveAt: new Date(),
+    };
+    return { accessToken, refreshToken, data };
   }
 
   private sendVerificationEmailSilent(userId: string, email: string): void {
