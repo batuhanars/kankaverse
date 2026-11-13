@@ -139,6 +139,20 @@ export interface GroupDmDeparture {
   reason: 'LEFT' | 'REMOVED'
 }
 
+// C67 — bir okuyucunun konumu: readAt'e kadarki mesajları gördü
+export interface DmSeenDto {
+  userId: string
+  readAt: string
+}
+
+// C67 — mesaj altında çizilen okuyucu (kanal üyesiyle birleştirilmiş)
+export interface SeenReader {
+  userId: string
+  username: string
+  avatarUrl: string | null
+  readAt: string
+}
+
 // Sprint 12 §3 — DmChannelDto discriminated union: 1-1 DM | GROUP_DM
 export type DmChannelDto =
   | {
@@ -161,6 +175,8 @@ export type DmChannelDto =
       // Kararı sunucu verir (`readReceiptDecision`, R7), istemci sorgulamaz.
       receiptsEnabled?: boolean
       otherReadAt?: string | null
+      // C67 — okuyanlar (avatar çizimi); eski alanlar artık "okundu" çizmez. Alan yok/boş = gösterme.
+      seenBy?: DmSeenDto[]
     }
   | {
       type: 'GROUP_DM'
@@ -177,6 +193,7 @@ export type DmChannelDto =
       // en az bu ana kadar okudu (biri hiç okumadıysa null → tek tik). Bireysel okuma anı yoktur.
       receiptsEnabled?: boolean
       groupAllReadAt?: string | null
+      seenBy?: DmSeenDto[] // C67
       // C62 — doluysa ben bu gruptan ayrıldım/çıkarıldım: salt okunur sohbet (üyeler = ayrılma anındaki DİĞER üyeler)
       departed?: GroupDmDeparture | null
     }

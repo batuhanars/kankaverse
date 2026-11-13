@@ -166,6 +166,20 @@ export const useDmStore = defineStore('dm', () => {
   }
 
   /**
+   * C67 — WS `dm:seen`: bir okuyucunun konumu güncellenir. Görünürlük kararı SUNUCUDA (R7); olay yalnız
+   * görebilenlere gelir, burada ek süzgeç yok. Geriye gitme yok: yarışta eski olay yeni anı ezmesin.
+   * Eski grupta (`departed`) hiçbir şey yazılmaz.
+   */
+  function applySeen(payload: { channelId: string; userId: string; readAt: string }) {
+    const ch = channels.value.find((c) => c.id === payload.channelId)
+    if (!ch || (ch.type === 'GROUP_DM' && ch.departed)) return
+    const list = ch.seenBy ?? (ch.seenBy = [])
+    const cur = list.find((s) => s.userId === payload.userId)
+    if (!cur) list.push({ userId: payload.userId, readAt: payload.readAt })
+    else if (cur.readAt < payload.readAt) cur.readAt = payload.readAt
+  }
+
+  /**
    * C12 §4.2 — bu kanalda tik çizilecek mi. Kaynak SUNUCUNUN gizlilik kararı (`receiptsEnabled`),
    * "okuma var mı" DEĞİL. İlk sürüm `otherReadAt`e bakıyordu ve karşı taraf sohbeti bir kez bile
    * açmadıysa tik hiç çizilmiyordu — ilk mesajda "İletildi" asla görünmüyordu (sahip bulgusu).
@@ -200,6 +214,7 @@ export const useDmStore = defineStore('dm', () => {
     ch.lastReaction = null
     ch.receiptsEnabled = false
     ch.groupAllReadAt = null
+    ch.seenBy = []
   }
 
   /**
@@ -220,6 +235,7 @@ export const useDmStore = defineStore('dm', () => {
       if (member && !ch.members.some((m) => m.id === member.id)) ch.members.push(member)
     } else {
       ch.members = ch.members.filter((m) => m.id !== event.target.id)
+      if (ch.seenBy) ch.seenBy = ch.seenBy.filter((s) => s.userId !== event.target.id) // C67: ayrılan okuyucu düşer
     }
   }
 
@@ -407,6 +423,7 @@ export const useDmStore = defineStore('dm', () => {
     applyReadReceipt,
     isSeen,
     applyGroupReadReceipt,
+    applySeen,
     showsReceipts,
     createGroup,
     addGroupMember,

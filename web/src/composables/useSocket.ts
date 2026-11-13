@@ -338,6 +338,11 @@ export function useSocket() {
       },
     )
 
+    // C67 — bir okuyucunun konumu güncellendi (görüldü avatarı); görebilme kararı sunucuda
+    socket.on('dm:seen', (data: { channelId: string; userId: string; readAt: string }) => {
+      dmStore.applySeen(data)
+    })
+
     // C62 — bu gruptan ayrıldım/çıkarıldım (yalnız benim soketlerime): sohbet listede kalır, band çıkar.
     socket.on(
       'dm.group_departed',

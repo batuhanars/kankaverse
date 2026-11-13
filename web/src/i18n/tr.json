@@ -2417,7 +2417,15 @@
     "tip5Title": "Özel sekmeler ve gizli pencereler",
     "tip5Body": "Gizli modda açık sekmelerin olup olmadığını kontrol et. Tarayıcı bildirimleri gizli sekmeden de gelebilir."
   },
+  "seen": {
+    "tooltip": "{name} gördü · {time}",
+    "more": "{names} da gördü",
+    "label": "Görenler"
+  },
   "mobile": {
+    "seen": {
+      "byAt": "%{name} gördü · %{time}"
+    },
     "appUpdate": {
       "available": "Kankaverse'ün yeni sürümü hazır.",
       "update": "Güncelle",

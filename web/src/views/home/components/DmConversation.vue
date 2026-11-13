@@ -50,9 +50,10 @@ import ReactionsModal from '@/components/shared/ReactionsModal.vue'
 import PinsPopover from '@/components/shared/PinsPopover.vue'
 import SearchPopover from '@/components/shared/SearchPopover.vue'
 import GroupManagePanel from './GroupManagePanel.vue'
+import SeenAvatars from './SeenAvatars.vue'
 import { useAppShellNav } from '@/composables/useAppShellNav'
 import { isNewDay, dayDividerLabel } from '@/utils/dateSeparator'
-import type { DmChannelDto, MessageDto } from '@/types'
+import type { DmChannelDto, MessageDto, SeenReader } from '@/types'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
 
 // Web `UserCard.vue` presenceColor ile aynı palet; `offline: null` = satır hiç çizilmez.
@@ -632,12 +633,97 @@ function isMine(msg: MessageDto): boolean {
  * Yalnız iki durum: 'sent' (gönderildi) ve 'seen' (okundu). Ortam kanalında tik yok (bu bileşen DM'e özel).
  */
 function messageReceipt(msg: MessageDto): 'sent' | 'seen' | null {
-  if (!isMine(msg)) return null
-  // Sahip kararı 2026-10-29: gizlilik kapısı kapalıysa gösterge gizlenmez, tek tik "gönderildi" kalır
-  // (okuma anı sunucudan zaten gelmez, bilgi sızmaz).
-  if (!dmStore.showsReceipts(props.channel.id)) return 'sent'
-  return dmStore.isSeen(props.channel.id, msg.createdAt) ? 'seen' : 'sent'
+  // C67: çift tik (okundu) kalktı; "kim nereye kadar gördü" mesajın altındaki avatarlarla (SeenAvatars) gösterilir.
+  // Kendi mesajımda tek tik (gönderildi) kalır.
+  return isMine(msg) ? 'sent' : null
 }
+
+// C67 — görüldü avatarları. Okuyucu = kanalın güncel üyesi (grupta `members`, 1-1'de `otherUser`); kim görünür
+// kararı sunucuda (`seenBy` yalnız görebildiklerimi taşır). Avatar, `createdAt <= readAt` olan EN SON mesajın altına
+// konur (yazarı kim olursa olsun); gönderilmemiş (yerel) mesaj sayılmaz. Eski grupta hiçbir şey çizilmez.
+const seenReaderPool = computed<Map<string, { username: string; avatarUrl: string | null }>>(() => {
+  const pool = new Map<string, { username: string; avatarUrl: string | null }>()
+  if (props.channel.type === 'DM') {
+    const o = props.channel.otherUser
+    pool.set(o.id, { username: o.username, avatarUrl: o.avatarUrl })
+  } else {
+    for (const m of props.channel.members) pool.set(m.id, { username: m.username, avatarUrl: m.avatarUrl })
+  }
+  return pool
+})
+
+/** mesaj kimliği → o mesajın altındaki okuyucular (eskiden yeniye: en yeni okuyan sağda). */
+const seenByMessage = computed<Map<string, SeenReader[]>>(() => {
+  const out = new Map<string, SeenReader[]>()
+  if (isDeparted.value) return out
+  const myId = authStore.user?.id
+  const sent = messages.value.filter((m) => !m.localStatus)
+  const entries = [...(props.channel.seenBy ?? [])].sort((a, b) => (a.readAt < b.readAt ? -1 : a.readAt > b.readAt ? 1 : 0))
+  for (const s of entries) {
+    const who = seenReaderPool.value.get(s.userId)
+    if (!who || s.userId === myId) continue
+    for (let i = sent.length - 1; i >= 0; i--) {
+      if (sent[i].createdAt <= s.readAt) {
+        const list = out.get(sent[i].id) ?? []
+        list.push({ userId: s.userId, username: who.username, avatarUrl: who.avatarUrl, readAt: s.readAt })
+        out.set(sent[i].id, list)
+        break
+      }
+    }
+  }
+  return out
+})
+
+// FLIP (250 ms, ease-out): bir okuyucunun avatarı başka mesajın altına geçince eski konumundan yeni konumuna kayar.
+// Konumlar LİSTE İÇERİĞİNE göre (scrollTop dahil) tutulur: kaydırma/dibe yapışma animasyonu bozmaz; transform
+// yerleşimi etkilemediği için scrollHeight değişmez. `prefers-reduced-motion` açıksa animasyon yok.
+const SEEN_MOVE_MS = 250
+const seenLayoutKey = computed(() => {
+  const parts: string[] = []
+  for (const [msgId, readers] of seenByMessage.value) for (const r of readers) parts.push(`${r.userId}:${msgId}`)
+  return `${props.channel.id}|${parts.sort().join(',')}`
+})
+function seenAvatarRects(): Map<string, { top: number; left: number }> {
+  const out = new Map<string, { top: number; left: number }>()
+  const list = listEl.value
+  if (!list) return out
+  const base = list.getBoundingClientRect()
+  list.querySelectorAll<HTMLElement>('[data-seen-user]').forEach((el) => {
+    const r = el.getBoundingClientRect()
+    out.set(el.dataset.seenUser ?? '', { top: r.top - base.top + list.scrollTop, left: r.left - base.left })
+  })
+  return out
+}
+let seenFirst = new Map<string, { top: number; left: number }>()
+let seenFirstChannel = ''
+watch(seenLayoutKey, () => {
+  seenFirst = seenAvatarRects() // DOM henüz eski: "first"
+  seenFirstChannel = props.channel.id
+}, { flush: 'pre' })
+watch(seenLayoutKey, () => {
+  const list = listEl.value
+  const sameChannel = seenFirstChannel === props.channel.id
+  const reduced = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!list || !sameChannel || reduced) return
+  const last = seenAvatarRects()
+  list.querySelectorAll<HTMLElement>('[data-seen-user]').forEach((el) => {
+    const id = el.dataset.seenUser ?? ''
+    const from = seenFirst.get(id)
+    const to = last.get(id)
+    if (!from || !to) return
+    const dx = from.left - to.left
+    const dy = from.top - to.top
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return
+    el.style.zIndex = '10'
+    const anim = el.animate(
+      [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+      { duration: SEEN_MOVE_MS, easing: 'ease-out' },
+    )
+    const done = () => { el.style.zIndex = '' }
+    anim.onfinish = done
+    anim.oncancel = done
+  })
+}, { flush: 'post' })
 
 // Sprint V2 Pins: DM/grup DM'de herkes sabitleyebilir (§2)
 const showDmPins = ref(false)
@@ -1141,6 +1227,7 @@ const dayLabels = computed<(string | null)[]>(() =>
             />
           </template>
         </MessageRow>
+        <SeenAvatars v-if="seenByMessage.has(msg.id)" :readers="seenByMessage.get(msg.id) ?? []" />
         </template>
         <E2eeDivider v-if="e2eeView.dividerIndex.value === messages.length" />
         <E2eeDeviceNotice v-for="n in e2eeView.deviceNotices.value.get(messages.length)" :key="`${n.userId}-${n.at}`" :name="noticeName(n.userId)" />
