@@ -62,6 +62,16 @@ export type DmChannelDto =
       departed?: DmDepartedDto | null;
     };
 
+/** C64 - grup DM uyelik olayi (mesaj DEGIL): ekleme / ayrilma / cikarma. `actor` ayrilmada null. */
+export interface GroupDmEventDto {
+  id: string;
+  channelId: string;
+  kind: 'MEMBER_ADDED' | 'MEMBER_LEFT' | 'MEMBER_REMOVED';
+  actor: { id: string; username: string } | null;
+  target: { id: string; username: string };
+  createdAt: string;
+}
+
 export interface MessageRequestDto {
   channelId: string;
   requester: DmParticipantDto | null;
@@ -137,6 +147,11 @@ export const dmApi = {
   },
   async deleteGroup(groupId: string): Promise<null> {
     const res = await http.delete<null>(`/dm/groups/${groupId}`);
+    return res.data;
+  },
+  /** C64 - grubun uyelik olaylari (eskiden yeniye, en cok son 200). */
+  async listGroupEvents(groupId: string): Promise<GroupDmEventDto[]> {
+    const res = await http.get<GroupDmEventDto[]>(`/dm/groups/${groupId}/events`);
     return res.data;
   },
   /** C62 — eski grup sohbetini yalnız kendi listemden sil (yoksa 404 DEPARTURE_NOT_FOUND). */

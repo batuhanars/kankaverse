@@ -24,6 +24,8 @@ import { EmailVerificationBanner } from './EmailVerificationBanner';
 import { DateSeparator } from './message/DateSeparator';
 import { E2eeDeviceNotice } from './message/E2eeDeviceNotice';
 import { E2eeDivider } from './message/E2eeDivider';
+import { GroupEventNotice } from './message/GroupEventNotice';
+import { useGroupEventSlots } from './message/useGroupEventSlots';
 import { E2eeWarningBanner } from './message/E2eeWarningBanner';
 import { useE2eeChannelView } from './message/useE2eeChannelView';
 import { useBackupInChannel } from './backup/useBackupInChannel';
@@ -298,10 +300,18 @@ export function MessageScreen({
   const hiddenBefore = useMessagesStore((s) => s.byChannel[channelId]?.hiddenBefore ?? false);
   const e2eeView = useE2eeChannelView(channelId, plainMessages, hasMoreOlder);
   /** E2 §3.3: `slot` = eskiden-yeniye dizideki yer (bu mesajdan ÖNCE; `items.length` = son mesajdan sonra). */
-  const renderNotices = (slot: number) =>
-    e2eeView.deviceNotices.get(slot)?.map((n) => (
-      <E2eeDeviceNotice key={`${n.userId}-${n.at}`} name={e2eeView.noticeName(n.userId)} />
-    ));
+  const groupEventSlots = useGroupEventSlots(channelId, plainMessages, hasMoreOlder);
+  const renderNotices = (slot: number) => (
+    <>
+      {e2eeView.deviceNotices.get(slot)?.map((n) => (
+        <E2eeDeviceNotice key={`${n.userId}-${n.at}`} name={e2eeView.noticeName(n.userId)} />
+      ))}
+      {/* C64: uyelik olaylari (mesaj degil); zamanina gore akisa karisir. */}
+      {groupEventSlots.get(slot)?.map((e) => (
+        <GroupEventNotice key={e.id} event={e} myId={authUser?.id} />
+      ))}
+    </>
+  );
   useBackupInChannel(e2eeView.encrypted, fetchMessages); // E5a: kurulum sorusu + geri yükleme sonrası yenileme
   // M6b §8.4 — sesli mesaj otomatik geçişi için kronolojik (eski → yeni) CLEAN ses eki sırası.
   useEffect(() => {

@@ -21,7 +21,7 @@ import { presentIncomingCall, dismissIncomingCall } from '@/notifications/incomi
 import { clearChannelNotifications } from '@/notifications/push';
 import { t } from '@/i18n';
 import type { MessageDto } from '@/api/messages';
-import type { DmLastReactionDto } from '@/api/dm';
+import type { DmLastReactionDto, GroupDmEventDto } from '@/api/dm';
 import type { FriendDto, FriendRequestDto } from '@/api/friends';
 import type { VoiceParticipantDto } from '@/api/voice';
 
@@ -338,6 +338,19 @@ function ensureSocket(): Socket {
   socket.on('dm.group_departed', (data: { channelId: string; reason: 'LEFT' | 'REMOVED'; leftAt: string }) => {
     useDmStore.getState().applyGroupDeparted(data);
   });
+
+  // C64 - grup DM uyelik olayi (ekleme/ayrilma/cikarma): satir akisa eklenir, uye listesi aninda guncellenir.
+  // Okunmadi/bildirim/ses uretmez; sunucu zaten mesaj olarak yollamiyor.
+  socket.on(
+    'dm.group_event',
+    (data: {
+      channelId: string;
+      event: GroupDmEventDto;
+      member?: { id: string; username: string; avatarUrl: string | null };
+    }) => {
+      useDmStore.getState().applyGroupEvent(data);
+    },
+  );
 
   socket.on('dm.request', () => {
     useDmStore.getState().refreshRequests();

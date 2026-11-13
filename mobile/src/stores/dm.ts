@@ -1,7 +1,14 @@
 import { create } from 'zustand';
-import { dmApi, type DmChannelDto, type DmLastReactionDto } from '@/api/dm';
+import {
+  dmApi,
+  type DmChannelDto,
+  type DmLastReactionDto,
+  type DmParticipantDto,
+  type GroupDmEventDto,
+} from '@/api/dm';
 import { extractErrorMessage } from '@/api/errors';
 import { playMessageTone } from '@/audio/messageTone';
+import { useGroupEventsStore } from '@/stores/groupEvents';
 
 /** 3 yerde aynı "id'ye göre çıkar" tekrarı (clearChannel/leaveGroup/deleteGroup) — Rule of Three,
  *  dosya-içi özel yardımcıya çıkarıldı (dışa açılmaz, sözleşme kapsamı yalnız bu store). */
@@ -87,6 +94,8 @@ interface DmState {
   leaveGroup: (groupId: string) => Promise<void>;
   /** C62 — WS `dm.group_departed`: kanal yerinde "eski grup"a çevrilir (açık ekran anında kilitlenir). */
   applyGroupDeparted: (payload: { channelId: string; reason: 'LEFT' | 'REMOVED'; leftAt: string }) => void;
+  /** C64 - WS `dm.group_event`: kalan uyelerde uye listesi aninda guncellenir (ADDED: `member` eklenir, LEFT/REMOVED: hedef duser). */
+  applyGroupEvent: (payload: { channelId: string; event: GroupDmEventDto; member?: DmParticipantDto }) => void;
   /** C62 — eski grup sohbetini listemden sil (grup/üyeler etkilenmez). */
   deleteDeparted: (groupId: string) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
@@ -370,6 +379,41 @@ export const useDmStore = create<DmState>((set, get) => ({
     }));
   },
 
+  applyGroupEvent({ channelId, event, member }) {
+    useGroupEventsStore.getState().append(event);
+    const { channels, myId } = get();
+    const existing = channels.find((c) => c.id === channelId);
+    const meAdded = event.kind === 'MEMBER_ADDED' && event.target.id === myId;
+    if (!existing || existing.type !== 'GROUP_DM' || existing.departed) {
+      // Listede yok ya da eski grup: beni (yeniden) eklediyse liste cekilir; aksi halde olay satiri yeter.
+      if (meAdded) void get().fetchAll();
+      return;
+    }
+    if (event.kind === 'MEMBER_ADDED') {
+      if (meAdded) return; // ben zaten listedeyim
+      const added: DmParticipantDto = member ?? { id: event.target.id, username: event.target.username, avatarUrl: null };
+      set((s) => ({
+        channels: s.channels.map((c) =>
+          c.id === channelId && c.type === 'GROUP_DM' && !c.members.some((m) => m.id === added.id)
+            ? { ...c, members: [...c.members, added] }
+            : c,
+        ),
+      }));
+      return;
+    }
+    set((s) => ({
+      channels: s.channels.map((c) =>
+        c.id === channelId && c.type === 'GROUP_DM'
+          ? {
+              ...c,
+              members: c.members.filter((m) => m.id !== event.target.id),
+              adminIds: (c.adminIds ?? []).filter((id) => id !== event.target.id),
+            }
+          : c,
+      ),
+    }));
+  },
+
   async deleteDeparted(groupId) {
     await dmApi.deleteDeparture(groupId);
     set((s) => ({ channels: withoutChannel(s.channels, groupId) }));
@@ -389,6 +433,7 @@ export const useDmStore = create<DmState>((set, get) => ({
 
   setSessionUser(userId) {
     if (userId === null) {
+      useGroupEventsStore.getState().reset();
       set({
         channels: [],
         requestCount: 0,
