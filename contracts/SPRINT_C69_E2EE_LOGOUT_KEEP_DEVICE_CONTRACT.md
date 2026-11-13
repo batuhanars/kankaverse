@@ -37,7 +37,7 @@ kurul şartı). Masaüstü ayrımı: `window.kankaverse` köprüsü (desktop/src
 - Giriş sonrası: yerel depoda bu kullanıcının cihazı varsa önce rebind; başarılıysa normal açılış (geri yükleme bandı,
   "cihaz öncesi gizli" çıkmaz). Başarısızsa bugünkü yeni cihaz akışı.
 - **Başka hesap girerse:** yerel depodaki önceki hesabın verisi silinir (sunucudaki park kaydı 30 günde düşer).
-- Geri dönüşte birikmiş commit işlenemezse: cihaz kendini kayıp sayar → yeni cihaz akışı ("çözülemedi" döngüsü yok).
+- ~~Geri dönüşte birikmiş commit işlenemezse yeni cihaz akışı~~ → **D110 borcuna alındı** (sahip onayı 2026-11-13; C69 dışı, bugün de var).
 - Açılışta park sırasında iptal edilmiş cihaz (Oturumlarım'dan kaldırılmış / parola değişmiş): rebind reddedilir → yerel silinir.
 
 ## §4 Adımlar (her biri R7)

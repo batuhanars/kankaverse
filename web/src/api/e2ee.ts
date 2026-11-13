@@ -16,6 +16,14 @@ import type {
 // E1 §2 uçları (axios adaptörü). Tipler ve arayüz paylaşılan pakette (shared/e2ee-client). Envelope axios'ta açılır.
 export { e2eeErrorCode } from '@kankaverse/e2ee-client'
 
+/** C69: çıkış yapılmış (park) cihaz satırı. `platform`: 'web' (masaüstü uygulaması) | 'android'. */
+export interface ParkedDevice {
+  id: string
+  platform: string
+  lastSeenAt: string
+  parkedAt: string
+}
+
 type TransferStep = { id: string; status: TransferStatus }
 type TransferBlobRef = { size: number; sha256: string }
 
@@ -27,6 +35,10 @@ export const e2eeApi = {
   registerDevice: (signatureKey: string) =>
     http.post<{ deviceId: string }>('/e2ee/devices', { platform: 'web', signatureKey }),
   available: () => http.get<{ available: number }>('/e2ee/devices/me'),
+  // C69: çıkışta park edilen cihazı yeni oturuma bağla.
+  rebindChallenge: () => http.post<{ nonce: string }>('/e2ee/devices/rebind/challenge'),
+  rebind: (deviceId: string, signature: string) =>
+    http.post<{ deviceId: string }>('/e2ee/devices/rebind', { deviceId, signature }),
   uploadKeyPackages: (keyPackages: string[], lastResort?: string) =>
     http.post<{ available: number }>('/e2ee/devices/me/key-packages', {
       keyPackages,
@@ -93,3 +105,9 @@ export const e2eeApi = {
   transferDone: (id: string) => http.post<TransferStep>(`/e2ee/transfer/${id}/done`),
   transferCancel: (id: string) => http.post<TransferStep>(`/e2ee/transfer/${id}/cancel`),
 } satisfies E2eeApi
+
+/** C69 Oturumlarım: motor portunun parçası değil (yalnız ayarlar ekranı kullanır). */
+export const e2eeParkedApi = {
+  list: () => http.get<ParkedDevice[]>('/e2ee/devices/parked'),
+  remove: (id: string) => http.delete<null>(`/e2ee/devices/parked/${id}`),
+}

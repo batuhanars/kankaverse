@@ -1,5 +1,7 @@
 // Testler için bellekte sahte E2EE sunucusu: sözleşme §2 uçlarının kurallarını (atomik KeyPackage, epoch kapısı,
 // iptal edilen cihazın 403'ü) taklit eder. Gerçek HTTP kanıtı ayrıca scripts/e2ee-e2e ile alınır.
+import { createPublicKey, randomBytes, verify } from 'node:crypto'
+import { rebindMessage } from '@kankaverse/e2ee-core'
 import type { E2eeApi, E2eeChannelState } from '../src/ports'
 import { FakeBackupStore } from './fakeBackup'
 import { FakeTransferStore } from './fakeTransfer'
@@ -10,6 +12,8 @@ interface Dev {
   family: string
   key: string
   revokedAt: Date | null
+  /** C69: çıkışta park edilmiş (family '' = hiçbir oturuma bağlı değil). */
+  parked?: boolean
   kps: string[]
   lastResort?: string
 }
@@ -65,12 +69,25 @@ export class FakeServer {
   /** Doluysa varlık kontrolü bu hatayla düşer (ağ/5xx). */
   existsError: Error | null = null
   existsCalls: { channelId: string; count: number }[] = []
+  /** C69 rebind: kullanıcı başına tek bekleyen nonce; çağrı sayaçları; doluysa ağ/5xx hatası. */
+  rebindNonces = new Map<string, Uint8Array>()
+  rebindCalls = { challenge: 0, rebind: 0 }
+  rebindNetworkError: Error | null = null
+  /** Sıradaki N rebind çağrısında nonce başka cihazca düşürülmüş gibi 400 NONCE_INVALID. */
+  rebindNonceLost = 0
   private seq = 0
 
   revoke(deviceId: string, at: Date) {
     const d = this.devices.get(deviceId)!
     d.revokedAt = at
     d.kps = []
+  }
+
+  /** C69: çıkış (park). Cihaz iptal edilmez, oturum zincirinden ayrılır. */
+  park(deviceId: string) {
+    const d = this.devices.get(deviceId)!
+    d.family = ''
+    d.parked = true
   }
 
   /** Kanalı grup yapar: üyelerin katılım zamanı bildirilir (E2 §2.3). */
@@ -135,6 +152,35 @@ export class FakeServer {
         return ok({ deviceId: id })
       },
       available: () => ok({ available: active().kps.length }),
+      rebindChallenge: () => {
+        this.rebindCalls.challenge++
+        if (this.rebindNetworkError) throw this.rebindNetworkError
+        const nonce = new Uint8Array(randomBytes(32))
+        this.rebindNonces.set(userId, nonce)
+        return ok({ nonce: Buffer.from(nonce).toString('base64') })
+      },
+      rebind: (deviceId: string, signature: string) => {
+        this.rebindCalls.rebind++
+        if (this.rebindNetworkError) throw this.rebindNetworkError
+        const nonce = this.rebindNonceLost > 0 ? undefined : this.rebindNonces.get(userId)
+        if (this.rebindNonceLost > 0) this.rebindNonceLost--
+        this.rebindNonces.delete(userId) // tek deneme
+        if (!nonce) throw fail(400, 'E2EE_REBIND_NONCE_INVALID')
+        const d = this.devices.get(deviceId)
+        if (this.deviceOfFamily(family) || !d || d.userId !== userId || d.revokedAt || !d.parked)
+          throw fail(403, 'E2EE_REBIND_REJECTED')
+        const spki = Buffer.concat([Buffer.from('302a300506032b6570032100', 'hex'), Buffer.from(d.key, 'base64')])
+        const good = verify(
+          null,
+          rebindMessage(nonce, userId, deviceId),
+          createPublicKey({ key: spki, format: 'der', type: 'spki' }),
+          Buffer.from(signature, 'base64'),
+        )
+        if (!good) throw fail(403, 'E2EE_REBIND_REJECTED')
+        d.family = family
+        d.parked = false
+        return ok({ deviceId })
+      },
       uploadKeyPackages: (kps: string[], lastResort?: string) => {
         const d = active()
         d.kps.push(...kps)

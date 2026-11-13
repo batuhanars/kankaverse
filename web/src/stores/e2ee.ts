@@ -14,7 +14,7 @@ import type {
   WarningKind,
 } from '@kankaverse/e2ee-client'
 import { startWebEngine } from '@/lib/e2ee/adapter'
-import { destroyAllVaults } from '@/lib/e2ee/vault'
+import { destroyAllVaults, destroyOtherVaults } from '@/lib/e2ee/vault'
 import type { MessageDto } from '@/types'
 
 /** `dm.message` soketindeki şifreli yük (api `e2eePushField`, E3 Rev.5). */
@@ -75,6 +75,33 @@ export const useE2eeStore = defineStore('e2ee', () => {
       await destroyAllVaults()
     } catch (e) {
       console.error('[e2ee] yerel depo silinemedi', e)
+    }
+  }
+
+  /**
+   * C69 korunan çıkış (masaüstü): motor bellekten düşer, zamanlayıcılar durur, yerel depo SİLİNMEZ.
+   * Sonraki girişte aynı kullanıcı için `init` depoyu açar ve park edilmiş cihazı yeniden bağlar.
+   */
+  function release(): void {
+    const current = engine.value
+    useE2eeBackupStore().stop()
+    useE2eeNoticesStore().clear()
+    engine.value = null
+    channels.value = {}
+    warnings.value = {}
+    ready = Promise.resolve()
+    current?.release()
+  }
+
+  /**
+   * C69 giriş: yerel depo BAŞKA kullanıcıya aitse silinir; aynı kullanıcınınsa kalır (rebind için).
+   * Vault'lar kullanıcı başına ayrı veritabanıdır (`kv-e2ee:<userId>`), bu yüzden "başkasının" = adı farklı olan.
+   */
+  async function dropOtherUsers(userId: string): Promise<void> {
+    try {
+      await destroyOtherVaults(userId)
+    } catch (e) {
+      console.error('[e2ee] başka hesabın deposu silinemedi', e)
     }
   }
 
@@ -300,6 +327,8 @@ export const useE2eeStore = defineStore('e2ee', () => {
     channels,
     init,
     wipe,
+    release,
+    dropOtherUsers,
     openChannel,
     syncChannel,
     plainTick,

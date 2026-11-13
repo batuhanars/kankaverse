@@ -62,6 +62,7 @@ export {
   type TransferSecrets,
   type TransferTranscript,
 } from './transfer'
+export { REBIND_SIGN_LABEL, rebindMessage } from './rebind'
 export { SerialQueue } from './queue'
 // Tek UTF-8 yolu (yerleşik varsa o, yoksa katı saf JS); istemciler TextDecoder'ı doğrudan kullanmaz.
 export { fromUtf8, utf8, utf8Path, InvalidUtf8Error } from './utf8'

@@ -517,7 +517,13 @@
       "lastActive": "Son aktivite",
       "terminate": "Kapat",
       "terminateOthers": "Diğerlerini Kapat",
-      "noSessions": "Aktif oturum bulunamadı."
+      "noSessions": "Aktif oturum bulunamadı.",
+      "parkedRow": "Çıkış yapılmış cihaz · {platform} · son görülme {date}",
+      "parkedDesktop": "Masaüstü",
+      "parkedAndroid": "Android",
+      "parkedRemove": "Kaldır",
+      "parkedRemoveTitle": "Cihazı kaldır",
+      "parkedRemoveConfirm": "Bu cihaz kaldırılırsa üzerindeki şifreli mesajlar bir sonraki açılışta silinir. Devam edilsin mi?"
     },
     "password": {
       "title": "Şifre Değiştir",

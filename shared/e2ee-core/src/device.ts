@@ -67,6 +67,14 @@ export class Device {
     this.id = deviceId
   }
 
+  /**
+   * Cihazın imza anahtarıyla ham Ed25519 imzası (C69 yeniden bağlama). Sağlayıcı soyutlamasından geçer:
+   * WebCrypto'da Ed25519 olmayan ortamda (Electron 36) saf noble yolu kullanılır.
+   */
+  async sign(message: Uint8Array): Promise<Uint8Array> {
+    return (await this.provider.loadSuite()).signature.sign(this.signaturePrivateKey, message)
+  }
+
   /** Tüketilmemiş (last-resort olmayan) KeyPackage sayısı; 10'un altına inince istemci tamamlar. */
   get availableKeyPackages(): number {
     return this.entries.filter((e) => !e.lastResort).length

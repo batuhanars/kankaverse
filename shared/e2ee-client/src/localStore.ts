@@ -188,6 +188,16 @@ export class LocalStore {
     return this.vault.put('groups', `${channelId}:notices`, utf8(JSON.stringify(notices)))
   }
 
+  /**
+   * C69: bu kullanıcının deposundaki HER şeyi (cihaz, gruplar, mesajlar, bayraklar, yedek anahtarı) siler;
+   * vault açık kalır (yeniden kurulum aynı vault üzerinden). Yeniden bağlama reddedilince kullanılır.
+   */
+  async wipeAll(): Promise<void> {
+    for (const store of ['device', 'groups', 'messages'] as const) {
+      for (const key of await this.vault.keys(store)) await this.vault.delete(store, key)
+    }
+  }
+
   /** Yalnız grup durumunu düşer; çözülmüş mesaj kayıtlarına dokunmaz. */
   async deleteGroup(channelId: string): Promise<void> {
     await this.vault.delete('groups', channelId)

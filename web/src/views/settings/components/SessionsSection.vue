@@ -2,8 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { authApi } from '@/api/auth'
+import { e2eeParkedApi, type ParkedDevice } from '@/api/e2ee'
 import type { SessionDto } from '@/types'
 import KvButton from '@/components/ui/KvButton.vue'
+import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import { formatDateTime } from '@/utils/formatDateTime'
 
 const { t } = useI18n()
 const sessions = ref<SessionDto[]>([])
@@ -52,7 +55,45 @@ function formatRelative(dateStr: string): string {
   return `${Math.floor(h / 24)} gün önce`
 }
 
-onMounted(load)
+// C69: çıkış yapılmış (park) şifreleme cihazları. E2EE kapalıysa (404 E2EE_DISABLED) ya da yükleme
+// başarısızsa bölüm hiç görünmez; bu ekranın asıl işi (oturumlar) bundan etkilenmez.
+const parked = ref<ParkedDevice[]>([])
+const parkedToRemove = ref<ParkedDevice | null>(null)
+const removing = ref(false)
+const removeError = ref('')
+
+async function loadParked() {
+  try {
+    parked.value = (await e2eeParkedApi.list()).data
+  } catch {
+    parked.value = []
+  }
+}
+
+const platformLabel = (p: string) =>
+  p === 'android' ? t('security.sessions.parkedAndroid') : t('security.sessions.parkedDesktop')
+
+async function removeParked() {
+  const target = parkedToRemove.value
+  if (!target) return
+  removing.value = true
+  removeError.value = ''
+  try {
+    await e2eeParkedApi.remove(target.id)
+    parked.value = parked.value.filter((d) => d.id !== target.id)
+    parkedToRemove.value = null
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    removeError.value = err.response?.data?.message ?? t('common.error')
+  } finally {
+    removing.value = false
+  }
+}
+
+onMounted(() => {
+  void load()
+  void loadParked()
+})
 </script>
 
 <template>
@@ -110,5 +151,40 @@ onMounted(load)
         </button>
       </div>
     </div>
+
+    <div v-if="parked.length" class="flex flex-col gap-2 mt-4">
+      <div
+        v-for="device in parked"
+        :key="device.id"
+        class="flex items-center justify-between gap-3 px-3 py-2.5 rounded-[var(--kv-radius-md)]"
+        style="background: var(--kv-bg-elevated);"
+      >
+        <span class="text-[13px]" style="color: var(--kv-text-primary);">
+          {{
+            t('security.sessions.parkedRow', {
+              platform: platformLabel(device.platform),
+              date: formatDateTime(Date.parse(device.lastSeenAt)),
+            })
+          }}
+        </span>
+        <button
+          class="text-[12px] cursor-pointer hover:underline shrink-0"
+          style="color: var(--kv-danger);"
+          @click="parkedToRemove = device; removeError = ''"
+        >
+          {{ t('security.sessions.parkedRemove') }}
+        </button>
+      </div>
+    </div>
+
+    <ConfirmDialog
+      v-if="parkedToRemove"
+      :title="t('security.sessions.parkedRemoveTitle')"
+      :message="removeError || t('security.sessions.parkedRemoveConfirm')"
+      :confirm-label="t('security.sessions.parkedRemove')"
+      :loading="removing"
+      @confirm="removeParked"
+      @cancel="parkedToRemove = null"
+    />
   </div>
 </template>

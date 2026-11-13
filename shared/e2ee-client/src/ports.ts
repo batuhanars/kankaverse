@@ -103,6 +103,10 @@ export interface E2eeApi {
   /** Platform bilgisini (web/android) adaptör ekler; motor bilmez. */
   registerDevice(signatureKey: string): Promise<Reply<{ deviceId: string }>>
   available(): Promise<Reply<{ available: number }>>
+  /** C69: park cihazı yeniden bağlama. Nonce base64(32 bayt), 2 dk, tek kullanımlık. */
+  rebindChallenge(): Promise<Reply<{ nonce: string }>>
+  /** Ham Ed25519 imzası base64(64 bayt). Hata: 400 E2EE_REBIND_NONCE_INVALID, 403 E2EE_REBIND_REJECTED. */
+  rebind(deviceId: string, signature: string): Promise<Reply<{ deviceId: string }>>
   uploadKeyPackages(
     keyPackages: string[],
     lastResort?: string,

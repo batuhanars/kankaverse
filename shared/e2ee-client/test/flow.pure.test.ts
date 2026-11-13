@@ -3,6 +3,7 @@ import { backupSuite } from './backupSuite'
 import { transferSuite } from './transferSuite'
 import { flowSuite } from './flowSuite'
 import { groupSuite } from './groupSuite'
+import { rebindSuite } from './rebindSuite'
 import { frankingSuite } from './frankingSuite'
 import { notificationSuite } from './notificationSuite'
 
@@ -13,3 +14,4 @@ notificationSuite('pure') // beforeEach ve sunucu flowSuite'ten gelir
 backupSuite('pure') // beforeEach ve sunucu flowSuite'ten gelir
 transferSuite('pure')
 groupSuite('pure') // beforeEach ve sunucu flowSuite'ten gelir
+rebindSuite('pure')

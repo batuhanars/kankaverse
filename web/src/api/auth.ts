@@ -37,8 +37,12 @@ export const authApi = {
   refresh() {
     return http.post<{ accessToken: string }>('/auth/refresh')
   },
-  logout() {
-    return http.post<null>('/auth/logout')
+  /** C69: `keepE2eeDevice` yalnız true ise şifreleme cihazı iptal edilmez, park edilir (masaüstü). */
+  logout(opts?: { keepE2eeDevice?: boolean }) {
+    return http.post<null>(
+      '/auth/logout',
+      opts?.keepE2eeDevice ? { keepE2eeDevice: true } : undefined,
+    )
   },
   me() {
     return http.get<UserDto>('/auth/me')

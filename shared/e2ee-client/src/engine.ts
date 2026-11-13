@@ -170,7 +170,7 @@ export class E2eeEngine {
     engine.franking = data.franking === true
     try {
       await engine.run(async () => {
-        await ensureDevice(deps.api, engine.store, deps.provider)
+        await ensureDevice(deps.api, engine.store, deps.provider, userId)
         await engine.rememberFrankingFlag()
       })
     } catch (e) {
@@ -527,6 +527,14 @@ export class E2eeEngine {
       sentAt: rec.sentAt ?? fallbackSentAt, // E4 öncesi kayıt: v1 olduğundan zaten "doğrulanmamış" gider
       ...(rec.fk !== undefined && { fk: rec.fk }),
     }
+  }
+
+  /**
+   * C69: korunan çıkış (masaüstü): motor bellekten düşer, yerel depo SİLİNMEZ. Sonraki girişte aynı
+   * kullanıcı için yeniden açılır ve park edilmiş cihaz yeniden bağlanır.
+   */
+  release(): void {
+    this.own.clear()
   }
 
   /** Çıkış: bu kullanıcının tüm yerel şifreli deposunu siler. */
