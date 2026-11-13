@@ -2,7 +2,7 @@
 /**
  * ContextMenuShell — sağ-tık / ⋯ menülerinin paylaşılan kabuğu (SPRINT_DM_MENU §2).
  *
- * Kalan kopyalar: `rail-ctx`, `ch-ctx`, `VoiceParticipantList` (`GuildMemberRow` C61'de taşındı);
+ * Bugün dört kopya var (`rail-ctx`, `ch-ctx`, `GuildMemberRow`, `VoiceParticipantList`);
  * bu kabuk beşincisini yazmamak için doğdu. **Bu sprintte yalnız DM menüsü kullanır** —
  * üç canlı yüzey bilinçli olarak taşınmadı (sözleşme §1 OUT, borç tetikleyiciyle kayıtlı).
  *
