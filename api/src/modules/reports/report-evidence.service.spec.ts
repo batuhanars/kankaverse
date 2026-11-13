@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { HttpException } from '@nestjs/common';
+import { ForbiddenException, HttpException } from '@nestjs/common';
 import { ReportEvidenceService } from './report-evidence.service';
 
 // Vektör kaynağı: shared/e2ee-core/test/vectors/franking.json (kopya; bkz. e2ee-franking.spec.ts)
@@ -16,7 +16,7 @@ const prisma = {
   message: { findUnique: jest.fn(), findMany: jest.fn() },
   channelMember: { findUnique: jest.fn() },
 };
-const membership = { requireChannelAccess: jest.fn() };
+const membership = { requireChannelAccess: jest.fn(), requireGroupHistoryAccess: jest.fn() };
 
 const att = { id: 'att1', contentType: 'image/png', size: 10, storageKey: 'k/att1' };
 const at = (min: number) => new Date(Date.UTC(2026, 10, 11, 10, min));
@@ -244,5 +244,96 @@ describe('ReportEvidenceService (E4 §3.3)', () => {
         },
       );
     });
+  });
+});
+
+/** C62 §2.3.c: eski grup üyesi penceresindeki mesajları şikâyet edebilir (T&S: mağdura çıkış yolu). */
+describe('ReportEvidenceService: eski grup üyesi (C62 §2.3.c)', () => {
+  const LEFT = at(30);
+  const CLEARED = at(2);
+  let svc: ReportEvidenceService;
+  const notMember = () => new ForbiddenException({ message: 'x', error: 'NOT_CHANNEL_MEMBER' });
+
+  function asFormer(clearedAt: Date | null = null) {
+    membership.requireChannelAccess.mockRejectedValue(notMember());
+    membership.requireGroupHistoryAccess.mockResolvedValue({
+      channel: {},
+      window: { joinedAt: at(0), leftAt: LEFT, clearedAt },
+    });
+  }
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    svc = new ReportEvidenceService(prisma as never, membership as never);
+  });
+
+  it('pencere içi hedef (leftAt öncesi) şifresiz: kanıt üretilir (201 yolu); üyelik satırı okunmaz', async () => {
+    asFormer();
+    prisma.message.findUnique.mockResolvedValue(plain('t', 10));
+    prisma.message.findMany.mockResolvedValue([plain('c1', 9)]);
+    const rows = await svc.build('old', 't', undefined);
+    expect(rows.map((r) => r.messageId)).toEqual(['t', 'c1']);
+    expect(membership.requireGroupHistoryAccess).toHaveBeenCalledWith('old', 'ch1');
+    expect(prisma.channelMember.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('bağlam sorgusu leftAt üst sınırı ve clearedAt alt sınırıyla gider (leftAt sonrası satır kanıta girmez)', async () => {
+    asFormer(CLEARED);
+    prisma.message.findUnique.mockResolvedValue(plain('t', 10));
+    prisma.message.findMany.mockResolvedValue([]);
+    await svc.build('old', 't', undefined);
+    expect(prisma.message.findMany.mock.calls[0][0].where.createdAt).toEqual({
+      lt: at(10),
+      gt: CLEARED,
+      lte: LEFT,
+    });
+  });
+
+  it('hedef leftAt SONRASI: 422 REPORT_EVIDENCE_INVALID, bağlam sorgusu açılmaz', async () => {
+    asFormer();
+    prisma.message.findUnique.mockResolvedValue(plain('t', 31));
+    await expect(svc.build('old', 't', undefined)).rejects.toMatchObject({
+      status: 422,
+      response: { error: 'REPORT_EVIDENCE_INVALID' },
+    });
+    expect(prisma.message.findMany).not.toHaveBeenCalled();
+  });
+
+  it('hedef clearedAt öncesi (eski üyenin temizlediği): 422', async () => {
+    asFormer(CLEARED);
+    prisma.message.findUnique.mockResolvedValue(plain('t', 1));
+    await expect(svc.build('old', 't', undefined)).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('şifreli kanıt: leftAt sonrası bir mesaj listede varsa 422; hepsi pencere içindeyse kabul', async () => {
+    asFormer();
+    prisma.message.findUnique.mockResolvedValue(enc('t', 10));
+    prisma.message.findMany.mockResolvedValue([enc('t', 10), enc('late', 31)]);
+    await expect(svc.build('old', 't', [item('t'), item('late')] as never)).rejects.toMatchObject({
+      status: 422,
+    });
+
+    prisma.message.findMany.mockResolvedValue([enc('t', 10), enc('early', 9)]);
+    const rows = await svc.build('old', 't', [item('t'), item('early')] as never);
+    expect(rows.map((r) => r.messageId)).toEqual(['t', 'early']);
+  });
+
+  it('yabancı (ayrılma kaydı yok): bugünkü 403 aynen; sorgular açılmaz', async () => {
+    membership.requireChannelAccess.mockRejectedValue(notMember());
+    membership.requireGroupHistoryAccess.mockRejectedValue(notMember());
+    prisma.message.findUnique.mockResolvedValue(plain('t', 10));
+    const err = await svc.build('stranger', 't', undefined).catch((e) => e);
+    expect(err).toBeInstanceOf(ForbiddenException);
+    expect(err.getResponse()).toMatchObject({ error: 'NOT_CHANNEL_MEMBER' });
+    expect(prisma.message.findMany).not.toHaveBeenCalled();
+  });
+
+  it('üyelik kapısı başka hata verirse (yaş kapısı vb.) departure kapısına bakılmaz', async () => {
+    membership.requireChannelAccess.mockRejectedValue(
+      new ForbiddenException({ message: 'x', error: 'AGE_RESTRICTED' }),
+    );
+    prisma.message.findUnique.mockResolvedValue(plain('t', 10));
+    await expect(svc.build('old', 't', undefined)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(membership.requireGroupHistoryAccess).not.toHaveBeenCalled();
   });
 });

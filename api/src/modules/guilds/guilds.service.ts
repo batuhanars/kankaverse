@@ -22,6 +22,7 @@ import { SetIconDto } from './dto/set-icon.dto';
 import { SetMediaDto } from '../../shared/media/dto/set-media.dto';
 import { PresignBannerDto } from '../../shared/media/dto/presign-banner.dto';
 import { GuildMemberDto, RoleSummaryDto } from './dto/guild-member.dto';
+import { VoiceService } from '../voice/voice.service';
 import { pickRoleEmoji } from '../../common/utils/role-emoji.util';
 import { InviteFriendDto } from './dto/invite-friend.dto';
 import { AuditLogEntryDto } from './dto/audit-log-entry.dto';
@@ -139,7 +140,26 @@ export class GuildsService {
     private notifications: NotificationsService,
     private invites: InvitesService,
     private imageUpload: ImageUploadService,
+    // C62 §2.3.d: üyeliği biten kullanıcı ortamın ses odalarından düşürülür (opsiyonel: eski spec'ler).
+    private voice?: VoiceService,
   ) {}
+
+  /** C62 §2.3.d: kullanıcıyı ortamın silinmemiş TÜM ses kanallarının LiveKit odasından düşürür (best-effort). */
+  private async evictFromGuildVoice(userId: string, guildId: string): Promise<void> {
+    if (!this.voice) return;
+    try {
+      const voiceChannels = await this.prisma.channel.findMany({
+        where: { guildId, type: 'GUILD_VOICE', deletedAt: null },
+        select: { id: true },
+      });
+      await this.voice.evictFromRooms(
+        userId,
+        voiceChannels.map((c) => c.id),
+      );
+    } catch {
+      // üyelik silme zaten tamamlandı; düşürme best-effort
+    }
+  }
 
   /** REV-14: guild'in tüm üyelerinin userId'lerini döner (realtime broadcast hedefi). */
   private async guildMemberIds(guildId: string): Promise<string[]> {
@@ -757,6 +777,7 @@ export class GuildsService {
       guildId,
       userId: targetUserId,
     });
+    await this.evictFromGuildVoice(targetUserId, guildId);
 
     // AuditLog (tx dışı — başarılı tx'ten sonra)
     await this.prisma.auditLog.create({
@@ -798,6 +819,7 @@ export class GuildsService {
       this.prisma.guildMember.delete({ where: { guildId_userId: { guildId, userId } } }),
     ]);
     this.realtime.emitToUsers(recipients, 'guild.member_left', { guildId, userId });
+    await this.evictFromGuildVoice(userId, guildId);
     return null;
   }
 
@@ -933,6 +955,7 @@ export class GuildsService {
       }),
     ]);
     this.realtime.emitToUsers(recipients, 'guild.member_left', { guildId, userId: targetUserId });
+    await this.evictFromGuildVoice(targetUserId, guildId);
     await this.prisma.auditLog.create({
       data: {
         actorId,

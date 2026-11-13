@@ -40,6 +40,11 @@ const prismaMock = {
   message: {
     findFirst: jest.fn(),
   },
+  groupDmDeparture: {
+    findMany: jest.fn(),
+    upsert: jest.fn(),
+    deleteMany: jest.fn(),
+  },
   $transaction: jest.fn(),
 };
 
@@ -61,6 +66,8 @@ function resetMocks() {
   // mock `undefined` dönüp `.find` patlıyordu; boş dizi güvenli varsayılan (üye bulunamaz → alanlar
   // null/false). Okundu bilgisini SINAYAN testler kendi verisini vererek bunu ezer.
   prismaMock.channelMember.findMany.mockResolvedValue([]);
+  // C62: eski-üye (departure) listesi varsayılan boş
+  prismaMock.groupDmDeparture.findMany.mockResolvedValue([]);
 }
 
 // ── Sabit fixture'lar ─────────────────────────────────────────────────────────

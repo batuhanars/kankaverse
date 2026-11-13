@@ -896,6 +896,25 @@ export class VoiceService {
   }
 
   /**
+   * C62 §2.3.d (T&S): üyeliği silinen kullanıcıyı verilen LiveKit odalarından düşürür (grup DM: oda = groupId;
+   * ortam: o ortamın ses kanalları). Commit SONRASI çağrılır; best-effort: LiveKit kapalı/erişilemez/bağlı değil
+   * → sessiz geç, çağıran işlem düşmez. Yetki kontrolü YOK (çağıran üyelik silmeyi zaten yetkilendirdi).
+   * VoiceSession kaydı LiveKit `participant_left` webhook'uyla temizlenir (mevcut akış, dokunulmadı).
+   */
+  async evictFromRooms(userId: string, roomIds: string[]): Promise<void> {
+    if (!this.roomService) return;
+    await Promise.all(
+      roomIds.map(async (roomId) => {
+        try {
+          await this.roomService!.removeParticipant(roomId, userId);
+        } catch {
+          // bağlı değil / oda yok / LiveKit erişilemez → best-effort
+        }
+      }),
+    );
+  }
+
+  /**
    * A4 — Acil snapshot bağlamı: kanaldaki aktif katılımcılar + yayıncılar (kamera/ekran). **METADATA-only**
    * (kimlik listesi + yayın durumu; canlı AV/içerik DEĞİL). LiveKit erişilemezse VoiceSession'a (leftAt null)
    * düşer, yayıncı = []. İnceleyenin bağlamı görmesi için; hukuk-gated içerik-kanıtı DEĞİL (A4 §0.4).

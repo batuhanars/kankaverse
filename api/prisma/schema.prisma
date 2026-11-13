@@ -632,6 +632,27 @@ model ChannelMember {
   @@index([userId])
 }
 
+enum DepartureReason {
+  LEFT
+  REMOVED
+}
+
+// C62: gruptan ayrılan/çıkarılan üyenin listede kalması ve ayrılana kadarki geçmişi okuması için iz.
+// ChannelMember silme davranışı DEĞİŞMEZ; yalnız findMessages + DM listesi bu kayda bakar (R7).
+model GroupDmDeparture {
+  id        String          @id @default(cuid())
+  channelId String
+  userId    String
+  joinedAt  DateTime // silinen ChannelMember.createdAt (katılım öncesi şifreli filtre için)
+  leftAt    DateTime        @default(now())
+  reason    DepartureReason
+  clearedAt DateTime? // silinen üyeliğin G4 clearedAt'i taşınır
+  memberIds String[] // ayrılma anında DİĞER üyeler (liste başlığı/avatarı; sonrası sızmaz)
+
+  @@unique([channelId, userId])
+  @@index([userId])
+}
+
 model Invite {
   id        String    @id @default(cuid())
   code      String    @unique // kısa, paylaşılabilir, URL-safe (8-char)

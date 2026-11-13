@@ -123,6 +123,16 @@ export class DmController {
     return this.dmService.leaveGroupDm(user.id, groupId);
   }
 
+  @Delete('groups/:id/departure')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'C62: gruptan ayrılan/çıkarılan kullanıcı, listesindeki eski grubu siler (yalnız kendi kaydı)',
+  })
+  deleteDeparture(@CurrentUser() user: { id: string }, @Param('id') groupId: string) {
+    return this.dmService.deleteDeparture(user.id, groupId);
+  }
+
   @Delete('groups/:id/members/:userId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

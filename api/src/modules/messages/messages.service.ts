@@ -59,6 +59,8 @@ type ReplyToDto = {
   authorUsername: string;
   /** Alıntılanan mesajın İLK eki; eki yoksa null. */
   attachment: ReplyAttachmentDto | null;
+  /** C62 §2.3.b: yalnız eski üye penceresinde ve alıntı `leftAt` sonrası düzenlendiyse (aksi hâlde alan YOK). */
+  editedAfterLeave?: true;
 } | null;
 
 type ReplyToRaw =
@@ -66,6 +68,7 @@ type ReplyToRaw =
       Message,
       'id' | 'content' | 'deletedAt' | 'webhookId' | 'webhookName' | 'encrypted' | 'createdAt'
     > & {
+      editedAt?: Date | null;
       author: Pick<User, 'username'>;
       attachments?: ReplyAttachmentDto[];
     })
@@ -87,9 +90,11 @@ type MessageWithAuthor = Message & {
 // için korunuyor; yeni istemci `attachment` doluyken türe göre etiket gösterir); silinmişse null
 // E1: şifreli mesajın metnini sunucu bilmez; boş içerik "[dosya]" değil, istemciye "yerel depodan doldur"
 // işaretidir (web/mobil `fillQuote` yalnız boş içerikte depoya bakar).
-function buildReplyToDto(raw: ReplyToRaw): ReplyToDto {
+function buildReplyToDto(raw: ReplyToRaw, leftAt?: Date | null): ReplyToDto {
   if (!raw || raw.deletedAt !== null) return null;
-  const snippet = raw.encrypted
+  // C62 §2.3.b: eski üye alıntılanan mesajın `leftAt` anındaki halini görür; sonradan düzenlendiyse gövde verilmez.
+  const editedAfterLeave = isEditedAfter(raw.editedAt, leftAt);
+  const snippet = raw.encrypted || editedAfterLeave
     ? ''
     : raw.content.trim().length > 0
       ? raw.content.slice(0, REPLY_SNIPPET_MAX)
@@ -106,14 +111,33 @@ function buildReplyToDto(raw: ReplyToRaw): ReplyToDto {
         thumbnail: first.thumbnail ?? null,
       }
     : null;
-  return { id: raw.id, content: snippet, authorUsername, attachment };
+  return {
+    id: raw.id,
+    content: snippet,
+    authorUsername,
+    attachment,
+    ...(editedAfterLeave ? { editedAfterLeave: true as const } : {}),
+  };
+}
+
+/** C62 §2.3.b: mesaj eski üyenin ayrılma anından SONRA düzenlendi mi (`leftAt` yoksa = aktif üye = hep false). */
+function isEditedAfter(editedAt: Date | null | undefined, leftAt: Date | null | undefined): boolean {
+  return !!leftAt && !!editedAt && editedAt > leftAt;
 }
 
 /**
  * `joinedAt` (yalnız GROUP_DM, E2 §2.5): çağıranın katılımından ÖNCE gönderilmiş şifreli bir mesaja yanıt
  * alıntısı verilmez (alıntı üst veri sızdırır: yazar adı). Düz eski mesajın alıntısı bugünkü gibi kalır.
  */
-function toMessageDto(msg: MessageWithAuthor, callerId?: string, joinedAt?: Date | null) {
+function toMessageDto(
+  msg: MessageWithAuthor,
+  callerId?: string,
+  joinedAt?: Date | null,
+  leftAt?: Date | null,
+) {
+  // C62 §2.3.b: eski üye penceresinde `leftAt` sonrası düzenlenen mesajın gövdesi (içerik, şifreli yük, bahsetme,
+  // embed) verilmez; yalnız `editedAfterLeave: true`. `leftAt` verilmediyse (aktif üye) hiçbir şey değişmez.
+  const editedAfterLeave = isEditedAfter(msg.editedAt, leftAt);
   const replyTo = msg.replyTo && isHiddenBeforeJoin(msg.replyTo, joinedAt) ? null : msg.replyTo;
   // Aggregate reactions: group by emoji, count, reactedByMe
   const reactionsAgg: ReactionAggDto[] = [];
@@ -139,9 +163,9 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string, joinedAt?: Date
   return {
     id: msg.id,
     channelId: msg.channelId,
-    content: msg.content,
+    content: editedAfterLeave ? '' : msg.content,
     replyToId: msg.replyToId,
-    replyTo: buildReplyToDto(replyTo ?? null),
+    replyTo: buildReplyToDto(replyTo ?? null, leftAt),
     editedAt: msg.editedAt ? msg.editedAt.toISOString() : null,
     pinnedAt: msg.pinnedAt ? msg.pinnedAt.toISOString() : null,
     author: msg.webhookId
@@ -163,7 +187,7 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string, joinedAt?: Date
           roleEmoji: null as string | null,
         },
     webhook: msg.webhookId ? { id: msg.webhookId } : null,
-    embeds: msg.webhookId ? ((msg.embeds ?? null) as unknown[] | null) : null,
+    embeds: msg.webhookId && !editedAfterLeave ? ((msg.embeds ?? null) as unknown[] | null) : null,
     attachments: msg.attachments.map((a) => ({
       id: a.id,
       filename: a.filename,
@@ -179,20 +203,22 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string, joinedAt?: Date
       aiGenerated: (a.aiGenerationId ?? null) !== null,
     })),
     reactions: reactionsAgg,
-    mentions: msg.mentions ?? [],
-    mentionsEveryone: msg.mentionsEveryone ?? false,
+    mentions: editedAfterLeave ? [] : (msg.mentions ?? []),
+    mentionsEveryone: editedAfterLeave ? false : (msg.mentionsEveryone ?? false),
     // R15 — istemci hem rol çipini çizmek hem "bana rolümden bahsedildi" bandını yakmak için
     // rol id'lerini görmeli (kendi rollerimle kesişim istemcide hesaplanır).
-    mentionRoles: msg.mentionRoles ?? [],
+    mentionRoles: editedAfterLeave ? [] : (msg.mentionRoles ?? []),
     createdAt: msg.createdAt.toISOString(),
+    ...(editedAfterLeave ? { editedAfterLeave: true as const } : {}),
     // E1: yalnız şifreli mesajda (şifresizde alan YOK). content '' kalır; istemci ciphertext'i çözer.
     ...(msg.encrypted && msg.ciphertext
       ? {
           encrypted: true as const,
-          ciphertext: toB64(msg.ciphertext),
+          // C62: leftAt sonrası düzenlenmişse şifreli yük ve franking etiketi VERİLMEZ.
+          ...(editedAfterLeave ? {} : { ciphertext: toB64(msg.ciphertext) }),
           senderDeviceId: msg.senderDeviceId ?? null,
           // E4: yalnız varsa (v1 istemci mesajında alan YOK). Okuyan cihaz kendi hesapladığıyla karşılaştırır.
-          ...(msg.frankingTag ? { frankingTag: toB64(msg.frankingTag) } : {}),
+          ...(msg.frankingTag && !editedAfterLeave ? { frankingTag: toB64(msg.frankingTag) } : {}),
         }
       : {}),
   };
@@ -224,6 +250,7 @@ const REPLY_TO_INCLUDE = {
     content: true,
     encrypted: true,
     createdAt: true,
+    editedAt: true, // C62 §2.3.b: eski üye penceresinde `leftAt` sonrası düzenleme tespiti
     deletedAt: true,
     webhookId: true,
     webhookName: true,
@@ -511,7 +538,29 @@ export class MessagesService {
   }
 
   async findMessages(userId: string, channelId: string, before?: string) {
-    const channel = await this.membership.requireChannelAccess(userId, channelId);
+    // C62 §2.3 🔴 R7: üyelik kapısı NOT_CHANNEL_MEMBER verirse, ayrılma kaydı olan eski GROUP_DM üyesi
+    // yalnız `leftAt`e kadarki pencereyi okur. Başka her hata (404, yaş kapısı) ve kaydı olmayan yabancı
+    // bugünkü gibi aynen fırlar.
+    let channel;
+    let departed: { joinedAt: Date; leftAt: Date; clearedAt: Date | null } | null = null;
+    try {
+      channel = await this.membership.requireChannelAccess(userId, channelId);
+    } catch (err) {
+      if (
+        !(err instanceof ForbiddenException) ||
+        (err.getResponse() as { error?: string }).error !== 'NOT_CHANNEL_MEMBER'
+      ) {
+        throw err;
+      }
+      try {
+        ({ channel, window: departed } = await this.membership.requireGroupHistoryAccess(
+          userId,
+          channelId,
+        ));
+      } catch {
+        throw err;
+      }
+    }
 
     // Sabit sayfa boyutu (cursor tabanlı). HTTP yüzeyinde ayarlanabilir limit YOK (controller before-only).
     const take = 50;
@@ -519,7 +568,7 @@ export class MessagesService {
     // createdAt filtresi: G4 clearedAt (gt) + cursor before (lt) TEK objede birleşir.
     // (Ayrı spread'lerde ikisi de `createdAt` anahtarını yazıp üzerine binerdi → load-more'da
     //  clearedAt filtresi düşer, temizlenmiş geçmiş geri görünürdü. B1 düzeltmesi.)
-    const createdAtFilter: { gt?: Date; lt?: Date } = {};
+    const createdAtFilter: { gt?: Date; lt?: Date; lte?: Date } = {};
 
     if (before) {
       const beforeMsg = await this.prisma.message.findUnique({ where: { id: before } });
@@ -531,7 +580,11 @@ export class MessagesService {
 
     // G4: DM kanalında çağıranın clearedAt'inden SONRASINI döndür (kendi temizlediği geçmiş kapanır).
     // Kayıt DB'de durur; karşı tarafın görünümü tam. Guild kanallarında clearedAt yoktur.
-    if (!channel.guildId) {
+    if (departed) {
+      // Eski üye: pencere `leftAt` (dahil) ile kapalı; sayfalama cursor'ı (`lt`) bu üst sınırla birlikte uygulanır.
+      createdAtFilter.lte = departed.leftAt;
+      if (departed.clearedAt) createdAtFilter.gt = departed.clearedAt;
+    } else if (!channel.guildId) {
       const member = await this.prisma.channelMember.findUnique({
         where: { channelId_userId: { channelId, userId } },
         select: { clearedAt: true },
@@ -539,7 +592,7 @@ export class MessagesService {
       if (member?.clearedAt) createdAtFilter.gt = member.clearedAt;
     }
     // E2 §2.5: grup DM'de katılım öncesi şifreli mesajlar (sayfalama dahil) dönmez.
-    const joinedAt = await groupJoinedAt(this.prisma, channel, userId);
+    const joinedAt = departed?.joinedAt ?? (await groupJoinedAt(this.prisma, channel, userId));
 
     const messages = await this.prisma.message.findMany({
       where: {
@@ -566,7 +619,11 @@ export class MessagesService {
           },
         },
         // Reaksiyonları tek sorguda çek — N+1 yok; aggregation JS tarafında
-        reactions: { select: { userId: true, emoji: true } },
+        // C62 §2.3.b: eski üye yalnız `leftAt`e kadar verilmiş tepkileri görür (aktif üyede süzgeç yok).
+        reactions: {
+          ...(departed ? { where: { createdAt: { lte: departed.leftAt } } } : {}),
+          select: { userId: true, emoji: true },
+        },
         replyTo: REPLY_TO_INCLUDE,
       },
       orderBy: { createdAt: 'desc' },
@@ -575,7 +632,7 @@ export class MessagesService {
 
     return this.withRoleEmojis(
       channel.guildId,
-      messages.map((msg) => toMessageDto(msg, userId, joinedAt)),
+      messages.map((msg) => toMessageDto(msg, userId, joinedAt, departed?.leftAt)),
     );
   }
 

@@ -1887,3 +1887,38 @@ describe('VoiceService.listParticipants — R16 §2 mutedUserIds', () => {
     expect(res).toEqual({ startedAt: null, participants: [], mutedUserIds: [TARGET_ID] });
   });
 });
+
+// ── C62 §2.3.d: evictFromRooms ───────────────────────────────────────────────
+describe('VoiceService.evictFromRooms (C62 §2.3.d)', () => {
+  beforeEach(() => {
+    mockRemoveParticipant.mockReset();
+    mockRemoveParticipant.mockResolvedValue(undefined);
+  });
+
+  it('her oda için removeParticipant(oda, kullanıcı) çağrılır', async () => {
+    const svc = makeService();
+    await svc.evictFromRooms('u1', ['room-a', 'room-b']);
+    expect(mockRemoveParticipant).toHaveBeenCalledTimes(2);
+    expect(mockRemoveParticipant).toHaveBeenCalledWith('room-a', 'u1');
+    expect(mockRemoveParticipant).toHaveBeenCalledWith('room-b', 'u1');
+  });
+
+  it('bir odada LiveKit hatası (bağlı değil) diğer odaları ve çağıranı bozmaz', async () => {
+    mockRemoveParticipant.mockRejectedValueOnce(new Error('not found'));
+    const svc = makeService();
+    await expect(svc.evictFromRooms('u1', ['room-a', 'room-b'])).resolves.toBeUndefined();
+    expect(mockRemoveParticipant).toHaveBeenCalledTimes(2);
+  });
+
+  it('LiveKit env eksik (roomService yok) → sessiz no-op', async () => {
+    const svc = makeService(
+      makeConfig({
+        'livekit.apiKey': undefined,
+        'livekit.apiSecret': undefined,
+        'livekit.url': undefined,
+      }),
+    );
+    await expect(svc.evictFromRooms('u1', ['room-a'])).resolves.toBeUndefined();
+    expect(mockRemoveParticipant).not.toHaveBeenCalled();
+  });
+});

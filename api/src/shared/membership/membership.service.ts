@@ -144,6 +144,43 @@ export class MembershipService {
   }
 
   /**
+   * 🔴 R7 (C62 §2.3): gruptan ayrılan/çıkarılan eski üyenin YALNIZ mesaj geçmişini okuma kapısı.
+   * Yalnız `findMessages` çağırır (`requireChannelAccess` NOT_CHANNEL_MEMBER verdikten sonra); başka hiçbir
+   * uç bu kaydı yetki olarak kullanmaz. Kanal silinmemiş GROUP_DM + çağıranın departure satırı şart; aksi
+   * hâlde bugünkü jenerik 403 NOT_CHANNEL_MEMBER aynen fırlar (durum sızıntısı yok).
+   * `window`: okunabilir pencere (`createdAt <= leftAt`, `clearedAt` sonrası, `joinedAt` katılım süzgeci için).
+   */
+  async requireGroupHistoryAccess(userId: string, channelId: string) {
+    const denied = () =>
+      new ForbiddenException({
+        message: 'Bu kanala erişim izniniz yok.',
+        error: 'NOT_CHANNEL_MEMBER',
+      });
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId, deletedAt: null },
+      include: { guild: true },
+    });
+    if (!channel) {
+      throw new NotFoundException({ message: 'Kanal bulunamadı.', error: 'CHANNEL_NOT_FOUND' });
+    }
+    if (channel.type !== 'GROUP_DM' || channel.guildId) throw denied();
+
+    const departure = await this.prisma.groupDmDeparture.findUnique({
+      where: { channelId_userId: { channelId, userId } },
+    });
+    if (!departure) throw denied();
+
+    return {
+      channel,
+      window: {
+        joinedAt: departure.joinedAt,
+        leftAt: departure.leftAt,
+        clearedAt: departure.clearedAt,
+      },
+    };
+  }
+
+  /**
    * Kanal GÖRÜNÜR mü (erişebilir değil) — "görünür ama girişi kapalı" özel kanal modeli.
    * requireChannelAccess'ten farkı: özel kanal üye-bloğu YOK (private kanal tüm guild
    * üyelerine görünür; giriş `requireChannelAccess` ile ayrıca kapılır). Yaş kapısı KORUNUR

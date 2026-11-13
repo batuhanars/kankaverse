@@ -30,6 +30,12 @@ function setup() {
     user: { findUnique: jest.fn() },
     friendship: { findFirst: jest.fn() },
     message: { findFirst: jest.fn() },
+    // C62: ayrılma izi; op'lar tx dizisinde okunabilsin diye sabit dize döner
+    groupDmDeparture: {
+      findMany: jest.fn().mockResolvedValue([]),
+      upsert: jest.fn().mockReturnValue('departure-op'),
+      deleteMany: jest.fn().mockReturnValue('departure-delete-op'),
+    },
     userBlock: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn().mockResolvedValue([]),
   };
@@ -72,7 +78,14 @@ describe('DmService.addGroupMember: E2EE bağlantısı (§2.2/§2.4)', () => {
     await service.addGroupMember(OWNER, GROUP, { userId: TARGET });
 
     expect(e2ee.assertMemberAddable).toHaveBeenCalledWith(GROUP, TARGET);
-    expect(prisma.$transaction).toHaveBeenCalledWith(['create-op', 'former-delete-op']);
+    expect(prisma.$transaction).toHaveBeenCalledWith([
+      'create-op',
+      'departure-delete-op',
+      'former-delete-op',
+    ]);
+    expect(prisma.groupDmDeparture.deleteMany).toHaveBeenCalledWith({
+      where: { channelId: GROUP, userId: TARGET },
+    });
     expect(e2ee.afterAdd).toHaveBeenCalledWith(GROUP, TARGET);
   });
 
@@ -90,7 +103,7 @@ describe('DmService.addGroupMember: E2EE bağlantısı (§2.2/§2.4)', () => {
 });
 
 describe('DmService.leaveGroupDm / removeGroupMember: E2EE bağlantısı (§2.4)', () => {
-  it('ayrılma: üyelik silme + eski-üye upsert + bekleyen Welcome silme TEK transaction; sonra afterDeparture(kanal silinmedi)', async () => {
+  it('ayrılma: departure upsert + üyelik silme + eski-üye upsert + bekleyen Welcome silme TEK transaction; sonra afterDeparture(kanal silinmedi)', async () => {
     const { prisma, e2ee, service } = setup();
     prisma.channelMember.findUnique.mockResolvedValue({ id: 'cm-1' });
     prisma.channelMember.count.mockResolvedValue(2);
@@ -99,6 +112,7 @@ describe('DmService.leaveGroupDm / removeGroupMember: E2EE bağlantısı (§2.4)
 
     expect(e2ee.departureOps).toHaveBeenCalledWith(GROUP, TARGET);
     expect(prisma.$transaction).toHaveBeenCalledWith([
+      'departure-op',
       'delete-op',
       'former-upsert-op',
       'welcome-delete-op',
@@ -133,7 +147,7 @@ describe('DmService.leaveGroupDm / removeGroupMember: E2EE bağlantısı (§2.4)
     expect(e2ee.afterDeparture).toHaveBeenCalledWith(GROUP, TARGET, true);
   });
 
-  it('şifreli grup yoksa (departureOps boş) tek sorgu, transaction yok (bugünkü davranış)', async () => {
+  it('şifreli grup yoksa (departureOps boş) transaction yalnız departure upsert + üyelik silme içerir', async () => {
     const { prisma, e2ee, service } = setup();
     e2ee.departureOps.mockResolvedValue([]);
     prisma.channelMember.findUnique.mockResolvedValue({ id: 'cm-1' });
@@ -142,7 +156,7 @@ describe('DmService.leaveGroupDm / removeGroupMember: E2EE bağlantısı (§2.4)
     await service.leaveGroupDm(TARGET, GROUP);
 
     expect(prisma.channelMember.delete).toHaveBeenCalledTimes(1);
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op']);
     expect(e2ee.afterDeparture).toHaveBeenCalledWith(GROUP, TARGET, false);
   });
 

@@ -9,6 +9,7 @@ const prismaMock = {
   channelMember: { findUnique: jest.fn(), findFirst: jest.fn() },
   user: { findUnique: jest.fn() },
   userBlock: { findFirst: jest.fn() },
+  groupDmDeparture: { findUnique: jest.fn() },
 };
 
 // R20 — özel kanal kapısında "yönetici mi" sorusu artık PermissionsService.hasFullAccess'e
@@ -484,5 +485,80 @@ describe('MembershipService.requireChannelAccess — özel kanal (isPrivate)', (
     await expect(
       service.requireChannelAccess('user1', PRIVATE_AGE_GATED_CHANNEL.id),
     ).rejects.toMatchObject({ response: { error: 'NOT_CHANNEL_MEMBER' } });
+  });
+});
+
+// ── C62: eski grup üyesi — yalnız geçmiş okuma kapısı ─────────────────────────
+describe('MembershipService.requireGroupHistoryAccess (C62, R7)', () => {
+  const GROUP_CHANNEL = {
+    id: 'grp1',
+    type: 'GROUP_DM',
+    guildId: null,
+    ageGated: false,
+    deletedAt: null,
+    guild: null,
+  };
+  const DEPARTURE = {
+    joinedAt: new Date('2026-11-01T00:00:00Z'),
+    leftAt: new Date('2026-11-10T00:00:00Z'),
+    clearedAt: null,
+  };
+  let service: MembershipService;
+
+  beforeEach(() => {
+    resetMocks();
+    service = makeService();
+  });
+
+  async function codeOf(p: Promise<unknown>): Promise<string> {
+    try {
+      await p;
+    } catch (e) {
+      return ((e as ForbiddenException).getResponse() as { error: string }).error;
+    }
+    return 'NO_ERROR';
+  }
+
+  it('departure satırı olan eski üye: kanal + pencere döner', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(GROUP_CHANNEL);
+    prismaMock.groupDmDeparture.findUnique.mockResolvedValue(DEPARTURE);
+    const res = await service.requireGroupHistoryAccess('u1', 'grp1');
+    expect(res.channel).toBe(GROUP_CHANNEL);
+    expect(res.window).toEqual(DEPARTURE);
+    expect(prismaMock.groupDmDeparture.findUnique).toHaveBeenCalledWith({
+      where: { channelId_userId: { channelId: 'grp1', userId: 'u1' } },
+    });
+  });
+
+  it('departure satırı yok: bugünkü jenerik 403 NOT_CHANNEL_MEMBER', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(GROUP_CHANNEL);
+    prismaMock.groupDmDeparture.findUnique.mockResolvedValue(null);
+    expect(await codeOf(service.requireGroupHistoryAccess('stranger', 'grp1'))).toBe(
+      'NOT_CHANNEL_MEMBER',
+    );
+  });
+
+  it('GROUP_DM olmayan kanal (1-1 DM / ortam) departure olsa bile 403, kayıt hiç sorgulanmaz', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({ ...GROUP_CHANNEL, type: 'DM' });
+    expect(await codeOf(service.requireGroupHistoryAccess('u1', 'grp1'))).toBe('NOT_CHANNEL_MEMBER');
+    prismaMock.channel.findUnique.mockResolvedValue({ ...GROUP_CHANNEL, guildId: 'guild1' });
+    expect(await codeOf(service.requireGroupHistoryAccess('u1', 'grp1'))).toBe('NOT_CHANNEL_MEMBER');
+    expect(prismaMock.groupDmDeparture.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('silinmiş/yok kanal: 404 CHANNEL_NOT_FOUND', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(null);
+    await expect(service.requireGroupHistoryAccess('u1', 'grp1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('DEĞİŞMEZLİK: requireChannelAccess / requireChannelVisible eski üyeye 403 verir, departure kaydına HİÇ bakmaz', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue(GROUP_CHANNEL);
+    prismaMock.channelMember.findUnique.mockResolvedValue(null);
+    prismaMock.groupDmDeparture.findUnique.mockResolvedValue(DEPARTURE);
+    expect(await codeOf(service.requireChannelAccess('u1', 'grp1'))).toBe('NOT_CHANNEL_MEMBER');
+    expect(await codeOf(service.requireChannelVisible('u1', 'grp1'))).toBe('NOT_CHANNEL_MEMBER');
+    expect(prismaMock.groupDmDeparture.findUnique).not.toHaveBeenCalled();
   });
 });

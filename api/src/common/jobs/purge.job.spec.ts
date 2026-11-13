@@ -11,6 +11,7 @@ const prismaMock = {
   notificationPref: { deleteMany: jest.fn() },
   recoveryCode: { deleteMany: jest.fn() },
   recentGame: { deleteMany: jest.fn() },
+  groupDmDeparture: { deleteMany: jest.fn() },
   externalAccount: { deleteMany: jest.fn() },
   externalLinkState: { deleteMany: jest.fn() },
   streamAnnounceOptIn: { deleteMany: jest.fn() },
@@ -42,6 +43,7 @@ function resetMocks() {
   prismaMock.notificationPref.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.recoveryCode.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.recentGame.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.groupDmDeparture.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.externalAccount.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.externalLinkState.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.streamAnnounceOptIn.deleteMany.mockResolvedValue({ count: 0 });
@@ -182,6 +184,17 @@ describe('PurgeJob.run — Sprint R6a §2 asgari kimlik imhası', () => {
 
     expect(prismaMock.e2eeTransfer.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-123' } });
     expect(storageMock.delete).toHaveBeenCalledWith('e2ee-transfer/user-123/t1');
+  });
+
+  it('C62: hesap imhasi kullanicinin KENDI grup DM ayrilma kayitlarini siler', async () => {
+    prismaMock.user.findMany.mockResolvedValue([{ id: 'user-123' }]);
+    configMock.get.mockReturnValue(true);
+
+    await job.run();
+
+    expect(prismaMock.groupDmDeparture.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-123' },
+    });
   });
 
   it('birden fazla aday → her biri için ayrı transaction, biri başarısız olsa diğeri etkilenmez', async () => {

@@ -21,9 +21,14 @@ import { RenameGroupDmDto } from './dto/rename-group-dm.dto';
 import { visibleLastReaction } from '../../common/utils/last-reaction.util';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { PushService } from '../../shared/push/push.service';
-import { Prisma } from '@prisma/client';
 import { E2eeMembershipService } from '../e2ee/e2ee-membership.service';
+import { VoiceService } from '../voice/voice.service';
 import { isHiddenBeforeJoin, preJoinEncryptedFilter } from '../../common/utils/pre-join.util';
+import {
+  DepartureReasonValue,
+  departureUpsertOp,
+  loadDepartedGroupItems,
+} from './dm-departure.util';
 
 /**
  * 🫀 C12 §3.2 — okundu bilgisi görünürlük kararı. **T&S karar fonksiyonu (R7), satır satır insan
@@ -132,6 +137,8 @@ export class DmService {
     @Optional() private push?: PushService,
     // E2: grup üyeliği değişiminin E2EE tarafı (Nest her zaman verir; `?` yalnız elle kurulan eski spec'ler için).
     private e2ee?: E2eeMembershipService,
+    // C62 §2.3.d: ayrılan/çıkarılan kullanıcıyı grup aramasından (LiveKit odası = groupId) düşürür.
+    private voice?: VoiceService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -372,8 +379,13 @@ export class DmService {
         lastReaction,
         receiptsEnabled: groupReceipt.visible,
         groupAllReadAt: groupReceipt.allReadAt ? groupReceipt.allReadAt.toISOString() : null,
+        departed: null,
       });
     }
+
+    // C62 §2.3: gruptan ayrılan/çıkarılan kullanıcının grupları (kanalı silinmemiş olanlar)
+    const departedItems = await loadDepartedGroupItems(this.prisma, userId);
+    for (const d of departedItems) result.push(d.item);
 
     // 🔴 Sıralama (sahip bulgusu 2026-08-12, web + mobil): bu liste HİÇ sıralanmıyordu.
     // Prisma `orderBy`sız bir sorguda satır sırasını garanti etmez; "en son mesaj gelen sohbet
@@ -385,6 +397,7 @@ export class DmService {
     const channelCreatedAt = new Map(
       activeMemberships.map((m) => [m.channel.id, m.channel.createdAt.getTime()]),
     );
+    for (const d of departedItems) channelCreatedAt.set(d.item.id as string, d.channelCreatedAt);
     const sortKey = (c: Record<string, unknown>): number => {
       const lastMessage = c.lastMessage as { createdAt: string } | null;
       if (lastMessage) return Date.parse(lastMessage.createdAt);
@@ -614,11 +627,13 @@ export class DmService {
 
     // E2 §2.2/§2.4: şifreli gruba uygun olmayan üye eklenemez (422); yeniden eklenen üyenin eski-üye kaydı
     // aynı transaction'da silinir; commit sonrası `e2ee:devices-changed`.
+    // C62 §2.2: geri eklenen normal üyedir; ayrılma izi (departure) üyelik create ile aynı tx'te silinir.
     await this.e2ee?.assertMemberAddable(groupId, targetId);
-    await this.writeMembership(
+    await this.prisma.$transaction([
       this.prisma.channelMember.create({ data: { channelId: groupId, userId: targetId } }),
-      this.e2ee?.addOps(groupId, targetId) ?? [],
-    );
+      this.prisma.groupDmDeparture.deleteMany({ where: { channelId: groupId, userId: targetId } }),
+      ...(this.e2ee?.addOps(groupId, targetId) ?? []),
+    ]);
     await this.e2ee?.afterAdd(groupId, targetId);
 
     return {
@@ -644,7 +659,7 @@ export class DmService {
       });
     }
 
-    await this.deleteGroupMembership(groupId, membership.id, userId);
+    await this.deleteGroupMembership(groupId, userId, membership, 'LEFT');
 
     return null;
   }
@@ -682,22 +697,42 @@ export class DmService {
       });
     }
 
-    await this.deleteGroupMembership(groupId, membership.id, targetUserId);
+    await this.deleteGroupMembership(groupId, targetUserId, membership, 'REMOVED');
 
     return null;
   }
 
   /**
-   * Gruptan ayrılma/çıkarma ortak yolu: üyelik satırı + (grupta E2EE varsa) eski-üye kaydı ve bekleyen
-   * Welcome silme AYNI transaction'da (E2 §2.4); kalan < 2 ise kanal soft-delete; commit sonrası soket
-   * odasından çıkarma + `e2ee:devices-changed` (E2EE servisi). Kanal silinirse E2EE satırlarına dokunulmaz.
+   * Gruptan ayrılma/çıkarma ortak yolu: departure upsert (C62) + üyelik satırı + (grupta E2EE varsa) eski-üye
+   * kaydı ve bekleyen Welcome silme AYNI transaction'da (E2 §2.4); kalan < 2 ise kanal soft-delete; commit sonrası
+   * soket odasından çıkarma + `e2ee:devices-changed` (E2EE servisi) + ayrılana `dm.group_departed`.
+   * Kanal silinirse E2EE satırlarına dokunulmaz.
    */
-  private async deleteGroupMembership(groupId: string, membershipId: string, userId: string) {
+  private async deleteGroupMembership(
+    groupId: string,
+    userId: string,
+    membership: { id: string; createdAt: Date; clearedAt: Date | null },
+    reason: DepartureReasonValue,
+  ) {
     const e2eeOps = (await this.e2ee?.departureOps(groupId, userId)) ?? [];
-    await this.writeMembership(
-      this.prisma.channelMember.delete({ where: { id: membershipId } }),
-      e2eeOps,
-    );
+    const others = await this.prisma.channelMember.findMany({
+      where: { channelId: groupId, userId: { not: userId } },
+      select: { userId: true },
+    });
+    const leftAt = new Date();
+    await this.prisma.$transaction([
+      departureUpsertOp(this.prisma, {
+        channelId: groupId,
+        userId,
+        joinedAt: membership.createdAt,
+        leftAt,
+        reason,
+        clearedAt: membership.clearedAt,
+        memberIds: others.map((o) => o.userId),
+      }),
+      this.prisma.channelMember.delete({ where: { id: membership.id } }),
+      ...e2eeOps,
+    ]);
 
     const remaining = await this.prisma.channelMember.count({ where: { channelId: groupId } });
     const channelDeleted = remaining < 2;
@@ -708,6 +743,28 @@ export class DmService {
       });
     }
     await this.e2ee?.afterDeparture(groupId, userId, channelDeleted);
+    // C62 §2.3.d: kişi devam eden grup aramasından da düşer (best-effort; hata işlemi bozmaz). Kanal silindiyse de.
+    await this.voice?.evictFromRooms(userId, [groupId]);
+    // Yalnız ayrılana (tüm soketleri); kalanlara canlı olay bu işte yok (C62 §6).
+    this.realtime.emitToUser(userId, 'dm.group_departed', {
+      channelId: groupId,
+      reason,
+      leftAt: leftAt.toISOString(),
+    });
+  }
+
+  /** DELETE /dm/groups/:id/departure — eski üye, ayrılma kaydını (listedeki grubu) siler; yerel etki, olay yok. */
+  async deleteDeparture(userId: string, groupId: string) {
+    const { count } = await this.prisma.groupDmDeparture.deleteMany({
+      where: { channelId: groupId, userId },
+    });
+    if (count === 0) {
+      throw new NotFoundException({
+        message: 'Ayrılma kaydı bulunamadı.',
+        error: 'DEPARTURE_NOT_FOUND',
+      });
+    }
+    return null;
   }
 
   /** Grup listesinin son mesajı, katılım öncesi şifreli mesajlar hariç (nadir yol: en yeni mesaj gizliyse). */
@@ -720,15 +777,6 @@ export class DmService {
         attachments: { select: { contentType: true } },
       },
     });
-  }
-
-  /** Üyelik yazımı; E2EE işlemi varsa hepsi tek transaction, yoksa tek sorgu (bugünkü davranış). */
-  private async writeMembership(
-    write: Prisma.PrismaPromise<unknown>,
-    e2eeOps: Prisma.PrismaPromise<unknown>[],
-  ): Promise<void> {
-    if (e2eeOps.length === 0) await write;
-    else await this.prisma.$transaction([write, ...e2eeOps]);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
