@@ -4,6 +4,9 @@
 > 🔴 **R7:** okundu karar yüzeyi (C12 `readReceiptDecision`, C34 `groupReadReceiptDecision`). C34 §1.2 "bireysel okuma
 > anları ASLA gönderilmez" kararı sahip tarafından KALDIRILDI (2026-11-13): uygun üyelerin bireysel okuma anı gider.
 
+> **Rev.1 (2026-11-13, sahip kararı, cihaz turu sonrası):** avatar sistemi YALNIZ grup DM'de. 1-1 DM eski C12 tik
+> davranışına döner (tek = gönderildi, çift = okundu). Sunucu `seenBy`'yi 1-1'de de göndermeye devam eder (istemci kullanmaz).
+
 ## §0 Hedef
 Mesajı kimin nereye kadar gördüğü, okuyanın küçük avatarıyla gösterilir: avatar, o kişinin okuduğu SON mesajın
 altında durur; daha yeni mesajları okudukça yumuşak animasyonla aşağı kayar. **Çift tik kalkar**; kendi mesajında
