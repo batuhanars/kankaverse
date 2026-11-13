@@ -408,9 +408,12 @@ watch(
     } else {
       realtimeError.value = false
     }
-    stickToBottom = true // (let, ilk await'ten sonra: TDZ) yükleme/çözme sırasında büyüyen içerik dibe yapışsın
     // E1: şifreli DM'de önce Welcome/commit'ler işlenir ki mesajlar doğru epoch'ta çözülsün.
     await e2eeStore.openChannel(id) // eski grupta no-op (depo kapısı)
+    // 🔴 `stickToBottom` aşağıda `let` ile tanımlı: atama İLK await'ten SONRA olmalı (TDZ). C62 sahip bulgusu
+    // 2026-11-13: eski grupta joinChannel await'i atlanınca atama kurulum sırasında çalıştı, ekran çöktü
+    // ("Cannot access before initialization"). openChannel her yolda await eder (`ready`), atama onun arkasında.
+    stickToBottom = true // yükleme/çözme sırasında büyüyen içerik dibe yapışsın
     void noticesStore.load(id) // E2 §3.3: yerel depodan "yeni cihaz eklendi" satırları
     await messagesStore.fetchMessages(id)
     void e2eeStore.syncChannel(id) // E1: mesajlar çözüldükten SONRA commit senkronu (sıra önemli); eski grupta no-op
