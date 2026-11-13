@@ -40,6 +40,7 @@ const prismaMock = {
   message: {
     findFirst: jest.fn(),
   },
+  groupDmEvent: { create: jest.fn().mockReturnValue('event-op') },
   groupDmDeparture: {
     findMany: jest.fn(),
     upsert: jest.fn(),

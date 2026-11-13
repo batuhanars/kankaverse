@@ -14,6 +14,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { DmService } from './dm.service';
+import { DmGroupEventsService } from './dm-group-events.service';
 import { CreateDmChannelDto } from './dto/create-dm-channel.dto';
 import { CreateGroupDmDto } from './dto/create-group-dm.dto';
 import { AddGroupMemberDto } from './dto/add-group-member.dto';
@@ -27,7 +28,10 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 @Controller('dm')
 export class DmController {
-  constructor(private dmService: DmService) {}
+  constructor(
+    private dmService: DmService,
+    private groupEvents: DmGroupEventsService,
+  ) {}
 
   @Get('channels')
   @ApiOperation({
@@ -121,6 +125,16 @@ export class DmController {
   @ApiOperation({ summary: 'Gruptan ayrıl; üye < 2 kalırsa kanal soft-delete' })
   leaveGroupDm(@CurrentUser() user: { id: string }, @Param('id') groupId: string) {
     return this.dmService.leaveGroupDm(user.id, groupId);
+  }
+
+  @Get('groups/:id/events')
+  @ApiOperation({
+    summary:
+      'C64: grup üyelik olay satırları (eklendi/ayrıldı/çıkarıldı), eskiden yeniye, en çok son 200. ' +
+      'Aktif üye katılımından, eski üye ayrıldığı ana kadar görür.',
+  })
+  listGroupEvents(@CurrentUser() user: { id: string }, @Param('id') groupId: string) {
+    return this.groupEvents.listEvents(user.id, groupId);
   }
 
   @Delete('groups/:id/departure')

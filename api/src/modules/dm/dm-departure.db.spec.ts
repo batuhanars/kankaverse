@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { MembershipService } from '../../shared/membership/membership.service';
 import { MessagesService } from '../messages/messages.service';
 import { DmService } from './dm.service';
+import { DmGroupEventsService } from './dm-group-events.service';
 
 const run = process.env.E2EE_DB_TESTS === '1' ? describe : describe.skip;
 
@@ -19,7 +20,7 @@ run('C62 grup DM departure gerçek DB', () => {
   const userIds: string[] = [];
   const channelIds: string[] = [];
 
-  const realtime = { removeUserFromRoom: jest.fn(), emitToUser: jest.fn() };
+  const realtime = { removeUserFromRoom: jest.fn(), emitToUser: jest.fn(), emitToUsers: jest.fn() };
   const membership = new MembershipService(prisma, { hasFullAccess: jest.fn() } as never);
   const dm = new DmService(prisma, { canDm: jest.fn() } as never, realtime as never);
   const messages = new MessagesService(
@@ -31,6 +32,8 @@ run('C62 grup DM departure gerçek DB', () => {
     {} as never,
     {} as never,
   );
+
+  const events = new DmGroupEventsService(prisma, membership);
 
   async function makeUser(name: string) {
     const u = await prisma.user.create({
@@ -70,6 +73,7 @@ run('C62 grup DM departure gerçek DB', () => {
     prisma.message.create({ data: { channelId, authorId, content, createdAt } });
 
   afterAll(async () => {
+    await prisma.groupDmEvent.deleteMany({ where: { channelId: { in: channelIds } } });
     await prisma.groupDmDeparture.deleteMany({ where: { channelId: { in: channelIds } } });
     await prisma.messageReaction.deleteMany({
       where: { message: { channelId: { in: channelIds } } },
@@ -286,5 +290,48 @@ run('C62 grup DM departure gerçek DB', () => {
     await prisma.user.update({ where: { id: c.id }, data: { deletedAt: new Date() } });
     const after = (await dm.getDmChannels(b.id)).find((x) => x.id === ch.id) as Record<string, any>;
     expect(after.members.map((m: { id: string }) => m.id)).toEqual([owner.id]);
+  });
+
+  it('C64: çıkarma + geri ekleme olay satırları; üyelikle aynı an; pencere (aktif/eski üye/yabancı) ve yayın alıcıları', async () => {
+    const { ch, owner, b, c } = await makeGroup('7');
+    await prisma.friendship.create({
+      data: { requesterId: owner.id, addresseeId: b.id, status: 'ACCEPTED' },
+    });
+    await dm.removeGroupMember(owner.id, ch.id, b.id);
+    const dep = await prisma.groupDmDeparture.findFirstOrThrow({
+      where: { channelId: ch.id, userId: b.id },
+    });
+    const removed = await prisma.groupDmEvent.findFirstOrThrow({ where: { channelId: ch.id } });
+    expect(removed).toMatchObject({ kind: 'MEMBER_REMOVED', actorId: owner.id, targetId: b.id });
+    expect(removed.createdAt).toEqual(dep.leftAt);
+    const [recipients, name] = realtime.emitToUsers.mock.calls[0];
+    expect(name).toBe('dm.group_event');
+    expect([...recipients].sort()).toEqual([owner.id, c.id, b.id].sort());
+
+    // eski üye kendi çıkarılma olayını görür; yabancı 403
+    const own = await events.listEvents(b.id, ch.id);
+    expect(own.map((e) => e.kind)).toEqual(['MEMBER_REMOVED']);
+    expect(own[0].actor?.id).toBe(owner.id);
+    const stranger = await makeUser('s7');
+    await expect(events.listEvents(stranger.id, ch.id)).rejects.toMatchObject({ status: 403 });
+
+    // geri ekle: ekleme olayı, ChannelMember.createdAt ile aynı an
+    await dm.addGroupMember(owner.id, ch.id, { userId: b.id });
+    const added = await prisma.groupDmEvent.findFirstOrThrow({
+      where: { channelId: ch.id, kind: 'MEMBER_ADDED' },
+    });
+    const cm = await prisma.channelMember.findFirstOrThrow({
+      where: { channelId: ch.id, userId: b.id },
+    });
+    expect(added.createdAt).toEqual(cm.createdAt);
+
+    // aktif b: katılımından (yeni) önceki çıkarılma olayı dönmez, ekleme olayı döner
+    const active = await events.listEvents(b.id, ch.id);
+    expect(active.map((e) => e.kind)).toEqual(['MEMBER_ADDED']);
+    // owner (eski üyelikten beri) ikisini de eskiden yeniye görür
+    const all = await events.listEvents(owner.id, ch.id);
+    expect(all.map((e) => e.kind)).toEqual(['MEMBER_REMOVED', 'MEMBER_ADDED']);
+    // olay mesaj hattına girmez
+    expect(await prisma.message.count({ where: { channelId: ch.id } })).toBe(0);
   });
 });

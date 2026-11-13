@@ -637,6 +637,25 @@ enum DepartureReason {
   REMOVED
 }
 
+enum GroupDmEventKind {
+  MEMBER_ADDED
+  MEMBER_LEFT
+  MEMBER_REMOVED
+}
+
+// C64: grup DM üyelik olay satırı ("X gruptan ayrıldı"). Message DEĞİL: okunmadı/bildirim/push/lastMessage/şifreleme
+// hattına girmez. Üyelik değişikliğiyle AYNI transaction ve AYNI an yazılır (createdAt açıkça verilir).
+model GroupDmEvent {
+  id        String            @id @default(cuid())
+  channelId String
+  kind      GroupDmEventKind
+  actorId   String? // ekleyen/çıkaran; MEMBER_LEFT'te null
+  targetId  String // eklenen/ayrılan/çıkarılan
+  createdAt DateTime // üyelik değişikliğiyle aynı an (@default DEĞİL)
+
+  @@index([channelId, createdAt])
+}
+
 // C62: gruptan ayrılan/çıkarılan üyenin listede kalması ve ayrılana kadarki geçmişi okuması için iz.
 // ChannelMember silme davranışı DEĞİŞMEZ; yalnız findMessages + DM listesi bu kayda bakar (R7).
 model GroupDmDeparture {

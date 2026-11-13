@@ -29,6 +29,7 @@ import {
   departureUpsertOp,
   loadDepartedGroupItems,
 } from './dm-departure.util';
+import { GroupDmEventInput, buildGroupEventPayload, groupEventCreateOp } from './dm-group-event.util';
 
 /**
  * 🫀 C12 §3.2 — okundu bilgisi görünürlük kararı. **T&S karar fonksiyonu (R7), satır satır insan
@@ -629,12 +630,33 @@ export class DmService {
     // aynı transaction'da silinir; commit sonrası `e2ee:devices-changed`.
     // C62 §2.2: geri eklenen normal üyedir; ayrılma izi (departure) üyelik create ile aynı tx'te silinir.
     await this.e2ee?.assertMemberAddable(groupId, targetId);
+    // C64 §2.2: olay satırı üyelikle AYNI tx ve AYNI an (`at`; ChannelMember.createdAt açıkça verilir).
+    const at = new Date();
+    const added = groupEventCreateOp(this.prisma, {
+      channelId: groupId,
+      kind: 'MEMBER_ADDED',
+      actorId: callerId,
+      targetId,
+      createdAt: at,
+    });
     await this.prisma.$transaction([
-      this.prisma.channelMember.create({ data: { channelId: groupId, userId: targetId } }),
+      this.prisma.channelMember.create({
+        data: { channelId: groupId, userId: targetId, createdAt: at },
+      }),
       this.prisma.groupDmDeparture.deleteMany({ where: { channelId: groupId, userId: targetId } }),
+      added.op,
       ...(this.e2ee?.addOps(groupId, targetId) ?? []),
     ]);
     await this.e2ee?.afterAdd(groupId, targetId);
+    // Alıcılar: değişiklik SONRASI grubun tüm üyeleri (eklenen dahil).
+    const members = await this.prisma.channelMember.findMany({
+      where: { channelId: groupId },
+      select: { userId: true },
+    });
+    await this.emitGroupEvent(
+      added.event,
+      (members ?? []).map((m) => m.userId),
+    );
 
     return {
       id: target.id,
@@ -659,7 +681,7 @@ export class DmService {
       });
     }
 
-    await this.deleteGroupMembership(groupId, userId, membership, 'LEFT');
+    await this.deleteGroupMembership(groupId, userId, membership, 'LEFT', null);
 
     return null;
   }
@@ -697,7 +719,7 @@ export class DmService {
       });
     }
 
-    await this.deleteGroupMembership(groupId, targetUserId, membership, 'REMOVED');
+    await this.deleteGroupMembership(groupId, targetUserId, membership, 'REMOVED', callerId);
 
     return null;
   }
@@ -713,6 +735,7 @@ export class DmService {
     userId: string,
     membership: { id: string; createdAt: Date; clearedAt: Date | null },
     reason: DepartureReasonValue,
+    actorId: string | null,
   ) {
     const e2eeOps = (await this.e2ee?.departureOps(groupId, userId)) ?? [];
     const others = await this.prisma.channelMember.findMany({
@@ -720,6 +743,14 @@ export class DmService {
       select: { userId: true },
     });
     const leftAt = new Date();
+    // C64 §2.2: olay `leftAt` ile AYNI an ve AYNI tx. LEFT → actor null; REMOVED → çıkaran.
+    const left = groupEventCreateOp(this.prisma, {
+      channelId: groupId,
+      kind: reason === 'LEFT' ? 'MEMBER_LEFT' : 'MEMBER_REMOVED',
+      actorId: reason === 'LEFT' ? null : actorId,
+      targetId: userId,
+      createdAt: leftAt,
+    });
     await this.prisma.$transaction([
       departureUpsertOp(this.prisma, {
         channelId: groupId,
@@ -731,6 +762,7 @@ export class DmService {
         memberIds: others.map((o) => o.userId),
       }),
       this.prisma.channelMember.delete({ where: { id: membership.id } }),
+      left.op,
       ...e2eeOps,
     ]);
 
@@ -751,6 +783,18 @@ export class DmService {
       reason,
       leftAt: leftAt.toISOString(),
     });
+    // C64: kalan üyelere + ayrılana `dm.group_event` (kanal silinse de; kalan üyeye ve ayrılana gider).
+    await this.emitGroupEvent(left.event, [...others.map((o) => o.userId), userId]);
+  }
+
+  /** C64: commit sonrası `dm.group_event` yayını. Best-effort: yayın hatası işlemi bozmaz. */
+  private async emitGroupEvent(event: GroupDmEventInput, recipientIds: string[]): Promise<void> {
+    try {
+      const payload = await buildGroupEventPayload(this.prisma, event);
+      this.realtime.emitToUsers([...new Set(recipientIds)], 'dm.group_event', payload);
+    } catch {
+      // olay satırı zaten yazıldı; canlı yayın düşerse istemci sayfa yenilemesinde görür
+    }
   }
 
   /** DELETE /dm/groups/:id/departure — eski üye, ayrılma kaydını (listedeki grubu) siler; yerel etki, olay yok. */

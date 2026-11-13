@@ -31,6 +31,7 @@ function setup() {
     friendship: { findFirst: jest.fn() },
     message: { findFirst: jest.fn() },
     // C62: ayrılma izi; op'lar tx dizisinde okunabilsin diye sabit dize döner
+    groupDmEvent: { create: jest.fn().mockReturnValue('event-op') },
     groupDmDeparture: {
       findMany: jest.fn().mockResolvedValue([]),
       upsert: jest.fn().mockReturnValue('departure-op'),
@@ -81,6 +82,7 @@ describe('DmService.addGroupMember: E2EE bağlantısı (§2.2/§2.4)', () => {
     expect(prisma.$transaction).toHaveBeenCalledWith([
       'create-op',
       'departure-delete-op',
+      'event-op',
       'former-delete-op',
     ]);
     expect(prisma.groupDmDeparture.deleteMany).toHaveBeenCalledWith({
@@ -114,6 +116,7 @@ describe('DmService.leaveGroupDm / removeGroupMember: E2EE bağlantısı (§2.4)
     expect(prisma.$transaction).toHaveBeenCalledWith([
       'departure-op',
       'delete-op',
+      'event-op',
       'former-upsert-op',
       'welcome-delete-op',
     ]);
@@ -156,7 +159,7 @@ describe('DmService.leaveGroupDm / removeGroupMember: E2EE bağlantısı (§2.4)
     await service.leaveGroupDm(TARGET, GROUP);
 
     expect(prisma.channelMember.delete).toHaveBeenCalledTimes(1);
-    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op']);
+    expect(prisma.$transaction).toHaveBeenCalledWith(['departure-op', 'delete-op', 'event-op']);
     expect(e2ee.afterDeparture).toHaveBeenCalledWith(GROUP, TARGET, false);
   });
 
