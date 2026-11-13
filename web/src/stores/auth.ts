@@ -24,15 +24,15 @@ export const useAuthStore = defineStore('auth', () => {
 
   // E1: yeni giriş = yeni oturum zinciri = yeni şifreleme cihazı. Eski oturumdan kalan yerel şifreli
   // depo bu oturuma ait değildir (cihaz kimliği/anahtarı uyuşmaz) ve başka hesaba ait olabilir: silinir.
-  // C69: masaüstü uygulamasında çıkışta depo korunur; girişte yalnız BAŞKA kullanıcının deposu silinir,
-  // aynı kullanıcınınki kalır (motor açılışta park edilmiş cihazı yeniden bağlar, olmazsa kendisi siler).
-  const wipeE2eeForLogin = (userId: string) =>
-    keepsE2eeDevice() ? useE2eeStore().dropOtherUsers(userId) : useE2eeStore().wipe()
+  // C69: masaüstü uygulamasında girişte HİÇBİR depo silinmez (hesap değişiminde de; sahip kararı 2026-11-13).
+  // Depolar kullanıcı başına ayrı ve kendi anahtarıyla; yalnız giriş yapan hesabınki açılır. Aynı kullanıcının
+  // park edilmiş cihazını motor açılışta yeniden bağlar, reddedilirse kendisi siler. Tarayıcı: bugünkü gibi silinir.
+  const wipeE2eeForLogin = () => (keepsE2eeDevice() ? Promise.resolve() : useE2eeStore().wipe())
   const wipeE2ee = () => useE2eeStore().wipe()
 
   async function register(payload: RegisterPayload) {
     const res = await authApi.register(payload)
-    await wipeE2eeForLogin(res.data.user.id)
+    await wipeE2eeForLogin()
     setAccessToken(res.data.accessToken)
     user.value = res.data.user
   }
@@ -45,7 +45,7 @@ export const useAuthStore = defineStore('auth', () => {
       return data
     }
     const authData = data
-    await wipeE2eeForLogin(authData.user.id)
+    await wipeE2eeForLogin()
     setAccessToken(authData.accessToken)
     user.value = authData.user
     return null
@@ -53,7 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function loginTwoFa(challengeToken: string, code: string) {
     const res = await authApi.loginTwoFa(challengeToken, code)
-    await wipeE2eeForLogin(res.data.user.id)
+    await wipeE2eeForLogin()
     setAccessToken(res.data.accessToken)
     user.value = res.data.user
   }

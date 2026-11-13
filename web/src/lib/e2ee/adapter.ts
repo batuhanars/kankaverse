@@ -11,6 +11,7 @@ import { detectWebProvider } from '@kankaverse/e2ee-core'
 import { webArgon2id } from './argon2'
 import { webBlobTransport } from './blobTransport'
 import { destroyOtherVaults, Vault } from './vault'
+import { keepsE2eeDevice } from './keepDevice'
 
 const sameTab = serialLock()
 
@@ -38,9 +39,10 @@ export async function startWebEngine(
   }
   return E2eeEngine.start(userId, {
     api,
-    // Aynı tarayıcıdaki başka hesapların kalıntısı bu kullanıcıya karışmasın / sızmasın (hesap değişimi).
+    // Tarayıcı: başka hesapların kalıntısı silinir (ortak bilgisayar). Masaüstü (C69): diğer hesapların depoları
+    // KALIR; her depo kendi anahtarıyla ayrı, yalnız giriş yapan hesabınki açılır (sahip kararı 2026-11-13).
     openVault: async (id) => {
-      await destroyOtherVaults(id)
+      if (!keepsE2eeDevice()) await destroyOtherVaults(id)
       return Vault.open(id)
     },
     withLock: webLock,

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { ChannelInfo, E2eeEngine, EvidenceItem, SentCipher, WarningKind } from '@kankaverse/e2ee-client';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { startMobileEngine } from '@/e2ee/startEngine';
-import { dropOtherMobileVaults, wipeMobileVaults } from '@/e2ee/sqliteRows';
+import { wipeMobileVaults } from '@/e2ee/sqliteRows';
 import { useDmStore } from '@/stores/dm';
 import { isDepartedGroup } from '@/e2ee/departed';
 import { clearDeviceNotices, loadDeviceNotices } from '@/stores/e2eeNotices';
@@ -66,15 +66,6 @@ export function releaseE2ee(): void {
   clearDeviceNotices();
   ready = Promise.resolve();
   current?.release();
-}
-
-/** C69 giriş: yerel depo BAŞKA kullanıcıya aitse silinir; aynı kullanıcınınki kalır. Depo kullanıcı başınadır (`user_id`). */
-export async function dropOtherE2eeUsers(userId: string): Promise<void> {
-  try {
-    await dropOtherMobileVaults(userId);
-  } catch (e) {
-    console.error('[E2EE] başka hesabın deposu silinemedi', e instanceof Error ? e.name : '');
-  }
 }
 
 /** Hesap silme: bu cihazdaki TÜM şifreli yerel depolar silinir (E1 §5). */

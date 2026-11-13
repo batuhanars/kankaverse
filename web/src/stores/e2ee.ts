@@ -14,7 +14,7 @@ import type {
   WarningKind,
 } from '@kankaverse/e2ee-client'
 import { startWebEngine } from '@/lib/e2ee/adapter'
-import { destroyAllVaults, destroyOtherVaults } from '@/lib/e2ee/vault'
+import { destroyAllVaults } from '@/lib/e2ee/vault'
 import type { MessageDto } from '@/types'
 
 /** `dm.message` soketindeki şifreli yük (api `e2eePushField`, E3 Rev.5). */
@@ -91,18 +91,6 @@ export const useE2eeStore = defineStore('e2ee', () => {
     warnings.value = {}
     ready = Promise.resolve()
     current?.release()
-  }
-
-  /**
-   * C69 giriş: yerel depo BAŞKA kullanıcıya aitse silinir; aynı kullanıcınınsa kalır (rebind için).
-   * Vault'lar kullanıcı başına ayrı veritabanıdır (`kv-e2ee:<userId>`), bu yüzden "başkasının" = adı farklı olan.
-   */
-  async function dropOtherUsers(userId: string): Promise<void> {
-    try {
-      await destroyOtherVaults(userId)
-    } catch (e) {
-      console.error('[e2ee] başka hesabın deposu silinemedi', e)
-    }
   }
 
   /** Şifrelenebilen sohbet: 1-1 DM ya da grup DM (E2 §3.1). Ortam kanalları şifrelenmez. */
@@ -328,7 +316,6 @@ export const useE2eeStore = defineStore('e2ee', () => {
     init,
     wipe,
     release,
-    dropOtherUsers,
     openChannel,
     syncChannel,
     plainTick,

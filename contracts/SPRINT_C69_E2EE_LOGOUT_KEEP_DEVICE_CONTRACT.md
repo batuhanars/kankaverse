@@ -36,7 +36,7 @@ kurul şartı). Masaüstü ayrımı: `window.kankaverse` köprüsü (desktop/src
 - Çıkış: depo SİLİNMEZ (mobil + masaüstü). Tarayıcıda `wipeE2ee` aynen.
 - Giriş sonrası: yerel depoda bu kullanıcının cihazı varsa önce rebind; başarılıysa normal açılış (geri yükleme bandı,
   "cihaz öncesi gizli" çıkmaz). Başarısızsa bugünkü yeni cihaz akışı.
-- **Başka hesap girerse:** yerel depodaki önceki hesabın verisi silinir (sunucudaki park kaydı 30 günde düşer).
+- **Başka hesap girerse:** ~~önceki hesabın verisi silinir~~ **Rev.1 (sahip kararı 2026-11-14): HİÇBİR hesabın verisi silinmez** (mobil + masaüstü). Depolar kullanıcı başına ayrı ve kendi anahtarıyla; yalnız giriş yapan hesabınki açılır, kural koruma sağlamıyordu. Tarayıcı bugünkü gibi siler. Diğer hesabın park kaydı sunucuda 30 günde düşer; dönünce rebind reddedilirse motor o depoyu siler.
 - ~~Geri dönüşte birikmiş commit işlenemezse yeni cihaz akışı~~ → **D110 borcuna alındı** (sahip onayı 2026-11-13; C69 dışı, bugün de var).
 - Açılışta park sırasında iptal edilmiş cihaz (Oturumlarım'dan kaldırılmış / parola değişmiş): rebind reddedilir → yerel silinir.
 

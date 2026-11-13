@@ -14,7 +14,7 @@ import { isDefinitiveRefreshRejection, retryTransient } from '@/api/refreshRejec
 import { resetSocket } from '@/realtime/socket';
 import { clearPushToken } from '@/notifications/push';
 import { clearResume } from '@/utils/resumeLastScreen';
-import { dropOtherE2eeUsers, releaseE2ee, wipeE2ee } from '@/stores/e2ee';
+import { releaseE2ee, wipeE2ee } from '@/stores/e2ee';
 
 export type AuthStatus = 'booting' | 'authenticated' | 'unauthenticated';
 export type LoginResult = 'ok' | 'challenge' | 'error';
@@ -108,9 +108,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ challenge: { challengeToken: result.challengeToken } });
         return 'challenge';
       }
-      // C69: yeni giriş: yalnız BAŞKA kullanıcının yerel şifreli deposu silinir; aynı kullanıcınınki kalır
-      // (motor park edilmiş cihazı imzayla yeniden bağlar, reddedilirse depoyu kendisi siler).
-      await dropOtherE2eeUsers(result.user.id);
       setAccessToken(result.accessToken);
       if (result.refreshToken) {
         await setRefreshToken(result.refreshToken);
@@ -129,9 +126,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ errorMessage: null });
     try {
       const result = await authApi.loginTwoFa(challenge.challengeToken, code);
-      // C69: yeni giriş: yalnız BAŞKA kullanıcının yerel şifreli deposu silinir; aynı kullanıcınınki kalır
-      // (motor park edilmiş cihazı imzayla yeniden bağlar, reddedilirse depoyu kendisi siler).
-      await dropOtherE2eeUsers(result.user.id);
       setAccessToken(result.accessToken);
       if (result.refreshToken) {
         await setRefreshToken(result.refreshToken);
@@ -148,9 +142,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ errorMessage: null });
     try {
       const result = await authApi.register(payload);
-      // C69: yeni giriş: yalnız BAŞKA kullanıcının yerel şifreli deposu silinir; aynı kullanıcınınki kalır
-      // (motor park edilmiş cihazı imzayla yeniden bağlar, reddedilirse depoyu kendisi siler).
-      await dropOtherE2eeUsers(result.user.id);
       setAccessToken(result.accessToken);
       if (result.refreshToken) {
         await setRefreshToken(result.refreshToken);

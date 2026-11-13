@@ -7,7 +7,6 @@ import { fromB64, toB64 } from '@kankaverse/e2ee-client'
 import {
   SealedVault,
   destroyAllVaults,
-  destroyOtherVaults,
   type KeyStore,
   type RowStore,
   type SealedRow,
@@ -88,16 +87,14 @@ const secureKeys: KeyStore = {
 
 const random = (n: number) => Crypto.getRandomBytes(n)
 
-/** Hesap değişimi: başka hesapların kalıntısı silinir, sonra bu kullanıcının deposu açılır. */
+/**
+ * Bu kullanıcının deposunu açar. C69 (sahip kararı 2026-11-13): diğer hesapların depoları SİLİNMEZ; her depo kendi
+ * Keystore anahtarıyla ayrı, yalnız giriş yapan hesabınki açılır. Hesap silme `wipeMobileVaults` ile hepsini siler.
+ */
 export async function openMobileVault(userId: string): Promise<SealedVault> {
-  await destroyOtherVaults(userId, sqliteRows, secureKeys)
   return SealedVault.open(userId, sqliteRows, secureKeys, random)
 }
 
-/** C69 giriş: yalnız BAŞKA kullanıcıların depoları silinir; girişteki kullanıcınınki kalır (rebind için). */
-export function dropOtherMobileVaults(userId: string): Promise<void> {
-  return destroyOtherVaults(userId, sqliteRows, secureKeys)
-}
 
 /** Hesap silme: bu cihazdaki TÜM kullanıcıların şifreli depoları silinir. */
 export function wipeMobileVaults(): Promise<void> {
