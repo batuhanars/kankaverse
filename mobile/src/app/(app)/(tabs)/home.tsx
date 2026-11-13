@@ -3,6 +3,7 @@ import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useGuildSyncStore } from '@/stores/guildSync';
 import { guildsApi, type GuildSummaryDto } from '@/api/guilds';
 import type { ChannelSummaryDto } from '@/api/channels';
 import type { DmChannelDto } from '@/api/dm';
@@ -138,6 +139,19 @@ export default function HomeScreen() {
     if (joinedId) setSelection({ type: 'guild', id: joinedId });
     router.setParams({ joinedGuildId: undefined, refreshGuilds: undefined });
   }, [params.joinedGuildId, params.refreshGuilds, fetchGuilds, router]);
+
+  // C62 §5 — soket: `guild.joined` listeyi tazeler; atılan/ayrılan bensem ortam yerelden düşer ve
+  // seçiliyse DM görünümüne dönülür (ortam ekranlarını `(app)/_layout.tsx` kapatır).
+  const refreshTick = useGuildSyncStore((s) => s.refreshTick);
+  const removed = useGuildSyncStore((s) => s.removed);
+  useEffect(() => {
+    if (refreshTick > 0) fetchGuilds();
+  }, [refreshTick, fetchGuilds]);
+  useEffect(() => {
+    if (!removed) return;
+    setGuilds((cur) => cur.filter((g) => g.id !== removed.guildId));
+    setSelection((cur) => (cur.type === 'guild' && cur.id === removed.guildId ? { type: 'dm' } : cur));
+  }, [removed]);
 
   function retryGuilds() {
     setGuildState('loading');

@@ -10,6 +10,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { SelectSheet } from '@/components/guild/SelectSheet';
 import { getMuteDurationOptions, getNotificationLevelOptions, muteMinutesFromValue } from '@/utils/notifPrefUi';
 import { DmMenuSheet } from './DmMenuSheet';
+import { DeleteDepartedDialog } from '@/components/dm/DeleteDepartedDialog';
 import { t } from '@/i18n';
 
 /**
@@ -34,6 +35,8 @@ type SubSheet = 'none' | 'mute' | 'level';
 export function DmMenuHost({ channel, onClose, onOpenDetails, onAddFriend }: Props) {
   const [clearTarget, setClearTarget] = useState<DmChannelDto | null>(null);
   const [clearing, setClearing] = useState(false);
+  // C62 — eski grupta uzun basma menüsü yalnız "Sohbeti sil"; onay kendi diyaloğunda.
+  const [deleteDepartedId, setDeleteDepartedId] = useState<string | null>(null);
   // Sprint M2b §4.1 — süre/seviye seçici, `DmMenuSheet`in ÜSTÜNE değil YERİNE açılır (tek modal
   // katmanı — iki `Modal` aynı anda görünür olsaydı arka arkaya iki karartılmış perde binerdi).
   // `channel` (ebeveynin `menuDm`'i) BURADA sıfırlanmaz; yalnız hangi katmanın göründüğü değişir —
@@ -128,6 +131,7 @@ export function DmMenuHost({ channel, onClose, onOpenDetails, onAddFriend }: Pro
     <>
       <DmMenuSheet
         visible={!!channel && subSheet === 'none'}
+        departedOnly={channel?.type === 'GROUP_DM' && !!channel.departed}
         title={channel ? channelTitle(channel) : ''}
         hasUnread={!!channel?.unread}
         // Kanka Ekle yalnız 1-1 DM'de VE henüz kanka olunmamışsa (§4 — yukarıdaki kapı).
@@ -154,7 +158,8 @@ export function DmMenuHost({ channel, onClose, onOpenDetails, onAddFriend }: Pro
           useDmStore.getState().clearUnread(c.id);
         }}
         onClear={() => {
-          setClearTarget(channel);
+          if (channel?.type === 'GROUP_DM' && channel.departed) setDeleteDepartedId(channel.id);
+          else setClearTarget(channel);
           closeAll();
         }}
         canReport={!!otherUserId}
@@ -166,6 +171,14 @@ export function DmMenuHost({ channel, onClose, onOpenDetails, onAddFriend }: Pro
         onMutePress={onMutePress}
         onLevelPress={() => setSubSheet('level')}
       />
+
+      {deleteDepartedId && (
+        <DeleteDepartedDialog
+          groupId={deleteDepartedId}
+          onCancel={() => setDeleteDepartedId(null)}
+          onDeleted={() => setDeleteDepartedId(null)}
+        />
+      )}
 
       {clearTarget && (
         <ConfirmDialog

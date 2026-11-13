@@ -25,6 +25,8 @@ import { theme } from '@/theme';
  */
 interface Props {
   visible: boolean;
+  /** C62 — eski grup (gruptan ayrılan/çıkarılan): menüde yalnız "Sohbeti sil" kalır. */
+  departedOnly?: boolean;
   title: string;
   /** Okunmamış mesaj var mı — yoksa "Okunmuş İşaretle" soluk + pasif. */
   hasUnread: boolean;
@@ -52,6 +54,7 @@ interface Props {
 
 export function DmMenuSheet({
   visible,
+  departedOnly = false,
   title,
   hasUnread,
   canAddFriend,
@@ -83,6 +86,15 @@ export function DmMenuSheet({
               {title}
             </Text>
 
+            {departedOnly ? (
+              <View style={styles.group}>
+                <Pressable style={styles.option} onPress={onClear}>
+                  <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
+                  <Text style={[styles.optionText, styles.optionTextDanger]}>{t('mobile.dm.departedDelete')}</Text>
+                </Pressable>
+              </View>
+            ) : (
+            <>
             <View style={styles.group}>
               <Pressable style={styles.option} onPress={onDetails}>
                 <Ionicons name="information-circle-outline" size={20} color={theme.colors.textSecondary} />
@@ -151,6 +163,8 @@ export function DmMenuSheet({
                 </>
               )}
             </View>
+            </>
+            )}
           </View>
         </Pressable>
       </Pressable>

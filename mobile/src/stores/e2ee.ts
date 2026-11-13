@@ -4,6 +4,7 @@ import { messagesApi, type MessageDto } from '@/api/messages';
 import { startMobileEngine } from '@/e2ee/startEngine';
 import { wipeMobileVaults } from '@/e2ee/sqliteRows';
 import { useDmStore } from '@/stores/dm';
+import { isDepartedGroup } from '@/e2ee/departed';
 import { clearDeviceNotices, loadDeviceNotices } from '@/stores/e2eeNotices';
 import { t } from '@/i18n';
 
@@ -75,10 +76,14 @@ async function isEncryptableDm(channelId: string): Promise<boolean> {
   return useDmStore.getState().channels.some((c) => c.id === channelId && (c.type === 'DM' || c.type === 'GROUP_DM'));
 }
 
+/** C62: gruptan ayrılmış/çıkarılmış sohbet. Motor orada Welcome/senkron/açma ağ çağrısı yapmaz (üyelik yok,
+ *  sunucu reddeder ve "çıkarıldı" uyarısı üretirdi); çözme yalnız yerel depodan çalışır. */
+const isDeparted = (channelId: string): boolean => isDepartedGroup(useDmStore.getState().channels, channelId);
+
 export async function openE2eeChannel(channelId: string): Promise<void> {
   await ready;
   const engine = get().engine;
-  if (!engine || !(await isEncryptableDm(channelId))) return;
+  if (!engine || !(await isEncryptableDm(channelId)) || isDeparted(channelId)) return;
   try {
     const info = await engine.open(channelId);
     set((s) => ({ channels: { ...s.channels, [channelId]: info } }));
@@ -92,7 +97,7 @@ export async function openE2eeChannel(channelId: string): Promise<void> {
 export async function syncE2eeChannel(channelId: string): Promise<void> {
   await ready;
   const engine = get().engine;
-  if (!engine || !(await isEncryptableDm(channelId))) return;
+  if (!engine || !(await isEncryptableDm(channelId)) || isDeparted(channelId)) return;
   await engine.onGroupChanged(channelId).catch((e) => console.error('[E2EE] senkron', e instanceof Error ? e.name : ''));
   await loadDeviceNotices(channelId); // commit "yeni cihaz eklendi" satırı üretmiş olabilir (E2 §3.3)
 }
@@ -118,10 +123,15 @@ const undecryptable = (m: MessageDto): MessageDto =>
 async function fillQuote(m: MessageDto): Promise<MessageDto> {
   const r = m.replyTo;
   const engine = get().engine;
-  if (!r || r.content !== '' || r.attachment || !engine) return m;
+  if (!r || r.content !== '' || r.attachment || r.editedAfterLeave || !engine) return m;
   const text = await engine.quoteText(r.id);
   return { ...m, replyTo: text === null ? { ...r, e2eeUnknown: true } : { ...r, content: text } };
 }
+
+/** C62: ayrıldıktan sonra düzenlenen mesajın içeriği sunucuda boşaltıldı; motorun etiketi ya da yerel depodan
+ *  doldurduğu metin gösterilmez (balon `editedAfterLeave` notunu çizer). */
+const keepEditedAfterLeaveEmpty = (m: MessageDto): MessageDto =>
+  m.editedAfterLeave ? { ...m, content: '', e2eeStatus: undefined } : m;
 
 /** `asc` eskiden yeniye. Şifresiz liste aynen geçer; şifreliler çözülür, iptal cihazdan gelenler elenir. */
 export async function hydrateMessages(channelId: string, asc: MessageDto[]): Promise<MessageDto[]> {
@@ -131,7 +141,7 @@ export async function hydrateMessages(channelId: string, asc: MessageDto[]): Pro
   const out = engine
     ? await engine.hydrate(channelId, asc).catch(() => asc.map(undecryptable))
     : asc.map(undecryptable);
-  return Promise.all(out.map(fillQuote));
+  return Promise.all(out.map(keepEditedAfterLeaveEmpty).map(fillQuote));
 }
 
 /**
@@ -215,9 +225,9 @@ export async function hydratePage(
   }
   try {
     const out = await engine.hydrateHistory(channelId, descPage, loadOlder);
-    return Promise.all(out.map(fillQuote));
+    return Promise.all(out.map(keepEditedAfterLeaveEmpty).map(fillQuote));
   } catch {
-    return descPage.map(undecryptable);
+    return descPage.map(undecryptable).map(keepEditedAfterLeaveEmpty);
   }
 }
 

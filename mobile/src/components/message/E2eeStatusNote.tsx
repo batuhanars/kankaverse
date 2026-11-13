@@ -19,6 +19,11 @@ export function E2eeStatusNote({ status }: { status: 'unsupported' | 'undecrypta
   );
 }
 
+/** C62 — eski üye: mesaj ayrıldıktan sonra düzenlendi, içerik gösterilmez. */
+export function EditedAfterLeaveNote() {
+  return <Text style={styles.note}>{t('mobile.dm.editedAfterLeave')}</Text>;
+}
+
 const styles = StyleSheet.create({
   note: { color: theme.colors.textMuted, fontSize: theme.fontSize.md, fontStyle: 'italic' },
 });

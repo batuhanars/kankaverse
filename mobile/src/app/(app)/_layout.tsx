@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
-import { Redirect, Stack, usePathname, useRouter } from 'expo-router';
+import { Redirect, Stack, useGlobalSearchParams, usePathname, useRouter } from 'expo-router';
 import { theme } from '@/theme';
 import { useAuthStore } from '@/stores/auth';
 import { restoreActiveAiVideo, useAiVideoViewerStore } from '@/stores/aiVideoViewer';
 import { useShareIntentStore } from '@/stores/shareIntent';
 import { useDmStore } from '@/stores/dm';
+import { useGuildSyncStore } from '@/stores/guildSync';
 import { initE2ee } from '@/stores/e2ee';
 import { backupOnBackground, startBackup, stopBackup } from '@/stores/e2eeBackup';
 import { TransferIncomingSheet, TransferNewSheet } from '@/components/transfer/TransferSheets';
@@ -44,6 +45,20 @@ export default function AppLayout() {
     const timer = setTimeout(() => router.push('/share'), 0);
     return () => clearTimeout(timer);
   }, [status, sharePayloadId, pathname, router]);
+
+  // C62 §5 — ortamdan atıldım/ayrıldım: o ortamın kanal/ayar ekranı açıksa ana ekrana dön.
+  // Kanal ekranı `guildId`, `guild-*` ekranları `id` (ortam kimliği) paramıyla gelir.
+  const removedGuild = useGuildSyncStore((s) => s.removed);
+  const globalParams = useGlobalSearchParams<{ id?: string; guildId?: string }>();
+  useEffect(() => {
+    if (!removedGuild) return;
+    const open =
+      globalParams.guildId === removedGuild.guildId ||
+      (pathname.startsWith('/guild-') && globalParams.id === removedGuild.guildId);
+    if (open) router.dismissAll();
+    // Yalnız olay anında karar verilir; param değişimi yeniden tetiklemesin.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [removedGuild]);
 
   // Sözleşme §8.3 — DM store'u oturum kapsamlıdır: `useBackgroundSocket` ile aynı gerekçeyle burada
   // bağlanır. Mount = oturum başı (id yazılır, `applyActivity` "bu mesaj benim mi"yi bilir),

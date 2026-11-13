@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -64,6 +64,12 @@ export default function DmDetailsScreen() {
   const [profileOpen, setProfileOpen] = useState(false);
 
   const muted = useNotificationPrefsStore((s) => s.isMuted(NotifTargetType.CHANNEL, id ?? ''));
+
+  // C62 — eski grupta detay/üye yönetimi kapalı (sunucu 403): ekran açıkken ayrılma gelirse geri dön.
+  const departed = channel?.type === 'GROUP_DM' && !!channel.departed;
+  useEffect(() => {
+    if (departed) router.back();
+  }, [departed, router]);
 
   const tabs = useMemo(() => {
     const rest: { key: ChannelDetailsTab; label: string }[] = [

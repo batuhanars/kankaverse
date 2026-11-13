@@ -85,6 +85,10 @@ interface DmState {
   removeGroupMember: (groupId: string, userId: string) => Promise<void>;
   setGroupAdmin: (groupId: string, userId: string, isAdmin: boolean) => Promise<void>;
   leaveGroup: (groupId: string) => Promise<void>;
+  /** C62 — WS `dm.group_departed`: kanal yerinde "eski grup"a çevrilir (açık ekran anında kilitlenir). */
+  applyGroupDeparted: (payload: { channelId: string; reason: 'LEFT' | 'REMOVED'; leftAt: string }) => void;
+  /** C62 — eski grup sohbetini listemden sil (grup/üyeler etkilenmez). */
+  deleteDeparted: (groupId: string) => Promise<void>;
   deleteGroup: (groupId: string) => Promise<void>;
   renameGroup: (groupId: string, name: string) => Promise<void>;
   /** Oturum başlar/biter: id verilir ya da null ile TÜM DM durumu silinir. null hâli kritik —
@@ -333,6 +337,41 @@ export const useDmStore = create<DmState>((set, get) => ({
 
   async leaveGroup(groupId) {
     await dmApi.leaveGroup(groupId);
+    // C62: ayrılınca grup listeden DÜŞMEZ, eski grup olarak kalır. Soket olayı yanıttan önce
+    // gelmiş olabilir; uygulama idempotent (zaten `departed` ise dokunmaz).
+    get().applyGroupDeparted({ channelId: groupId, reason: 'LEFT', leftAt: new Date().toISOString() });
+    void get().fetchAll();
+  },
+
+  applyGroupDeparted({ channelId, reason, leftAt }) {
+    const { channels, myId } = get();
+    const existing = channels.find((c) => c.id === channelId);
+    if (!existing) {
+      // Listede yok (soğuk durum): sunucudan tam liste, eski grup `departed` ile gelir.
+      void get().fetchAll();
+      return;
+    }
+    if (existing.type !== 'GROUP_DM' || existing.departed) return;
+    set((s) => ({
+      channels: s.channels.map((c) =>
+        c.id === channelId && c.type === 'GROUP_DM'
+          ? {
+              ...c,
+              departed: { leftAt, reason },
+              members: c.members.filter((m) => m.id !== myId),
+              adminIds: [],
+              unread: false,
+              lastReaction: null,
+              receiptsEnabled: false,
+              groupAllReadAt: null,
+            }
+          : c,
+      ),
+    }));
+  },
+
+  async deleteDeparted(groupId) {
+    await dmApi.deleteDeparture(groupId);
     set((s) => ({ channels: withoutChannel(s.channels, groupId) }));
   },
 

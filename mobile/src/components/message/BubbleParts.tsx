@@ -69,7 +69,9 @@ export function ReplyQuote({ message, isMine, resolveMention, resolveRole, onPre
                   />{' '}
                 </>
               ) : null}
-              {reply.e2eeUnknown
+              {reply.editedAfterLeave
+                ? t('mobile.dm.editedAfterLeave')
+                : reply.e2eeUnknown
                 ? t('e2ee.encryptedQuote') // E1: alıntılanan şifreli mesajın düz metni bu cihazda yok
                 : replyBody(formatMentionsPlain(reply.content, resolveMention, t('mention.unknown'), resolveRole), attachment)}
             </Text>

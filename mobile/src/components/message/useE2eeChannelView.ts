@@ -15,7 +15,13 @@ import type { MessageDto } from '@/api/messages';
 export function useE2eeChannelView(channelId: string, messages: MessageDto[], hasMore: boolean) {
   const encrypted = useE2eeStore((s) => s.channels[channelId]?.encrypted === true);
   // Kanala özel uyarı, yoksa cihaz geneli ('' anahtarı: örn. cihaz anahtarı bozuk).
-  const warning = useE2eeStore((s) => s.warnings[channelId] ?? s.warnings[''] ?? null);
+  const rawWarning = useE2eeStore((s) => s.warnings[channelId] ?? s.warnings[''] ?? null);
+  // C62: eski grupta "çıkarıldı" bandı çıkmaz; tek band var (üyelik bandı, MessageScreen `disabledNotice`).
+  const departed = useDmStore((s) => {
+    const c = s.channels.find((x) => x.id === channelId);
+    return c?.type === 'GROUP_DM' && !!c.departed;
+  });
+  const warning = departed ? null : rawWarning;
 
   const { dividerBeforeId, dividerAtEnd } = useMemo(() => {
     const first = messages.findIndex((m) => m.encrypted);

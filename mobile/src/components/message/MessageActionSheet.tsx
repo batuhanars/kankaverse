@@ -25,6 +25,8 @@ import { theme } from '@/theme';
 
 interface Props {
   visible: boolean;
+  /** C62 — salt okunur geçmiş: yalnız Kopyala + Şikâyet et (T&S: çıkarılan mağdur olabilir) çizilir. */
+  copyOnly?: boolean;
   /** Mesaj bana mı ait — düzenle yalnız o zaman render edilir. */
   isMine: boolean;
   /** Sil satırı: kendi mesajım ya da ortamda `MANAGE_MESSAGES` (web ile aynı kural; sunucu otorite). */
@@ -62,6 +64,7 @@ interface Props {
 
 export function MessageActionSheet({
   visible,
+  copyOnly = false,
   isMine,
   canDelete,
   myEmojis,
@@ -96,6 +99,7 @@ export function MessageActionSheet({
 
           <View style={styles.content}>
             {/* Hızlı tepki şeridi — verdiğim tepki vurgulu; tekrar dokunmak kaldırır (web ile aynı). */}
+            {!copyOnly && (
             <View style={styles.emojiRow}>
               {quickEmojis.map((emoji) => {
                 const mine = myEmojis.includes(emoji);
@@ -131,6 +135,7 @@ export function MessageActionSheet({
                 <Ionicons name="pencil-outline" size={16} color={theme.colors.textMuted} />
               </Pressable>
             </View>
+            )}
 
             <View style={styles.group}>
               {onReply && (
@@ -140,6 +145,7 @@ export function MessageActionSheet({
                   <Text style={styles.optionText}>{t('reply.button')}</Text>
                 </Pressable>
               )}
+              {!copyOnly && (<>
               {/* İlet — web'de var (`ForwardMessageModal.vue`), parite gereği mobile de geldi.
                   Ayrı bir uç DEĞİL: mesajın metni seçilen DM'e yeni mesaj olarak gönderilir. */}
               <Pressable style={styles.option} onPress={onForward}>
@@ -170,13 +176,14 @@ export function MessageActionSheet({
                   <Text style={styles.optionText}>{t('reaction.viewReactions')}</Text>
                 </Pressable>
               )}
+              </>)}
               <Pressable style={styles.option} onPress={onCopy}>
                 <Ionicons name="copy-outline" size={20} color={theme.colors.textSecondary} />
                 <Text style={styles.optionText}>{t('message.copyText')}</Text>
               </Pressable>
             </View>
 
-            {(canReport || canDelete) && (
+            {(canReport || (!copyOnly && canDelete)) && (
               <View style={styles.group}>
                 {canReport && (
                   <Pressable style={styles.option} onPress={onReport}>
@@ -184,7 +191,7 @@ export function MessageActionSheet({
                     <Text style={[styles.optionText, styles.optionTextDanger]}>{t('report.reportMessage')}</Text>
                   </Pressable>
                 )}
-                {canDelete && (
+                {!copyOnly && canDelete && (
                   <Pressable style={styles.option} onPress={onDelete}>
                     <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
                     <Text style={[styles.optionText, styles.optionTextDanger]}>{t('message.delete')}</Text>

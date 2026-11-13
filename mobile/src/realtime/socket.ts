@@ -12,6 +12,7 @@ import { useDmStore } from '@/stores/dm';
 import { useUnreadStore } from '@/stores/unread';
 import { useFriendsStore } from '@/stores/friends';
 import { useAuthStore } from '@/stores/auth';
+import { useGuildSyncStore } from '@/stores/guildSync';
 import { useVoiceStore } from '@/stores/voice';
 import { useVoicePresenceStore } from '@/stores/voicePresence';
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence';
@@ -333,6 +334,11 @@ function ensureSocket(): Socket {
     },
   );
 
+  // C62 — gruptan ayrıldım/çıkarıldım (yalnız benim soketlerime): kanal eski grup olur, açık ekran kilitlenir.
+  socket.on('dm.group_departed', (data: { channelId: string; reason: 'LEFT' | 'REMOVED'; leftAt: string }) => {
+    useDmStore.getState().applyGroupDeparted(data);
+  });
+
   socket.on('dm.request', () => {
     useDmStore.getState().refreshRequests();
   });
@@ -403,6 +409,17 @@ function ensureSocket(): Socket {
 
   socket.on('friend.remove', (payload: { userId: string }) => {
     useFriendsStore.getState().handleRemoved(payload.userId);
+  });
+
+  // C62 §5 — ortam üyeliği olayları (web useSocket.ts guild.joined / guild.member_left ile parite).
+  // Üye listesi store'u mobilde yok (guild-members ekranı odakta tazeler); yalnız benim ayrılışım işlenir.
+  socket.on('guild.joined', () => {
+    useGuildSyncStore.getState().requestRefresh();
+  });
+  socket.on('guild.member_left', (data: { guildId: string; userId: string }) => {
+    if (data.userId === useAuthStore.getState().user?.id) {
+      useGuildSyncStore.getState().markRemoved(data.guildId);
+    }
   });
 
   // ---- M4a-1 sesli arama (sözleşme §2/§3) ----

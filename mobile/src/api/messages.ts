@@ -41,6 +41,8 @@ export interface ReplyPreviewDto {
   attachment?: ReplyAttachmentDto | null;
   /** E1 — YALNIZ yerel: alıntılanan mesaj şifreli ve düz metni bu cihazda yok ("Şifreli mesaj" gösterilir). */
   e2eeUnknown?: boolean;
+  /** C62 — eski üye: alıntılanan mesaj ayrıldıktan sonra düzenlendi (içerik sunucuda boşaltıldı). */
+  editedAfterLeave?: boolean;
 }
 
 export interface MessageAuthorDto {
@@ -159,6 +161,8 @@ export interface MessageDto {
   /** E4 — v2 mesajın parmak izi (base64); okuyan cihaz kendi hesapladığıyla doğrular. */
   frankingTag?: string | null;
   /** E1 — YALNIZ yerel: çözme sonucu. 'ok' dışı = metin yok, baloncuk durum cümlesi gösterir. */
+  /** C62 — eski üye penceresi: mesaj ayrıldıktan sonra düzenlendi; `content: ''`, şifre yok. Aktif üyede alan yok. */
+  editedAfterLeave?: boolean;
   e2eeStatus?: 'ok' | 'unsupported' | 'undecryptable' | 'failed' | 'unverified';
 }
 

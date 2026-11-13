@@ -40,6 +40,8 @@ interface Props {
   placeholder: string;
   /** Doluysa giriş kutusu yerine sebep şeridi gösterilir (T&S: sessizce gizleme yok, sebep yazılır). */
   disabledNotice?: string | null;
+  /** C62 — şeridin altında metin düğmesi (eski grup: "Sohbeti sil"). */
+  disabledAction?: { label: string; onPress: () => void };
   /** "X yazıyor…" — null ise şerit hiç render edilmez. */
   typingLabel: string | null;
   bottomInset: number;
@@ -108,6 +110,7 @@ export function MessageComposer({
   sendError,
   placeholder,
   disabledNotice,
+  disabledAction,
   typingLabel,
   bottomInset,
   replyToAuthor,
@@ -188,6 +191,16 @@ export function MessageComposer({
       {disabledNotice ? (
         <View style={[styles.disabledBar, { paddingBottom: theme.layout.panelGap + bottomInset }]}>
           <Text style={styles.disabledText}>{disabledNotice}</Text>
+          {disabledAction ? (
+            <Pressable
+              onPress={disabledAction.onPress}
+              hitSlop={8}
+              accessibilityRole="button"
+              style={styles.disabledAction}
+            >
+              <Text style={styles.disabledActionText}>{disabledAction.label}</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : (
         <View style={[styles.inputBar, { paddingBottom: theme.layout.panelGap + bottomInset }]}>
@@ -530,5 +543,16 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.sm,
     textAlign: 'center',
+  },
+  disabledAction: {
+    alignSelf: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  disabledActionText: {
+    color: theme.colors.danger,
+    fontSize: theme.fontSize.sm,
+    fontWeight: '600',
   },
 });

@@ -18,6 +18,12 @@ export interface DmLastReactionDto {
   at: string;
 }
 
+/** C62 — gruptan ayrılan/çıkarılan kullanıcının eski grubu: `leftAt` sonrası mesaj yok, yazma/okundu kapalı. */
+export interface DmDepartedDto {
+  leftAt: string;
+  reason: 'LEFT' | 'REMOVED';
+}
+
 export type DmChannelDto =
   | {
       type: 'DM';
@@ -52,6 +58,8 @@ export type DmChannelDto =
       // en az bu ana kadar okudu (biri hiç okumadıysa null → tek tik). Bireysel okuma anı yoktur.
       receiptsEnabled?: boolean;
       groupAllReadAt?: string | null;
+      /** C62 — null/yok = aktif grup; dolu = eski grup (salt okunur, yalnız "Sohbeti sil"). */
+      departed?: DmDepartedDto | null;
     };
 
 export interface MessageRequestDto {
@@ -129,6 +137,11 @@ export const dmApi = {
   },
   async deleteGroup(groupId: string): Promise<null> {
     const res = await http.delete<null>(`/dm/groups/${groupId}`);
+    return res.data;
+  },
+  /** C62 — eski grup sohbetini yalnız kendi listemden sil (yoksa 404 DEPARTURE_NOT_FOUND). */
+  async deleteDeparture(groupId: string): Promise<null> {
+    const res = await http.delete<null>(`/dm/groups/${groupId}/departure`);
     return res.data;
   },
   async renameGroup(groupId: string, name: string): Promise<RenameGroupResultDto> {

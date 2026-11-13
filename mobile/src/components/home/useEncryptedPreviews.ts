@@ -35,7 +35,11 @@ export function useEncryptedPreviews(channels: DmChannelDto[]): Record<string, s
     if (!engine) return;
     const pending = channels.filter(
       // `in`: '' (cihaz öncesi, gizli) de sonuçlanmış sayılır, yeniden denenmez.
-      (c) => c.lastMessage?.encrypted && c.lastMessage.id && !(c.lastMessage.id in byMessageId),
+      (c) =>
+        c.lastMessage?.encrypted &&
+        !c.lastMessage.editedAfterLeave &&
+        c.lastMessage.id &&
+        !(c.lastMessage.id in byMessageId),
     );
     if (pending.length === 0) return;
     let cancelled = false;

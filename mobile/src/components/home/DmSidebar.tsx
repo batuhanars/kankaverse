@@ -191,6 +191,8 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
             const preview =
               item.lastReaction && showUnread
                 ? t('dm.reactionPreview', { actor: item.lastReaction.actorUsername, emoji: item.lastReaction.emoji })
+                : item.lastMessage?.editedAfterLeave
+                ? t('mobile.dm.editedAfterLeave')
                 : item.lastMessage?.encrypted
                   ? // E3 §4.1: yerel depoda düz metin varsa o, yoksa genel önizleme (çözme yapılmaz)
                     (encryptedPreviews[item.lastMessage.id] ?? t('e2ee.preview'))

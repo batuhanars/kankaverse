@@ -29,11 +29,13 @@ interface Props {
   canPin: boolean;
   /** Başkasının bu mesajını silebilir miyim (ortamda `MANAGE_MESSAGES`, grupta kurucu/yönetici). */
   canDeleteOthers?: (message: MessageDto) => boolean;
+  /** C62 — eski grup: yalnız "Kopyala" + "Şikâyet et" kalır (tepki/yanıt/düzenle/ilet/sabitle/sil gizli). */
+  copyOnly?: boolean;
   /** C46 — "Tepkileri gör" panelinde kişiye dokunuş: çağıran ekran profil panelini açar. */
   onOpenProfile: (user: MessageAuthorDto) => void;
 }
 
-export function MessageActionHost({ actions, onReply, onEdit, canPin, canDeleteOthers, onOpenProfile }: Props) {
+export function MessageActionHost({ actions, onReply, onEdit, canPin, canDeleteOthers, copyOnly, onOpenProfile }: Props) {
   const router = useRouter();
   const myId = useAuthStore((s) => s.user?.id);
   const openReport = useReportStore((s) => s.openReport);
@@ -41,6 +43,7 @@ export function MessageActionHost({ actions, onReply, onEdit, canPin, canDeleteO
     <>
       <MessageActionSheet
         visible={!!actions.target}
+        copyOnly={copyOnly}
         isMine={actions.isMine}
         canDelete={actions.isMine || (!!actions.target && !!canDeleteOthers?.(actions.target))}
         myEmojis={actions.myEmojis}

@@ -6,7 +6,7 @@ import { AttachmentView } from './AttachmentView';
 import { PresenceDot } from './PresenceDot';
 import { usePresenceStore, selectStatus } from '@/stores/presence';
 import { BubbleMeta, MetaSpacer, ReactionRow, ReplyQuote } from './message/BubbleParts';
-import { E2eeStatusNote } from './message/E2eeStatusNote';
+import { E2eeStatusNote, EditedAfterLeaveNote } from './message/E2eeStatusNote';
 import { EmbedCards } from './message/EmbedCard';
 import { BUBBLE_TAP_MAX_DURATION_MS } from './message/MediaPressable';
 import { MarkdownText } from './message/MarkdownText';
@@ -239,7 +239,9 @@ export function MessageBubble({
           )}
 
           {/* E1: çözülemeyen / bilinmeyen sürümlü şifreli mesaj (metin yok, durum cümlesi) */}
-          {!hasContent && message.e2eeStatus && message.e2eeStatus !== 'ok' && (
+          {/* C62: ayrıldıktan sonra düzenlenmiş mesaj — E2EE etiketinden ÖNCE bakılır. */}
+          {message.editedAfterLeave && <EditedAfterLeaveNote />}
+          {!message.editedAfterLeave && !hasContent && message.e2eeStatus && message.e2eeStatus !== 'ok' && (
             <E2eeStatusNote status={message.e2eeStatus} />
           )}
 

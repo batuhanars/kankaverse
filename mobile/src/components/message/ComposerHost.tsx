@@ -26,6 +26,7 @@ interface Props {
   mention: ReturnType<typeof useMentionCompose>;
   placeholder: string;
   disabledNotice?: string | null;
+  disabledAction?: { label: string; onPress: () => void };
   typingLabel: string | null;
   bottomInset: number;
   /** M6b — kayıt, sohbet değişince iptal edilsin diye kanal kimliğini bilir. */
@@ -39,6 +40,7 @@ export function ComposerHost({
   mention,
   placeholder,
   disabledNotice,
+  disabledAction,
   typingLabel,
   bottomInset,
   channelId,
@@ -109,6 +111,7 @@ export function ComposerHost({
         uploadLabel={composer.uploadLabel}
         placeholder={placeholder}
         disabledNotice={disabledNotice}
+        disabledAction={disabledAction}
         typingLabel={typingLabel}
         bottomInset={bottomInset}
         replyToAuthor={composer.replyTo?.author.username}

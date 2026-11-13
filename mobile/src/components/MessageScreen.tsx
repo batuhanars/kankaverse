@@ -61,6 +61,13 @@ interface Props {
   // T&S — DM engelli/izinsizse sunucu göndermede 403 döner; ama giriş kutusunu baştan devre dışı
   // bırakmak için sidebar'dan taşınan bilgi (contract §6 — sessizce gizlenmez, neden gösterilir).
   disabledNotice?: string | null;
+  /** C62 — bandın yanındaki eylem (eski grup: "Sohbeti sil"); yalnız `disabledNotice` doluyken çizilir. */
+  disabledAction?: { label: string; onPress: () => void };
+  /**
+   * C62 — salt okunur geçmiş (gruptan ayrılan/çıkarılan): yanıt/tepki/düzenle/sil/sabitle/ilet/şikâyet
+   * ve odaya katılma kapalı, yalnız kopyala açık. Okundu çağrısını `markRead` veren ekran keser.
+   */
+  readOnly?: boolean;
   // Sözleşme §3.6 — DM'e özel başlık ikonları (Sohbeti Temizle / Grup Yönetimi). Kanal ekranında
   // yok (undefined). Arama ikonu HER İKİ ekranda ortak olduğu için burada, MessageScreen'in kendi
   // headerRight'ına eklenir — tek `<Stack.Screen>` headerRight sahibi bu bileşen (birden fazla
@@ -125,6 +132,8 @@ export function MessageScreen({
   receiptFor,
   typingMode,
   disabledNotice,
+  disabledAction,
+  readOnly = false,
   headerActions,
   topBanner,
   searchable = true,
@@ -203,9 +212,12 @@ export function MessageScreen({
       });
 
     markRead(channelId).catch(() => {});
-    joinChannel(channelId).then((ack) => {
-      if (__DEV__ && !ack.ok) console.warn('[MessageScreen] join başarısız:', ack.error);
-    });
+    // C62: eski üyenin soket odası yok; katılma 403 olurdu.
+    if (!readOnly) {
+      joinChannel(channelId).then((ack) => {
+        if (__DEV__ && !ack.ok) console.warn('[MessageScreen] join başarısız:', ack.error);
+      });
+    }
 
     return () => {
       cancelled = true;
@@ -483,7 +495,7 @@ export function MessageScreen({
                 }
                 // Düzenle yalnız kendi mesajımda: eylem panelindeki `isMine` koşuluyla aynı (yazar = ben).
                 onEdit={
-                  !item.message.localStatus && item.message.author.id === authUser?.id
+                  !readOnly && !item.message.localStatus && item.message.author.id === authUser?.id
                     ? () => setEditTarget(item.message)
                     : undefined
                 }
@@ -499,10 +511,10 @@ export function MessageScreen({
                 highlighted={item.message.id === list.highlightId}
                 onLongPress={() => actions.open(item.message)}
                 onPressAuthor={() => setProfileTarget(item.message.author)}
-                onToggleReaction={(emoji) => actions.toggleReaction(item.message, emoji)}
-                onShowReactions={() => actions.openReactions(item.message)}
+                onToggleReaction={readOnly ? undefined : (emoji) => actions.toggleReaction(item.message, emoji)}
+                onShowReactions={readOnly ? undefined : () => actions.openReactions(item.message)}
                 onDoubleTap={
-                  item.message.localStatus ? undefined : () => actions.quickReact(item.message, quickEmojis[0])
+                  readOnly || item.message.localStatus ? undefined : () => actions.quickReact(item.message, quickEmojis[0])
                 }
                 onRetry={() => retryOptimistic(item.message)}
                 onDiscard={() => discardOptimistic(item.message)}
@@ -529,6 +541,7 @@ export function MessageScreen({
         mention={mention}
         placeholder={placeholder}
         disabledNotice={disabledNotice}
+        disabledAction={disabledAction}
         typingLabel={typing.label}
         bottomInset={bottomInset}
         channelId={channelId}
@@ -538,6 +551,7 @@ export function MessageScreen({
       <MessageActionHost
         canPin={canPin}
         canDeleteOthers={canDeleteOthers}
+        copyOnly={readOnly}
         actions={actions}
         onOpenProfile={setProfileTarget}
         onReply={

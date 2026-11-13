@@ -14,6 +14,7 @@ import { usePresenceStore, selectStatus } from '@/stores/presence';
 import { PRESENCE_COLOR } from '@/components/PresenceDot';
 import { OngoingCallBanner } from '@/components/call/OngoingCallBanner';
 import { MessageScreen } from '@/components/MessageScreen';
+import { DeleteDepartedDialog } from '@/components/dm/DeleteDepartedDialog';
 import { ChatBackButton } from '@/components/ChatBackButton';
 import { channelTitle } from '@/utils/channelTitle';
 import { clearChannelNotifications } from '@/notifications/push';
@@ -21,6 +22,8 @@ import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 const EMPTY_PRESENCE: VoicePresenceParticipant[] = [];
+// C62: eski grupta okundu çağrısı 403 olurdu; MessageScreen'e boş bir işlev verilir.
+const noopMarkRead = () => Promise.resolve(null);
 
 
 // Sprint M1a contract §5 ekran 3 — DM mesaj ekranı: kanal ekranıyla "aynısı" (MessageScreen ortak
@@ -74,13 +77,19 @@ export default function DmScreen() {
   // Grup DM: kurucu/yönetici başkasının mesajını silebilir (hiyerarşi utils/groupRoles; kapı sunucuda).
   // 1-1 DM'de hiç: başkasının mesajı silinemez.
   const canDeleteOthers = (m: MessageDto) => {
+    if (departed) return false;
     if (storeChannel?.type !== 'GROUP_DM' || m.author.id === myUserId) return false;
     return canModerateGroupTarget(
       groupRoleOf(storeChannel, myUserId),
       groupRoleOf(storeChannel, m.author.id),
     );
   };
-  const voiceEligible = isDm || isGroupDm;
+  // C62 — gruptan ayrılan/çıkarılan: salt okunur geçmiş. Sunucu bütün kapıları zaten 403'ler; istemci
+  // bu kanalda okundu/yazıyor/tepki/arama/sabitleme ÇAĞIRMAZ. Kaynak store (soket `dm.group_departed`
+  // anında günceller, açık ekran yenilemeden kilitlenir).
+  const departed = storeChannel?.type === 'GROUP_DM' ? (storeChannel.departed ?? null) : null;
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const voiceEligible = (isDm || isGroupDm) && !departed;
 
   /**
    * Sprint M2d §3.2 — bahsetme öneri kaynağı. Grup DM'de üyeler store'daki kanal kaydından gelir;
@@ -245,7 +254,17 @@ export default function DmScreen() {
   const selfBlocked =
     storeChannel && storeChannel.type === 'DM' ? storeChannel.selfBlocked : params.selfBlocked === 'true';
 
-  const disabledNotice = isDm && !canMessage ? (selfBlocked ? t('dm.selfBlocked') : t('dm.cannotMessage')) : null;
+  // C62: eski grupta tek band (E2EE "çıkarıldı" bandı MessageScreen'de bastırılır); yanında "Sohbeti sil".
+  const disabledNotice = departed
+    ? t(departed.reason === 'REMOVED' ? 'mobile.dm.departedRemoved' : 'mobile.dm.departedLeft')
+    : isDm && !canMessage
+      ? selfBlocked
+        ? t('dm.selfBlocked')
+        : t('dm.cannotMessage')
+      : null;
+  const disabledAction = departed
+    ? { label: t('mobile.dm.departedDelete'), onPress: () => setDeleteOpen(true) }
+    : undefined;
 
   // Placeholder kısa tutuluyor (sahip bulgusu 2026-08-11): web'in "{ad} kullanıcısına mesaj yaz"
   // metni dar ekranda iki satıra sarıyor, boş kutu iki satır yükseliyor ve sağdaki emoji ikonu
@@ -308,6 +327,7 @@ export default function DmScreen() {
    * (§3.1), grup üye listesi de detay ekranının bir sekmesi (§2.3.1).
    */
   function onTitlePress() {
+    if (departed) return; // C62: eski grupta detay/üye yönetimi kapalı
     router.push({ pathname: '/dm-details', params: { id: channelId } });
   }
 
@@ -353,12 +373,14 @@ export default function DmScreen() {
         // Ekstra istek YOK, ikisi de zaten elde. `@everyone` verilmez (guild yok).
         mentionCandidates={mentionCandidates}
         jumpToMessageId={params.jumpTo}
-        markRead={dmApi.markRead}
+        markRead={departed ? noopMarkRead : dmApi.markRead}
+        readOnly={!!departed}
         receiptFor={receiptFor}
         // M6a §2 — 1-1 DM'de avatar/ad yok (karşıdaki tek kişi belli); grup DM'de var.
         showIdentity={isGroupDm}
         typingMode="simple"
         disabledNotice={disabledNotice}
+        disabledAction={disabledAction}
         // M4a-1 sözleşme §3.1/§4 — telefon düğmesi + "sesli arama sürüyor" şeridi. M4b'den beri
         // 1-1 DM VE grup DM'de (`voiceEligible`, §4: "Grup DM'de de görünür"/"OngoingCallBanner
         // grup DM'de de kullanılır, yeni bileşen yazılmaz") — M4a'nın "yalnız 1-1" sınırı bu
@@ -412,19 +434,34 @@ export default function DmScreen() {
         }
         // 1-1 DM'de arama YOK (sahip kararı 2026-08-01); grup DM'de kalıyor — orada birden çok
         // kişi ve daha uzun geçmiş var, aramanın işi görülüyor. Web'de de aynı ayrım yapıldı.
-        searchable={!isDm}
+        searchable={!isDm && !departed}
         // 🔴 DM ve grup DM'de sabitleme **her üyeye açık** — sunucu `requirePinAccess` bu iki
         // kanal türünde ek kontrol yapmıyor, üyelik yeterli. Ortam kanalındaki `MANAGE_MESSAGES`
         // şartı buraya taşınmaz; olmayan bir kapıyı istemcide kurmak da gevşetmek kadar yanlış.
-        canPin
+        canPin={!departed}
         canDeleteOthers={canDeleteOthers}
-        onOpenPins={() =>
-          router.push({
-            pathname: '/pins',
-            params: { channelId: params.id, name: title, origin: 'dm' },
-          })
+        onOpenPins={
+          departed
+            ? undefined
+            : () =>
+                router.push({
+                  pathname: '/pins',
+                  params: { channelId: params.id, name: title, origin: 'dm' },
+                })
         }
       />
+      {deleteOpen && (
+        <DeleteDepartedDialog
+          groupId={channelId}
+          onCancel={() => setDeleteOpen(false)}
+          onDeleted={() => {
+            setDeleteOpen(false);
+            // Sohbet listeden düştü; ölü kanala geri dönülmesin (D34 deseni).
+            router.dismissAll();
+            router.replace('/home');
+          }}
+        />
+      )}
     </>
   );
 }
