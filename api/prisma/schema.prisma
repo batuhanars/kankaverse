@@ -995,6 +995,17 @@ model E2eeGroup {
   createdAt   DateTime @default(now()) // ayraç zamanı
 }
 
+/// E2: şifreli GROUP_DM'den ayrılan/çıkarılan üye. Eski üyenin MLS yaprakları grupta kaldığı sürece doğrulama onları tanımalı.
+model E2eeFormerMember {
+  id        String   @id @default(cuid())
+  channelId String
+  userId    String
+  leftAt    DateTime @default(now())
+
+  @@unique([channelId, userId])
+  @@index([channelId])
+}
+
 model E2eeHandshake {
   id             String   @id @default(cuid())
   channelId      String

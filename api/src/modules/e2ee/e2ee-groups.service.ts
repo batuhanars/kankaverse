@@ -19,15 +19,24 @@ export class E2eeGroupsService {
     private notify: E2eeNotifyService,
   ) {}
 
-  /** Kanal üyelerinin İPTAL EDİLMİŞLER DAHİL tüm cihazları (Rev.1 §3.3 geçmiş commit kuralı). */
+  /**
+   * Kanal durumu. Cihazlar İPTAL EDİLMİŞLER DAHİL (Rev.1 §3.3 geçmiş commit kuralı). GROUP_DM'de (E2 §2.3)
+   * ek olarak eski üyeler (`formerMembers`: ayrılma zamanı + kayıtlı TÜM cihazları; yaprakları grupta kalmış
+   * olabilir, doğrulama onları tanımalı) ve üyelerin katılım zamanı (`joinedAt`) döner. 1-1'de `formerMembers` hep [].
+   */
   async getState(userId: string, channelId: string) {
-    const { isOneToOneDm, memberIds } = await this.channels.access(userId, channelId);
-    const group = isOneToOneDm
+    const { isOneToOneDm, isGroupDm, memberIds, joinedAt } = await this.channels.access(
+      userId,
+      channelId,
+    );
+    const encryptable = isOneToOneDm || isGroupDm === true;
+    const group = encryptable
       ? await this.prisma.e2eeGroup.findUnique({ where: { channelId } })
       : null;
-    const devices = isOneToOneDm
+    const former = isGroupDm === true ? await this.listFormerMembers(channelId) : [];
+    const devices = encryptable
       ? await this.prisma.e2eeDevice.findMany({
-          where: { userId: { in: memberIds } },
+          where: { userId: { in: [...memberIds, ...former.map((f) => f.userId)] } },
           orderBy: { createdAt: 'asc' },
         })
       : [];
@@ -36,19 +45,39 @@ export class E2eeGroupsService {
       epoch: group?.epoch ?? null,
       groupId: group ? toB64(group.groupId) : null,
       createdAt: group ? group.createdAt.toISOString() : null,
-      members: isOneToOneDm
+      members: encryptable
         ? memberIds.map((id) => ({
             userId: id,
-            devices: devices
-              .filter((d) => d.userId === id)
-              .map((d) => ({
-                deviceId: d.id,
-                signatureKey: toB64(d.signatureKey),
-                revokedAt: d.revokedAt ? d.revokedAt.toISOString() : null,
-              })),
+            joinedAt: joinedAt?.get(id)?.toISOString() ?? null,
+            devices: this.deviceViews(devices, id),
           }))
         : [],
+      formerMembers: former.map((f) => ({
+        userId: f.userId,
+        leftAt: f.leftAt.toISOString(),
+        devices: this.deviceViews(devices, f.userId),
+      })),
     };
+  }
+
+  private listFormerMembers(channelId: string) {
+    return this.prisma.e2eeFormerMember.findMany({
+      where: { channelId },
+      orderBy: { leftAt: 'asc' },
+    });
+  }
+
+  private deviceViews(
+    devices: { id: string; userId: string; signatureKey: Uint8Array; revokedAt: Date | null }[],
+    userId: string,
+  ) {
+    return devices
+      .filter((d) => d.userId === userId)
+      .map((d) => ({
+        deviceId: d.id,
+        signatureKey: toB64(d.signatureKey),
+        revokedAt: d.revokedAt ? d.revokedAt.toISOString() : null,
+      }));
   }
 
   /** Grubu kurar (epoch 0 → 1). Yarışı kaybeden 409 E2EE_GROUP_EXISTS alır. Tek transaction. */
@@ -60,7 +89,7 @@ export class E2eeGroupsService {
     if (groupId.length !== E2EE_GROUP_ID_BYTES) {
       throw E2EE_ERRORS.invalidPayload('Grup kimliği 32 bayt olmalı.');
     }
-    await this.assertEveryMemberHasDevice(memberIds);
+    await this.assertEnoughMembersHaveDevice(memberIds);
     const targets = await this.resolveWelcomeTargets(dto.welcomes, memberIds, device.id);
     if ((await this.prisma.e2eeGroup.count({ where: { channelId } })) > 0) throw this.groupExists();
 
@@ -193,13 +222,18 @@ export class E2eeGroupsService {
     return new Map(devices.map((d) => [d.id, d.userId]));
   }
 
-  private async assertEveryMemberHasDevice(memberIds: string[]): Promise<void> {
+  /**
+   * §2.2 / E2 §0: grup en az İKİ üyenin (gönderen dahil) etkin cihazıyla kurulur. 1-1'de bu "iki üyenin de
+   * cihazı var" demektir (E1 kuralı aynen); grupta cihazsız üye engel DEĞİL, cihaz kaydedince sonradan eklenir.
+   * Gönderenin kendi etkin cihazı çağıran tarafta (`requireActiveDevice`) zaten doğrulanır.
+   */
+  private async assertEnoughMembersHaveDevice(memberIds: string[]): Promise<void> {
     const active = await this.prisma.e2eeDevice.findMany({
       where: { userId: { in: memberIds }, revokedAt: null },
       select: { userId: true },
       distinct: ['userId'],
     });
-    if (active.length !== memberIds.length) throw E2EE_ERRORS.notEligible();
+    if (active.length < 2) throw E2EE_ERRORS.notEligible();
   }
 
   private groupExists() {

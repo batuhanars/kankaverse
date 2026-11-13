@@ -8,6 +8,7 @@ import { E2eeExistsService } from './e2ee-exists.service';
 import { E2eeEnabledGuard } from './e2ee-enabled.guard';
 import { E2eeFlagService } from './e2ee-flag.service';
 import { E2eeGroupsService } from './e2ee-groups.service';
+import { E2eeMembershipService } from './e2ee-membership.service';
 import { E2eeMessageService } from './e2ee-message.service';
 import { E2eeNotifyService } from './e2ee-notify.service';
 import { E2eeRevocationService } from './e2ee-revocation.service';
@@ -29,9 +30,10 @@ import { UserThrottlerGuard } from './user-throttler.guard';
     E2eeClaimService,
     E2eeGroupsService,
     E2eeMessageService,
+    E2eeMembershipService,
     E2eeExistsService,
     E2eeRevocationService,
   ],
-  exports: [E2eeMessageService, E2eeRevocationService],
+  exports: [E2eeMessageService, E2eeRevocationService, E2eeMembershipService],
 })
 export class E2eeModule {}

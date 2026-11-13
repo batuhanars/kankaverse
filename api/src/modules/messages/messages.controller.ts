@@ -119,7 +119,7 @@ export class MessagesController {
       dto,
       user.tokenFamily,
     );
-    this.messagesGateway.broadcastMessageUpdate(channelId, message);
+    await this.messagesGateway.broadcastMessageUpdate(channelId, message);
     return message;
   }
 

@@ -16,6 +16,11 @@ import { ModerationService } from '../../shared/moderation/moderation.service';
 import { MESSAGE_AUTHOR_SELECT } from '../../common/utils/message-author.select';
 import { canModerateGroupTarget, getGroupRole } from '../../shared/group-roles/group-roles';
 import { loadRoleEmojis } from '../../common/utils/role-emoji.util';
+import {
+  groupJoinedAt,
+  isHiddenBeforeJoin,
+  preJoinEncryptedFilter,
+} from '../../common/utils/pre-join.util';
 import { E2eeMessageService, E2eeSendPlan } from '../e2ee/e2ee-message.service';
 import { toB64 } from '../e2ee/e2ee.util';
 import { CreateMessageDto } from './dto/create-message.dto';
@@ -57,7 +62,10 @@ type ReplyToDto = {
 } | null;
 
 type ReplyToRaw =
-  | (Pick<Message, 'id' | 'content' | 'deletedAt' | 'webhookId' | 'webhookName' | 'encrypted'> & {
+  | (Pick<
+      Message,
+      'id' | 'content' | 'deletedAt' | 'webhookId' | 'webhookName' | 'encrypted' | 'createdAt'
+    > & {
       author: Pick<User, 'username'>;
       attachments?: ReplyAttachmentDto[];
     })
@@ -101,7 +109,12 @@ function buildReplyToDto(raw: ReplyToRaw): ReplyToDto {
   return { id: raw.id, content: snippet, authorUsername, attachment };
 }
 
-function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
+/**
+ * `joinedAt` (yalnız GROUP_DM, E2 §2.5): çağıranın katılımından ÖNCE gönderilmiş şifreli bir mesaja yanıt
+ * alıntısı verilmez (alıntı üst veri sızdırır: yazar adı). Düz eski mesajın alıntısı bugünkü gibi kalır.
+ */
+function toMessageDto(msg: MessageWithAuthor, callerId?: string, joinedAt?: Date | null) {
+  const replyTo = msg.replyTo && isHiddenBeforeJoin(msg.replyTo, joinedAt) ? null : msg.replyTo;
   // Aggregate reactions: group by emoji, count, reactedByMe
   const reactionsAgg: ReactionAggDto[] = [];
   if (msg.reactions && msg.reactions.length > 0) {
@@ -128,7 +141,7 @@ function toMessageDto(msg: MessageWithAuthor, callerId?: string) {
     channelId: msg.channelId,
     content: msg.content,
     replyToId: msg.replyToId,
-    replyTo: buildReplyToDto(msg.replyTo ?? null),
+    replyTo: buildReplyToDto(replyTo ?? null),
     editedAt: msg.editedAt ? msg.editedAt.toISOString() : null,
     pinnedAt: msg.pinnedAt ? msg.pinnedAt.toISOString() : null,
     author: msg.webhookId
@@ -210,6 +223,7 @@ const REPLY_TO_INCLUDE = {
     id: true,
     content: true,
     encrypted: true,
+    createdAt: true,
     deletedAt: true,
     webhookId: true,
     webhookName: true,
@@ -506,11 +520,14 @@ export class MessagesService {
       });
       if (member?.clearedAt) createdAtFilter.gt = member.clearedAt;
     }
+    // E2 §2.5: grup DM'de katılım öncesi şifreli mesajlar (sayfalama dahil) dönmez.
+    const joinedAt = await groupJoinedAt(this.prisma, channel, userId);
 
     const messages = await this.prisma.message.findMany({
       where: {
         channelId,
         deletedAt: null,
+        ...preJoinEncryptedFilter(joinedAt),
         ...(Object.keys(createdAtFilter).length ? { createdAt: createdAtFilter } : {}),
       },
       include: {
@@ -540,7 +557,7 @@ export class MessagesService {
 
     return this.withRoleEmojis(
       channel.guildId,
-      messages.map((msg) => toMessageDto(msg, userId)),
+      messages.map((msg) => toMessageDto(msg, userId, joinedAt)),
     );
   }
 
@@ -1261,6 +1278,8 @@ export class MessagesService {
       });
       if (member?.clearedAt) createdAtFilter.gt = member.clearedAt;
     }
+    // E2 §2.5: sonuçların yanıt alıntıları için (şifreli mesaj zaten aramaya girmez).
+    const joinedAt = await groupJoinedAt(this.prisma, channel, userId);
 
     const messages = await this.prisma.message.findMany({
       where: {
@@ -1301,19 +1320,22 @@ export class MessagesService {
 
     return this.withRoleEmojis(
       channel.guildId,
-      messages.map((msg) => toMessageDto(msg, userId)),
+      messages.map((msg) => toMessageDto(msg, userId, joinedAt)),
     );
   }
 
   async findPins(userId: string, channelId: string) {
     // requireChannelAccess: üyelik + yaş kapısı dahil
     const channel = await this.membership.requireChannelAccess(userId, channelId);
+    // E2 §2.5: katılım öncesi şifreli sabitlenmiş mesaj yeni üyeye dönmez.
+    const joinedAt = await groupJoinedAt(this.prisma, channel, userId);
 
     const messages = await this.prisma.message.findMany({
       where: {
         channelId,
         pinnedAt: { not: null },
         deletedAt: null,
+        ...preJoinEncryptedFilter(joinedAt),
       },
       include: {
         author: { select: MESSAGE_AUTHOR_SELECT },
@@ -1340,7 +1362,7 @@ export class MessagesService {
 
     return this.withRoleEmojis(
       channel.guildId,
-      messages.map((msg) => toMessageDto(msg, userId)),
+      messages.map((msg) => toMessageDto(msg, userId, joinedAt)),
     );
   }
 

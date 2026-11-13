@@ -25,11 +25,19 @@ export class E2eeNotifyService {
     this.realtime.emitToUsers([...new Set(userIds)], E2EE_EVENT_WELCOME, { channelId });
   }
 
-  /** Kullanıcının grup kurulmuş 1-1 DM kanallarının odalarına `e2ee:devices-changed`. Hata yutulur, loglanır. */
+  /** Tek kanal odasına `e2ee:devices-changed` (üyelik değişimi, E2 §2.4). */
+  deviceChangedInChannel(channelId: string, userId: string): void {
+    this.realtime.emitToRoom(channelId, E2EE_EVENT_DEVICES_CHANGED, { channelId, userId });
+  }
+
+  /** Kullanıcının grup kurulmuş 1-1 DM ve GROUP_DM kanallarının odalarına `e2ee:devices-changed`. Hata yutulur, loglanır. */
   async devicesChanged(userId: string): Promise<void> {
     try {
       const memberships = await this.prisma.channelMember.findMany({
-        where: { userId, channel: { type: 'DM', guildId: null, deletedAt: null } },
+        where: {
+          userId,
+          channel: { type: { in: ['DM', 'GROUP_DM'] }, guildId: null, deletedAt: null },
+        },
         select: { channelId: true },
       });
       if (memberships.length === 0) return;

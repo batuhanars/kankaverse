@@ -21,6 +21,9 @@ import { RenameGroupDmDto } from './dto/rename-group-dm.dto';
 import { visibleLastReaction } from '../../common/utils/last-reaction.util';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { PushService } from '../../shared/push/push.service';
+import { Prisma } from '@prisma/client';
+import { E2eeMembershipService } from '../e2ee/e2ee-membership.service';
+import { isHiddenBeforeJoin, preJoinEncryptedFilter } from '../../common/utils/pre-join.util';
 
 /**
  * 🫀 C12 §3.2 — okundu bilgisi görünürlük kararı. **T&S karar fonksiyonu (R7), satır satır insan
@@ -127,6 +130,8 @@ export class DmService {
     private realtime: RealtimeService,
     // C50: opsiyonel (okundu push'u); yoksa yalnız soket yayını yapılır.
     @Optional() private push?: PushService,
+    // E2: grup üyeliği değişiminin E2EE tarafı (Nest her zaman verir; `?` yalnız elle kurulan eski spec'ler için).
+    private e2ee?: E2eeMembershipService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -306,7 +311,12 @@ export class DmService {
 
     // GROUP_DM kanalları
     for (const m of groupMemberships) {
-      const lastMsg = m.channel.messages[0] ?? null;
+      // E2 §2.5: katılım öncesi şifreli mesaj önizlemede/okunmamışta yok; son mesaj bu süzgeçle yeniden seçilir.
+      const newest = m.channel.messages[0] ?? null;
+      const lastMsg =
+        newest && isHiddenBeforeJoin(newest, m.createdAt)
+          ? await this.latestVisibleMessage(m.channel.id, m.createdAt)
+          : newest;
       const lastReaction = visibleLastReaction({
         raw: m.lastReaction,
         lastReadAt: m.lastReadAt,
@@ -602,9 +612,14 @@ export class DmService {
       throw new ConflictException({ message: 'Kullanıcı zaten grupta.', error: 'ALREADY_MEMBER' });
     }
 
-    await this.prisma.channelMember.create({
-      data: { channelId: groupId, userId: targetId },
-    });
+    // E2 §2.2/§2.4: şifreli gruba uygun olmayan üye eklenemez (422); yeniden eklenen üyenin eski-üye kaydı
+    // aynı transaction'da silinir; commit sonrası `e2ee:devices-changed`.
+    await this.e2ee?.assertMemberAddable(groupId, targetId);
+    await this.writeMembership(
+      this.prisma.channelMember.create({ data: { channelId: groupId, userId: targetId } }),
+      this.e2ee?.addOps(groupId, targetId) ?? [],
+    );
+    await this.e2ee?.afterAdd(groupId, targetId);
 
     return {
       id: target.id,
@@ -629,15 +644,7 @@ export class DmService {
       });
     }
 
-    await this.prisma.channelMember.delete({ where: { id: membership.id } });
-
-    const remaining = await this.prisma.channelMember.count({ where: { channelId: groupId } });
-    if (remaining < 2) {
-      await this.prisma.channel.update({
-        where: { id: groupId },
-        data: { deletedAt: new Date() },
-      });
-    }
+    await this.deleteGroupMembership(groupId, membership.id, userId);
 
     return null;
   }
@@ -675,17 +682,53 @@ export class DmService {
       });
     }
 
-    await this.prisma.channelMember.delete({ where: { id: membership.id } });
+    await this.deleteGroupMembership(groupId, membership.id, targetUserId);
+
+    return null;
+  }
+
+  /**
+   * Gruptan ayrılma/çıkarma ortak yolu: üyelik satırı + (grupta E2EE varsa) eski-üye kaydı ve bekleyen
+   * Welcome silme AYNI transaction'da (E2 §2.4); kalan < 2 ise kanal soft-delete; commit sonrası soket
+   * odasından çıkarma + `e2ee:devices-changed` (E2EE servisi). Kanal silinirse E2EE satırlarına dokunulmaz.
+   */
+  private async deleteGroupMembership(groupId: string, membershipId: string, userId: string) {
+    const e2eeOps = (await this.e2ee?.departureOps(groupId, userId)) ?? [];
+    await this.writeMembership(
+      this.prisma.channelMember.delete({ where: { id: membershipId } }),
+      e2eeOps,
+    );
 
     const remaining = await this.prisma.channelMember.count({ where: { channelId: groupId } });
-    if (remaining < 2) {
+    const channelDeleted = remaining < 2;
+    if (channelDeleted) {
       await this.prisma.channel.update({
         where: { id: groupId },
         data: { deletedAt: new Date() },
       });
     }
+    await this.e2ee?.afterDeparture(groupId, userId, channelDeleted);
+  }
 
-    return null;
+  /** Grup listesinin son mesajı, katılım öncesi şifreli mesajlar hariç (nadir yol: en yeni mesaj gizliyse). */
+  private latestVisibleMessage(channelId: string, joinedAt: Date) {
+    return this.prisma.message.findFirst({
+      where: { channelId, deletedAt: null, ...preJoinEncryptedFilter(joinedAt) },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        author: { select: { id: true, username: true, avatarUrl: true } },
+        attachments: { select: { contentType: true } },
+      },
+    });
+  }
+
+  /** Üyelik yazımı; E2EE işlemi varsa hepsi tek transaction, yoksa tek sorgu (bugünkü davranış). */
+  private async writeMembership(
+    write: Prisma.PrismaPromise<unknown>,
+    e2eeOps: Prisma.PrismaPromise<unknown>[],
+  ): Promise<void> {
+    if (e2eeOps.length === 0) await write;
+    else await this.prisma.$transaction([write, ...e2eeOps]);
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

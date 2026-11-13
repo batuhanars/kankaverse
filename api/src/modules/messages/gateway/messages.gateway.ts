@@ -754,8 +754,40 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(`room:${channelId}`).emit('message.created', messageDto);
   }
 
-  broadcastMessageUpdate(channelId: string, messageDto: unknown) {
-    this.server.to(`room:${channelId}`).emit('message.updated', messageDto);
+  /**
+   * 🔴 R7 (E2 §2.5): GROUP_DM'de ŞİFRELİ mesajın düzenleme yayını odaya DEĞİL, mesaj yazıldığında zaten üye olanların
+   * kişisel odalarına (`user:<id>`) gider; yoksa katılım sonrası eklenen üye, yeniden şifrelenmiş (şimdiki epoch)
+   * yükü alıp çözebilir. Şifresiz mesaj ve 1-1 bugünkü gibi oda yayını.
+   */
+  async broadcastMessageUpdate(channelId: string, messageDto: unknown) {
+    const dto = messageDto as { encrypted?: boolean; createdAt?: string };
+    const recipients =
+      dto.encrypted === true && dto.createdAt
+        ? await this.preJoinSafeRecipients(channelId, dto.createdAt)
+        : null;
+    if (!recipients) {
+      this.server.to(`room:${channelId}`).emit('message.updated', messageDto);
+      return;
+    }
+    for (const userId of recipients)
+      this.server.to(`user:${userId}`).emit('message.updated', messageDto);
+  }
+
+  /** GROUP_DM ise `ChannelMember.createdAt <= mesaj zamanı` olan üyeler; değilse null (oda yayını). */
+  private async preJoinSafeRecipients(
+    channelId: string,
+    messageCreatedAt: string,
+  ): Promise<string[] | null> {
+    const channel = await this.prisma.channel.findUnique({
+      where: { id: channelId },
+      select: { type: true },
+    });
+    if (channel?.type !== 'GROUP_DM') return null;
+    const members = await this.prisma.channelMember.findMany({
+      where: { channelId, createdAt: { lte: new Date(messageCreatedAt) } },
+      select: { userId: true },
+    });
+    return members.map((m) => m.userId);
   }
 
   broadcastMessageDelete(channelId: string, payload: { messageId: string; channelId: string }) {

@@ -33,6 +33,12 @@ export const E2EE_ERRORS = {
       'Bu sohbet uçtan uca şifrelenemez.',
       'E2EE_NOT_ELIGIBLE',
     ),
+  memberNotEligible: () =>
+    e2eeError(
+      HttpStatus.UNPROCESSABLE_ENTITY,
+      'Bu kişi şifreli sohbetlere henüz katılamıyor.',
+      'E2EE_MEMBER_NOT_ELIGIBLE',
+    ),
   required: () =>
     e2eeError(
       HttpStatus.CONFLICT,

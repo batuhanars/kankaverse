@@ -116,6 +116,13 @@ Grup başlığında kilit, ayraç, "çözülemedi", "güncelle" metinleri 1-1 il
 8. 1-1 DM'de davranış değişmedi (gönder, al, şikâyet).
 9. Log taraması temiz (yeni hata kodu dışında 5xx yok).
 
+## §4.1 Rev.1 (2026-11-13, adım 1 bulguları)
+- **Hesap silme** `ChannelMember` silmiyor (anonimleştirir, cihazları iptal eder). §2.1'deki "hesap silme yolu" maddesi düşer; silinen kullanıcının yaprakları "iptal edilmiş" olarak zaten çıkarılır.
+- **Soket odasından çıkarma** yalnız şifreli grupta değil, TÜM `GROUP_DM` ayrılma/çıkarmalarında yapılır: düz grupta da çıkarılan üye bağlantısı kopana dek mesaj alıyordu (mevcut açık kapandı).
+- **`message.updated` (R7):** GROUP_DM'de şifreli mesajın düzenleme yayını odaya değil, katılımı mesajdan önce olan üyelerin kişisel odalarına gider. Neden: düzenleme şimdiki epoch'la yeniden şifrelenir, yeni üye çözebilirdi.
+- **Bilinen sınırlar (kabul):** `message.created` yanıt alıntısında katılım öncesi şifreli mesajın yazar adı görünebilir (içerik yok); id tahminiyle şikâyet/tepki kapıları katılıma bakmaz (cuid, listeden görünmez); kriptografik çıkarma istemciye bağlı, sunucu yalnız iletmemeyi garanti eder.
+- **Borçlar (PLAN):** grup okundu bilgisi üyelik değişince yeniden hesaplanmıyor; çıkarılan üye `voice:` odasında kalıyor (E8'de); `E2eeFormerMember` temizliği yok; hesap silmede `devices-changed` yayını yok (E1'den).
+
 ## §5 Açık sorular (PM önerisiyle, sahip itiraz etmezse geçerli)
 - **Grup boyutu:** üye sınırı 10, cihaz sınırı kullanıcı başı 10 → en çok 100 yaprak. Ölçüm 20 yaprakla; 100 yaprak teorik, gerçek kullanımda beklenmez. Ölçüm kötü çıkarsa cihaz sınırı tartışılır.
 - **Grup kurucusu/yönetici yetkisi** MLS'e taşınmaz: kim ekleyip çıkarabileceği bugünkü gibi sunucuda (`canModerateGroupTarget`); MLS commit'ini herhangi bir üye cihaz gönderir. Bilinen sınır: kötü niyetli sunucu sahte üye ekleyebilir; azaltma §3.3 satırı, tam çözüm E7.
