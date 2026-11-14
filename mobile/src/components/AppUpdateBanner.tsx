@@ -6,17 +6,16 @@ import { theme } from '@/theme';
 
 /**
  * Ana sayfanın üstündeki güncelleme şeridi (masaüstündeki bandın karşılığı). Yalnız Play yeni sürüm
- * sunduğunda görünür; durum `stores/appUpdate`.
+ * sunduğunda görünür; durum `stores/appUpdate`. Kapatılamaz (sahip kararı 2026-11-14): eski sürümde
+ * kalmak şifreli sohbetleri bozabilir.
  */
 export function AppUpdateBanner() {
   const phase = useAppUpdateStore((s) => s.phase);
   const progress = useAppUpdateStore((s) => s.progress);
-  const dismissed = useAppUpdateStore((s) => s.dismissed);
   const start = useAppUpdateStore((s) => s.start);
   const restart = useAppUpdateStore((s) => s.restart);
-  const dismiss = useAppUpdateStore((s) => s.dismiss);
 
-  if (phase === 'idle' || dismissed) return null;
+  if (phase === 'idle') return null;
 
   let message = t('mobile.appUpdate.available');
   if (phase === 'ready') message = t('mobile.appUpdate.ready');
@@ -38,16 +37,6 @@ export function AppUpdateBanner() {
       {action ? (
         <Pressable onPress={() => void action.run()} hitSlop={8} accessibilityRole="button">
           <Text style={styles.action}>{action.label}</Text>
-        </Pressable>
-      ) : null}
-      {phase !== 'downloading' ? (
-        <Pressable
-          onPress={dismiss}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel={t('desktopUpdate.dismiss')}
-        >
-          <Ionicons name="close" size={18} color={theme.colors.textMuted} />
         </Pressable>
       ) : null}
     </View>

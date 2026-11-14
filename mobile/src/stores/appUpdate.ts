@@ -10,7 +10,7 @@ import { addUpdateStatusListener, checkForUpdate, completeUpdate, startUpdate } 
  *  downloading → kullanıcı onayladı, Play arka planda indiriyor
  *  ready       → indirildi: "Yeniden başlat"
  *
- * "Kapat" yalnız bu oturum için gizler; sonraki açılışta yine sorulur.
+ * Bant kapatılamaz (sahip kararı 2026-11-14); güncelleme sunulduğu sürece görünür.
  */
 type Phase = 'idle' | 'available' | 'downloading' | 'ready';
 
@@ -18,11 +18,9 @@ interface AppUpdateState {
   phase: Phase;
   /** 0-100; boyut bilinmiyorsa null. */
   progress: number | null;
-  dismissed: boolean;
   check: () => Promise<void>;
   start: () => Promise<void>;
   restart: () => Promise<void>;
-  dismiss: () => void;
 }
 
 /** Ön plana her dönüşte Play'e gitmeyelim. */
@@ -33,7 +31,6 @@ let listening = false;
 export const useAppUpdateStore = create<AppUpdateState>((set, get) => ({
   phase: 'idle',
   progress: null,
-  dismissed: false,
 
   async check() {
     if (!listening) {
@@ -45,8 +42,7 @@ export const useAppUpdateStore = create<AppUpdateState>((set, get) => ({
             progress: totalBytes > 0 ? Math.round((bytesDownloaded / totalBytes) * 100) : null,
           });
         } else if (status === 'downloaded') {
-          // İndirme bitince bant, daha önce kapatılmış olsa da yeniden görünür: iş yarıda kalmasın.
-          set({ phase: 'ready', progress: 100, dismissed: false });
+          set({ phase: 'ready', progress: 100 });
         } else if (status === 'failed' || status === 'canceled') {
           set({ phase: 'available', progress: null });
         }
@@ -76,7 +72,4 @@ export const useAppUpdateStore = create<AppUpdateState>((set, get) => ({
     await completeUpdate();
   },
 
-  dismiss() {
-    set({ dismissed: true });
-  },
 }));
