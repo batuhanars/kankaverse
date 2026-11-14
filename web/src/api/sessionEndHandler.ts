@@ -2,6 +2,9 @@
 export interface SessionEndDeps {
   clearAuth: () => void
   goToLogin: (opts: { expired: boolean }) => Promise<unknown>
+  // Oturum gerektiren bir sayfada mıyız? Değilse (şifre sıfırlama, e-posta doğrulama, yasal sayfalar)
+  // kullanıcı yerinden edilmez: oturumu hiç olmayan ziyaretçinin açılış /me denemesi de buraya düşer.
+  onProtectedPage: () => boolean
 }
 
 export function createSessionEndHandler(deps: SessionEndDeps) {
@@ -11,7 +14,7 @@ export function createSessionEndHandler(deps: SessionEndDeps) {
     ending = true
     try {
       deps.clearAuth()
-      await deps.goToLogin({ expired })
+      if (deps.onProtectedPage()) await deps.goToLogin({ expired })
     } finally {
       ending = false
     }

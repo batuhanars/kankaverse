@@ -10,6 +10,7 @@ import { SIGNED_OUT_EVENT } from '@/api/tabRefresh'
 export function installSessionEndHandler(router: Router): void {
   const handler = createSessionEndHandler({
     clearAuth: () => useAuthStore().clearAuth(),
+    onProtectedPage: () => !!router.currentRoute.value.meta.requiresAuth,
     goToLogin: ({ expired }) => {
       const current = router.currentRoute.value
       const query: Record<string, string> = {}
