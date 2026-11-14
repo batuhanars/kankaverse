@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -118,6 +118,7 @@ export default function NotificationsScreen() {
   const loadMore = useNotificationsStore((s) => s.loadMore);
   const markAllRead = useNotificationsStore((s) => s.markAllRead);
   const markRead = useNotificationsStore((s) => s.markRead);
+  const clearAll = useNotificationsStore((s) => s.clearAll);
 
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const hasUnread = unreadCount > 0 || items.some((n) => !n.readAt);
@@ -131,6 +132,22 @@ export default function NotificationsScreen() {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
+
+  // Temizle — kalıcı silme, onay ister (web ConfirmDialog ile aynı metinler).
+  function onClearPress() {
+    Alert.alert(t('notification.clearTitle'), t('notification.clearConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('notification.clearButton'),
+        style: 'destructive',
+        onPress: () => {
+          void clearAll().then((ok) => {
+            if (!ok) Alert.alert(t('common.error'));
+          });
+        },
+      },
+    ]);
+  }
 
   function onItemPress(n: NotificationDto) {
     // Dokunulan bildirim okundu işaretlenir (web NotificationBell.vue ile aynı semantik).
@@ -206,16 +223,28 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.flex} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>{t('notification.title')}</Text>
-        <Pressable
-          disabled={!hasUnread}
-          onPress={() => void markAllRead()}
-          hitSlop={8}
-          accessibilityRole="button"
-        >
-          <Text style={[styles.markAll, !hasUnread && styles.markAllDisabled]}>
-            {t('notification.markAllRead')}
-          </Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            disabled={!hasUnread}
+            onPress={() => void markAllRead()}
+            hitSlop={8}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.markAll, !hasUnread && styles.markAllDisabled]}>
+              {t('notification.markAllRead')}
+            </Text>
+          </Pressable>
+          <Pressable
+            disabled={items.length === 0}
+            onPress={onClearPress}
+            hitSlop={8}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.clearAll, items.length === 0 && styles.markAllDisabled]}>
+              {t('notification.clearAll')}
+            </Text>
+          </Pressable>
+        </View>
       </View>
       <NotificationPermissionBanner />
 
@@ -318,6 +347,16 @@ const styles = StyleSheet.create({
   },
   markAll: {
     color: theme.colors.accent500,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '600',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  clearAll: {
+    color: theme.colors.textMuted,
     fontSize: theme.fontSize.xs,
     fontWeight: '600',
   },

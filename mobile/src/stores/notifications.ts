@@ -16,6 +16,7 @@ interface NotificationsState {
   refreshUnreadCount: () => Promise<void>;
   applySnapshotUnreadCount: (count: number) => void;
   markAllRead: () => Promise<void>;
+  clearAll: () => Promise<boolean>;
   markRead: (id: string) => Promise<void>;
 }
 
@@ -70,6 +71,18 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       }));
     } catch {
       // sessizce yut
+    }
+  },
+
+  // Temizle — sunucuda silinir, liste ve rozet sıfırlanır. Başarıyı döner ki ekran hata gösterebilsin
+  // (sessiz başarısızlıkta kullanıcı listenin neden durduğunu anlamaz).
+  async clearAll() {
+    try {
+      await notificationsApi.clearAll();
+      set({ items: [], nextCursor: null, unreadCount: 0 });
+      return true;
+    } catch {
+      return false;
     }
   },
 

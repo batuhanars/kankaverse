@@ -10,6 +10,7 @@ import { useDmStore } from '@/stores/dm'
 import { useMessageJump } from '@/composables/useMessageJump'
 import { useAiVideoViewer } from '@/composables/useAiVideoViewer'
 import AiVideoDialog from '@/components/shared/AiVideoDialog.vue'
+import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import { reactionEmoji, reactionPreviewText } from '@/utils/reactionNotification'
 import type { NotificationDto } from '@/types'
 
@@ -43,6 +44,28 @@ const hasAnyUnread = computed(
 // Tıkla → hem çan bildirimlerini hem TÜM ortam/kanal okunmamışlarını okundu işaretle.
 async function markEverythingRead() {
   await Promise.allSettled([notificationsStore.markAllRead(), channelsStore.markAllRead()])
+}
+
+// Temizle — bildirimleri kalıcı siler, bu yüzden onay ister. Mesaj istekleri satırı bundan
+// etkilenmez (DM isteği, bildirim kaydı değil).
+const showClearConfirm = ref(false)
+const clearing = ref(false)
+
+function askClear() {
+  showNotifications.value = false
+  showClearConfirm.value = true
+}
+
+async function confirmClear() {
+  clearing.value = true
+  try {
+    await notificationsStore.clearAll()
+    showClearConfirm.value = false
+  } catch {
+    // ağ hatası: diyalog açık kalır, kullanıcı tekrar deneyebilir
+  } finally {
+    clearing.value = false
+  }
 }
 
 const showNotifications = ref(false)
@@ -207,15 +230,26 @@ async function onItemClick(n: NotificationDto) {
         <p class="text-[14px] font-bold" style="color: var(--kv-text-primary);">
           {{ t('notification.title') }}
         </p>
-        <button
-          type="button"
-          class="text-[12px] font-medium shrink-0 transition-colors disabled:opacity-40 disabled:cursor-default cursor-pointer hover:underline"
-          :style="`color: var(--kv-accent-500);`"
-          :disabled="!hasAnyUnread"
-          @click="markEverythingRead()"
-        >
-          {{ t('notification.markAllRead') }}
-        </button>
+        <div class="flex items-center gap-3 shrink-0">
+          <button
+            type="button"
+            class="text-[12px] font-medium shrink-0 transition-colors disabled:opacity-40 disabled:cursor-default cursor-pointer hover:underline"
+            :style="`color: var(--kv-accent-500);`"
+            :disabled="!hasAnyUnread"
+            @click="markEverythingRead()"
+          >
+            {{ t('notification.markAllRead') }}
+          </button>
+          <button
+            type="button"
+            class="text-[12px] font-medium shrink-0 transition-colors disabled:opacity-40 disabled:cursor-default cursor-pointer hover:underline"
+            style="color: var(--kv-text-muted);"
+            :disabled="!notificationsStore.items.length"
+            @click="askClear()"
+          >
+            {{ t('notification.clearAll') }}
+          </button>
+        </div>
       </div>
 
       <!-- C9 — Mesaj isteği satırı (bildirim listesinin üstünde sabit; varsa) -->
@@ -309,5 +343,15 @@ async function onItemClick(n: NotificationDto) {
     </div>
 
     <AiVideoDialog v-if="aiVideoViewId" mode="view" :initial-id="aiVideoViewId" @close="closeView" />
+
+    <ConfirmDialog
+      v-if="showClearConfirm"
+      :title="t('notification.clearTitle')"
+      :message="t('notification.clearConfirm')"
+      :confirm-label="t('notification.clearButton')"
+      :loading="clearing"
+      @confirm="confirmClear"
+      @cancel="showClearConfirm = false"
+    />
   </div>
 </template>

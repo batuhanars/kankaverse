@@ -72,6 +72,16 @@ export const useNotificationsStore = defineStore('notifications', () => {
     unreadCount.value = 0
   }
 
+  // Temizle → DELETE /notifications; liste ve rozet sıfır. initialFetched=true: sunucuda
+  // getirilecek eski sayfa kalmadı, loadMore boşuna istek atmasın.
+  async function clearAll() {
+    await notificationsApi.clearAll()
+    items.value = []
+    unreadCount.value = 0
+    nextCursor.value = null
+    initialFetched.value = true
+  }
+
   // Tek bildirimi okundu → POST /notifications/:id/read; o item.readAt set, badge azalt
   async function markRead(id: string) {
     const item = items.value.find((n) => n.id === id)
@@ -92,6 +102,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
     handleIncoming,
     loadMore,
     markAllRead,
+    clearAll,
     markRead,
   }
 })

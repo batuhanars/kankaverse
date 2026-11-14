@@ -11,6 +11,7 @@ const prismaMock = {
     findUnique: jest.fn(),
     update: jest.fn(),
     updateMany: jest.fn(),
+    deleteMany: jest.fn(),
     count: jest.fn(),
   },
   notificationPref: {
@@ -550,6 +551,20 @@ describe('NotificationsService', () => {
         data: { readAt: expect.any(Date) },
       });
       expect(result).toEqual({ count: 3 });
+    });
+  });
+
+  // ── clearAll ────────────────────────────────────────────────────────────────
+  describe('clearAll', () => {
+    it('yalnız kullanıcının kendi bildirimlerini siler, count döner', async () => {
+      prismaMock.notification.deleteMany.mockResolvedValue({ count: 5 });
+
+      const result = await service.clearAll(USER_ID);
+
+      expect(prismaMock.notification.deleteMany).toHaveBeenCalledWith({
+        where: { userId: USER_ID },
+      });
+      expect(result).toEqual({ count: 5 });
     });
   });
 

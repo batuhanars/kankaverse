@@ -63,6 +63,13 @@ export class NotificationsController {
     return this.notificationsService.markAll(user.id);
   }
 
+  @Delete()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Tüm bildirimleri temizle (yalnız kendi bildirimleri silinir)' })
+  clearAll(@CurrentUser() user: { id: string }) {
+    return this.notificationsService.clearAll(user.id);
+  }
+
   @Post(':id/read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Tek bildirimi okundu işaretle (sahiplik; başkasınınki → 404)' })

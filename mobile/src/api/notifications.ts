@@ -121,6 +121,11 @@ export const notificationsApi = {
     const res = await http.post<{ count: number }>('/notifications/read');
     return res.data;
   },
+  /** Bildirimlerin hepsini siler (yalnız kendi). Web NotificationBell "Temizle" ile aynı uç. */
+  async clearAll(): Promise<{ count: number }> {
+    const res = await http.delete<{ count: number }>('/notifications');
+    return res.data;
+  },
   async markRead(id: string): Promise<NotificationDto> {
     const res = await http.post<NotificationDto>(`/notifications/${id}/read`);
     return res.data;

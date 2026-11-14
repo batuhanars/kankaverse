@@ -188,6 +188,17 @@ export class NotificationsService {
   }
 
   /**
+   * Bildirim listesini temizle (sahip isteği 2026-11-14). Kullanıcının KENDİ başlattığı silmedir;
+   * yalnız kendi satırları (userId filtresi) silinir. `markFriendRequestActioned` notundaki
+   * "sessizce yok edilmez" kuralı sistemin kendiliğinden silmesi içindir, bu ona aykırı değil.
+   * Bildirim satırı T&S kanıtı taşımaz (şikâyet/moderasyon kendi kayıtlarını tutar).
+   */
+  async clearAll(userId: string): Promise<{ count: number }> {
+    const result = await this.prisma.notification.deleteMany({ where: { userId } });
+    return { count: result.count };
+  }
+
+  /**
    * §4 — Tek bildirimi okundu. Sahiplik kontrolü: başkasınınki/yok → jenerik 404.
    */
   async markOne(userId: string, id: string): Promise<NotificationDto> {

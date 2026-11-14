@@ -20,6 +20,9 @@ export const notificationsApi = {
   markAllRead() {
     return http.post<{ count: number }>('/notifications/read')
   },
+  clearAll() {
+    return http.delete<{ count: number }>('/notifications')
+  },
   markRead(id: string) {
     return http.post<NotificationDto>(`/notifications/${id}/read`)
   },
