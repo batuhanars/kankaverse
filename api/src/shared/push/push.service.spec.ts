@@ -7,6 +7,9 @@ const prismaMock = {
     findMany: jest.fn(),
     deleteMany: jest.fn(),
   },
+  session: {
+    findMany: jest.fn(),
+  },
 };
 
 function configMock(enabled: boolean) {
@@ -105,6 +108,83 @@ describe('PushService', () => {
     const secondBody = JSON.parse((global.fetch as jest.Mock).mock.calls[1][1].body);
     expect(firstBody).toHaveLength(100);
     expect(secondBody).toHaveLength(1);
+  });
+
+  // ── C70 — token oturum ailesine bağlı: ölü aile gönderilmez ve silinir ───────
+  describe('C70 oturuma bağlı token', () => {
+    const sentTo = () =>
+      JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body).map((m: any) => m.to);
+
+    beforeEach(() => {
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: () => ({ data: [] }) });
+      prismaMock.pushToken.deleteMany.mockResolvedValue({ count: 0 });
+    });
+
+    it("canlı ailenin token'ı gönderilir", async () => {
+      prismaMock.pushToken.findMany.mockResolvedValue([{ token: 'T1', tokenFamily: 'f1' }]);
+      prismaMock.session.findMany.mockResolvedValue([{ tokenFamily: 'f1' }]);
+
+      await makeService(true).sendToUsers(['u1'], BASE_PAYLOAD);
+
+      expect(sentTo()).toEqual(['T1']);
+      expect(prismaMock.session.findMany).toHaveBeenCalledWith({
+        where: { tokenFamily: { in: ['f1'] }, revokedAt: null },
+        select: { tokenFamily: true },
+        distinct: ['tokenFamily'],
+      });
+      expect(prismaMock.pushToken.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("iptal edilmiş ailenin token'ı gönderilmez ve silinir", async () => {
+      prismaMock.pushToken.findMany.mockResolvedValue([{ token: 'T1', tokenFamily: 'f1' }]);
+      prismaMock.session.findMany.mockResolvedValue([]);
+
+      await makeService(true).sendToUsers(['u1'], BASE_PAYLOAD);
+
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(prismaMock.pushToken.deleteMany).toHaveBeenCalledWith({
+        where: { tokenFamily: { in: ['f1'] } },
+      });
+    });
+
+    it('tokenFamily null (eski kayıt) gönderilir, silinmez, oturum sorgusu yapılmaz', async () => {
+      prismaMock.pushToken.findMany.mockResolvedValue([{ token: 'T1', tokenFamily: null }]);
+
+      await makeService(true).sendToUsers(['u1'], BASE_PAYLOAD);
+
+      expect(sentTo()).toEqual(['T1']);
+      expect(prismaMock.session.findMany).not.toHaveBeenCalled();
+      expect(prismaMock.pushToken.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('karışık listede yalnız canlı + null aileli gönderilir, ölü aile silinir', async () => {
+      prismaMock.pushToken.findMany.mockResolvedValue([
+        { token: 'LIVE', tokenFamily: 'f1' },
+        { token: 'DEAD', tokenFamily: 'f2' },
+        { token: 'OLD', tokenFamily: null },
+      ]);
+      prismaMock.session.findMany.mockResolvedValue([{ tokenFamily: 'f1' }]);
+
+      await makeService(true).sendToUsers(['u1'], BASE_PAYLOAD);
+
+      expect(sentTo()).toEqual(['LIVE', 'OLD']);
+      expect(prismaMock.pushToken.deleteMany).toHaveBeenCalledWith({
+        where: { tokenFamily: { in: ['f2'] } },
+      });
+    });
+
+    it('silme hatası gönderimi bozmaz', async () => {
+      prismaMock.pushToken.findMany.mockResolvedValue([
+        { token: 'LIVE', tokenFamily: 'f1' },
+        { token: 'DEAD', tokenFamily: 'f2' },
+      ]);
+      prismaMock.session.findMany.mockResolvedValue([{ tokenFamily: 'f1' }]);
+      prismaMock.pushToken.deleteMany.mockRejectedValue(new Error('db'));
+
+      await makeService(true).sendToUsers(['u1'], BASE_PAYLOAD);
+
+      expect(sentTo()).toEqual(['LIVE']);
+    });
   });
 
   // ── §2.3/§2.5 — DeviceNotRegistered → token silinir ─────────────────────────

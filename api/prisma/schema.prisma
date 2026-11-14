@@ -923,18 +923,22 @@ model NotificationPref {
 // bkz. SPRINT_M3_MOBILE_PUSH_CONTRACT.md §2.1/§4).
 
 model PushToken {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token      String   @unique // Expo push token (ExponentPushToken[...])
-  platform   String // 'android' | 'ios' — bugün yalnız android yazılır
-  deviceName String? // kullanıcıya gösterilmez; teşhis için
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token       String   @unique // Expo push token (ExponentPushToken[...])
+  platform    String // 'android' | 'ios' — bugün yalnız android yazılır
+  deviceName  String? // kullanıcıya gösterilmez; teşhis için
   // C50: push biçimi. 1 = bugünkü title/body; 2 = veri-yalnız (istemci bildirimi kendisi çizer).
-  format     Int      @default(1)
-  createdAt  DateTime @default(now())
-  lastUsedAt DateTime @default(now())
+  format      Int      @default(1)
+  // C70: kaydın yapıldığı oturumun token ailesi. Gönderimde canlı oturumu olmayan aile ölü sayılır.
+  // null = eski kayıt (geçiş; PLAN.md borcu).
+  tokenFamily String?
+  createdAt   DateTime @default(now())
+  lastUsedAt  DateTime @default(now())
 
   @@index([userId])
+  @@index([tokenFamily])
 }
 
 // ─── Sprint Closed-Registration: Platform Davet Sistemi ──────────────────────

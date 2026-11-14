@@ -157,15 +157,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // Contract §4 — sunucu hata verse bile yerel temizlik yapılır.
   async logout(opts) {
     const wipe = opts?.wipeE2ee === true;
+    // Sprint M3 §3 — T&S: cihazı bırakan kullanıcının push'u bir sonrakine düşmesin. 🔴 Sunucu
+    // çıkışından ÖNCE çağrılır: uç `Authorization` ister ve JwtStrategy iptal edilmiş oturumun
+    // access token'ını reddeder. Çıkıştan sonra çağrılınca 401 alıyor, token sunucuda asılı kalıyor,
+    // çıkış yapmış cihaza bildirim gelmeye devam ediyordu (sahip bulgusu 2026-11-14).
+    await clearPushToken();
     try {
       await authApi.logout({ keepE2eeDevice: !wipe });
     } catch {
       // yerel temizlik yine de yapılır
     } finally {
-      // Sprint M3 §3 — T&S: cihazı bırakan kullanıcının push'u bir sonrakine düşmesin. Access
-      // token TEMİZLENMEDEN önce çağrılır — uç `Authorization` ister (kendi token'ını sil), sıra
-      // değişirse 401 alır ve token sunucuda asılı kalır.
-      await clearPushToken();
       // C38 — kaldığın yerden aç kaydı çıkışta silinir (kullanıcı kimliği silinmeden önce).
       await clearResume(get().user?.id);
       clearAccessToken();

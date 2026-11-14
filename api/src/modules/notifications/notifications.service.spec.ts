@@ -869,7 +869,7 @@ describe('NotificationsService', () => {
     it('upsert çağrılır; update dalı da userId yazar (token devrinde eski kullanıcı sızmasın)', async () => {
       prismaMock.pushToken.upsert.mockResolvedValue({});
 
-      await service.registerPushToken(USER_ID, {
+      await service.registerPushToken(USER_ID, 'fam-1', {
         token: 'ExponentPushToken[abc]',
         platform: 'android',
         deviceName: 'Pixel',
@@ -883,12 +883,14 @@ describe('NotificationsService', () => {
           platform: 'android',
           deviceName: 'Pixel',
           format: 1,
+          tokenFamily: 'fam-1',
         },
         update: {
           userId: USER_ID,
           platform: 'android',
           deviceName: 'Pixel',
           format: 1,
+          tokenFamily: 'fam-1',
           lastUsedAt: expect.any(Date),
         },
       });
@@ -897,7 +899,7 @@ describe('NotificationsService', () => {
     it('C50: format 2 verilirse hem create hem update dalına yazılır', async () => {
       prismaMock.pushToken.upsert.mockResolvedValue({});
 
-      await service.registerPushToken(USER_ID, {
+      await service.registerPushToken(USER_ID, 'fam-1', {
         token: 'ExponentPushToken[abc]',
         platform: 'android',
         format: 2,
@@ -908,10 +910,23 @@ describe('NotificationsService', () => {
       expect(call.update.format).toBe(2);
     });
 
+    it('C70: tokenFamily hem create hem update dalına yazılır (yeni girişte token yeni aileye taşınır)', async () => {
+      prismaMock.pushToken.upsert.mockResolvedValue({});
+
+      await service.registerPushToken(USER_ID, 'fam-2', {
+        token: 'ExponentPushToken[abc]',
+        platform: 'android',
+      });
+
+      const call = prismaMock.pushToken.upsert.mock.calls[0][0];
+      expect(call.create.tokenFamily).toBe('fam-2');
+      expect(call.update.tokenFamily).toBe('fam-2');
+    });
+
     it('deviceName verilmezse null yazılır', async () => {
       prismaMock.pushToken.upsert.mockResolvedValue({});
 
-      await service.registerPushToken(USER_ID, {
+      await service.registerPushToken(USER_ID, 'fam-1', {
         token: 'ExponentPushToken[abc]',
         platform: 'android',
       });

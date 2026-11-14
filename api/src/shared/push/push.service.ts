@@ -1,5 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -134,9 +135,7 @@ export class PushService {
     if (targets.length === 0) return;
 
     try {
-      const tokens = await this.prisma.pushToken.findMany({
-        where: { userId: { in: targets } },
-      });
+      const tokens = await this.liveTokens({ userId: { in: targets } });
       if (tokens.length === 0) return;
 
       // M4a-3 §9.1 — yeni alanlar undefined kalırsa JSON.stringify onları atar; verilmediğinde
@@ -211,7 +210,7 @@ export class PushService {
       const prefix = v2PendingKey(userId, '');
       const pendingIds = taken.map((k) => k.slice(prefix.length));
 
-      const tokens = await this.prisma.pushToken.findMany({ where: { userId, format: 2 } });
+      const tokens = await this.liveTokens({ userId, format: 2 });
       if (tokens.length === 0) return;
 
       for (let i = 0; i < pendingIds.length; i += V2_READ_MAX_IDS) {
@@ -241,7 +240,7 @@ export class PushService {
   async sendCallEnd(userId: string, callChannelId: string): Promise<void> {
     if (!this.enabled || !this.v2AllowedFor(userId)) return;
     try {
-      const tokens = await this.prisma.pushToken.findMany({ where: { userId, format: 2 } });
+      const tokens = await this.liveTokens({ userId, format: 2 });
       if (tokens.length === 0) return;
       const data: V2CallEndData = { v: 2, kind: 'call_end', callChannelId };
       const messages: ExpoMessage[] = tokens.map((t) => ({
@@ -267,9 +266,7 @@ export class PushService {
     const targets = [...new Set(userIds)].filter((id) => this.v2AllowedFor(id));
     if (targets.length === 0) return;
     try {
-      const tokens = await this.prisma.pushToken.findMany({
-        where: { userId: { in: targets }, format: 2 },
-      });
+      const tokens = await this.liveTokens({ userId: { in: targets }, format: 2 });
       const messages: ExpoMessage[] = tokens.map((t) => ({
         to: t.token,
         data,
@@ -282,6 +279,32 @@ export class PushService {
     } catch (err) {
       this.logger.warn(`Grup arama push'u başarısız: ${(err as Error).message}`);
     }
+  }
+
+  /**
+   * C70: tek token okuma noktası. Canlı oturumu (iptal edilmemiş) olmayan ailenin token'ı
+   * kullanılmaz ve silinir: çıkış yapılmış cihaza bildirim (mesaj metni) gitmesin.
+   * tokenFamily=null (eski kayıt) geçiş süresince gönderilir (PLAN.md D111).
+   */
+  private async liveTokens(where: Prisma.PushTokenWhereInput) {
+    const tokens = await this.prisma.pushToken.findMany({ where });
+    const families = [...new Set(tokens.map((t) => t.tokenFamily).filter((f): f is string => !!f))];
+    if (families.length === 0) return tokens;
+
+    const sessions = await this.prisma.session.findMany({
+      where: { tokenFamily: { in: families }, revokedAt: null },
+      select: { tokenFamily: true },
+      distinct: ['tokenFamily'],
+    });
+    const live = new Set(sessions.map((s) => s.tokenFamily));
+    const dead = families.filter((f) => !live.has(f));
+    if (dead.length > 0) {
+      // Silme hatası gönderimi bozmaz.
+      await this.prisma.pushToken
+        .deleteMany({ where: { tokenFamily: { in: dead } } })
+        .catch((err: Error) => this.logger.warn(`Ölü push token silinemedi: ${err.message}`));
+    }
+    return tokens.filter((t) => !t.tokenFamily || live.has(t.tokenFamily));
   }
 
   private async sendBatch(batch: ExpoMessage[]): Promise<void> {

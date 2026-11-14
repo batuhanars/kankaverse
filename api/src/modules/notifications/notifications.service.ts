@@ -251,7 +251,11 @@ export class NotificationsService {
    * userId'yi yazar) — aksi hâlde önceki kullanıcının bildirimi yeni kullanıcının cihazına
    * düşerdi (T&S sızıntısı, contract §2.1/§4).
    */
-  async registerPushToken(userId: string, dto: CreatePushTokenDto): Promise<null> {
+  async registerPushToken(
+    userId: string,
+    tokenFamily: string,
+    dto: CreatePushTokenDto,
+  ): Promise<null> {
     await this.prisma.pushToken.upsert({
       where: { token: dto.token },
       create: {
@@ -260,6 +264,7 @@ export class NotificationsService {
         platform: dto.platform,
         deviceName: dto.deviceName ?? null,
         format: dto.format ?? 1,
+        tokenFamily,
       },
       update: {
         userId,
@@ -267,6 +272,8 @@ export class NotificationsService {
         deviceName: dto.deviceName ?? null,
         // C50: yeni sürüme geçen cihaz 2 olur; verilmezse 1 (eski sürüme dönen cihaz v1'e düşer).
         format: dto.format ?? 1,
+        // C70: aynı cihazda yeni girişte token yeni oturum ailesine taşınır.
+        tokenFamily,
         lastUsedAt: new Date(),
       },
     });

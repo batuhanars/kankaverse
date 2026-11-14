@@ -84,8 +84,11 @@ export class NotificationsController {
   @ApiOperation({
     summary: 'Push token kaydet/güncelle (upsert; token unique, userId çağırandan taşınır)',
   })
-  registerPushToken(@CurrentUser() user: { id: string }, @Body() dto: CreatePushTokenDto) {
-    return this.notificationsService.registerPushToken(user.id, dto);
+  registerPushToken(
+    @CurrentUser() user: { id: string; tokenFamily: string },
+    @Body() dto: CreatePushTokenDto,
+  ) {
+    return this.notificationsService.registerPushToken(user.id, user.tokenFamily, dto);
   }
 
   @Delete('push-tokens/:token')
