@@ -1734,7 +1734,7 @@
     "e2eeTransfer": "Şifreli mesaj geçmişin yeni bir cihaza aktarıldı: {device}. Bu sen değilsen hemen şifreni değiştir.",
     "e2eeTransferNoDevice": "Şifreli mesaj geçmişin yeni bir cihaza aktarıldı. Bu sen değilsen hemen şifreni değiştir.",
     "securityTitle": "Güvenlik",
-    "markAllRead": "Tümünü okundu işaretle",
+    "markAllRead": "Okundu olarak işaretle",
     "clearAll": "Temizle",
     "clearTitle": "Bildirimleri temizle",
     "clearConfirm": "Tüm bildirimlerin silinecek. Bu işlem geri alınamaz.",
