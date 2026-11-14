@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   clearAll: {
-    color: theme.colors.textMuted,
+    color: theme.colors.textSecondary,
     fontSize: theme.fontSize.xs,
     fontWeight: '600',
   },

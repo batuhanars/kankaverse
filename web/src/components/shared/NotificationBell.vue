@@ -242,8 +242,7 @@ async function onItemClick(n: NotificationDto) {
           </button>
           <button
             type="button"
-            class="text-[12px] font-medium shrink-0 transition-colors disabled:opacity-40 disabled:cursor-default cursor-pointer hover:underline"
-            style="color: var(--kv-text-muted);"
+            class="text-[12px] font-medium shrink-0 transition-colors disabled:opacity-40 disabled:cursor-default cursor-pointer hover:underline text-[var(--kv-text-secondary)] enabled:hover:text-[var(--kv-text-primary)]"
             :disabled="!notificationsStore.items.length"
             @click="askClear()"
           >
