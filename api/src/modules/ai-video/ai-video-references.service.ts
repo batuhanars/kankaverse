@@ -14,7 +14,7 @@ import {
   inputTypeOfKey,
 } from './ai-video.constants';
 import { AI_VIDEO_MESSAGES, referenceInputTypes } from './ai-video.mapper';
-import { AiVideoReferenceSpec } from './ai-video.models';
+import { AiVideoReferenceSpec, hasRequiredVisual } from './ai-video.models';
 import { AiVideoInputService } from './ai-video-input.service';
 
 export interface AiVideoReference {
@@ -74,7 +74,15 @@ export class AiVideoReferenceService {
     spec: AiVideoReferenceSpec,
     refs: AiVideoReference[],
   ): Promise<void> {
-    if (refs.length === 0) throw invalid(AiVideoError.INVALID_OPTION);
+    if (
+      refs.length === 0 ||
+      !hasRequiredVisual(
+        spec,
+        refs.map((r) => r.kind),
+      )
+    ) {
+      throw invalid(AiVideoError.INVALID_OPTION);
+    }
     for (const kind of AI_INPUT_KINDS) {
       if (refs.filter((r) => r.kind === kind).length > spec.max[kind]) {
         throw invalid(AiVideoError.INVALID_OPTION);

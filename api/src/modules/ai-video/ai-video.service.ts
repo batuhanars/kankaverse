@@ -37,6 +37,7 @@ import {
   AiVideoReferenceUrls,
   apiIdOf,
   buildPikaBody,
+  hasRequiredVisual,
   quotePlaceholderUrls,
 } from './ai-video.models';
 import { countKinds, translatePromptTags } from './ai-video-prompt-tags';
@@ -386,7 +387,13 @@ export class AiVideoService {
   private assertReferenceCounts(spec: AiVideoModelSpec, kinds: AiInputKind[]): void {
     const c = countKinds(kinds);
     const max = spec.references!.max;
-    if (kinds.length === 0 || c.image > max.image || c.video > max.video || c.audio > max.audio) {
+    if (
+      kinds.length === 0 ||
+      c.image > max.image ||
+      c.video > max.video ||
+      c.audio > max.audio ||
+      !hasRequiredVisual(spec.references!, kinds)
+    ) {
       throw this.invalidOption();
     }
   }

@@ -10,8 +10,11 @@ export interface AiVideoReferenceSpec {
   /**
    * 2026-11-22: gövde biçimi. `fields` (Wan, Seedance) = tür başına dizi alanı (`fields` alan adıdır);
    * `contents` (Kling 4.0) = istem + her referans tek `contents` dizisinde (`fields` içerik türüdür, ör. refer_image).
+   * `list` (Pika H3 Flex) = istem ayrı, referanslar sıralı tek `references` dizisinde (`{ type, url }`, tür adı `fields`).
    */
-  body?: 'fields' | 'contents';
+  body?: 'fields' | 'contents' | 'list';
+  /** 2026-11-22: en az bir görsel ya da video şart (H3 Flex yalnız sesi kabul etmez). */
+  requiresVisual?: boolean;
   fields: { image: string; video: string; audio: string };
   max: { image: number; video: number; audio: number };
   videoTotalMaxS: number;
@@ -221,7 +224,46 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
       tagFormat: '@{Kind}{n}',
     },
   },
+  // 2026-11-22: Pika'nın kendi modeli, sesli. Metin, görsel (ilk kare) ve referans (sıralı liste) uçları var.
+  {
+    key: 'pika-h3-flex',
+    label: 'Pika H3 Flex',
+    apiBase: 'pika/pika-h3-flex',
+    durations: secondsRange(5, 15),
+    // 480p/768p doğal; 1080p ve üstü 768p'den büyütme (ek ücret), şimdilik verilmez.
+    resolutions: ['480p', '768p'],
+    aspectField: 'aspect_ratio',
+    // Görselden üretimde oran verilmezse ilk kareyi izler: alan gönderilmez.
+    aspectRatios: { text: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], image: [] },
+    durationField: 'duration',
+    imageField: 'image',
+    supportsImage: true,
+    imagePromptRequired: true,
+    audio: 'always',
+    fixed: {},
+    // PikaH3FlexReferenceRequest: en fazla 9 görsel, 3 video, 3 ses (toplam 12); en az bir görsel/video şart.
+    // Video/ses 2-15 sn, tür toplamı 15 sn. Şema istem etiketini belirtmiyor; istem yeniden yazıcısı
+    // önizlemeleri görüyor, "Image 1" yazımı seçildi (canlıda sınanacak).
+    references: {
+      apiFunction: 'reference-to-video',
+      body: 'list',
+      requiresVisual: true,
+      fields: { image: 'image', video: 'video', audio: 'audio' },
+      max: { image: 9, video: 3, audio: 3 },
+      videoTotalMaxS: 15,
+      videoMaxS: 15,
+      audioMaxS: 15,
+      audioTotalMaxS: 15,
+      minS: 2,
+      aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+      tagFormat: '{Kind} {n}',
+    },
+  },
 ];
+
+/** Referans türlerinde H3 Flex kuralı: yalnız ses verilemez. */
+export const hasRequiredVisual = (refs: AiVideoReferenceSpec, kinds: string[]): boolean =>
+  !refs.requiresVisual || kinds.some((k) => k === 'image' || k === 'video');
 
 export const findModelSpec = (key: string): AiVideoModelSpec | undefined =>
   AI_VIDEO_MODEL_TABLE.find((m) => m.key === key);
@@ -254,6 +296,16 @@ export function buildPikaBody(
     referenceUrls?: AiVideoReferenceUrls;
   },
 ): Record<string, unknown> {
+  if (opts.referenceUrls !== undefined && spec.references?.body === 'list') {
+    return {
+      ...(opts.prompt !== undefined && opts.prompt.length > 0 && { prompt: opts.prompt }),
+      references: referenceList(spec, opts.referenceUrls),
+      resolution: opts.resolution,
+      [spec.durationField]: opts.durationS,
+      ...(opts.aspectRatio !== undefined && { [spec.aspectField]: opts.aspectRatio }),
+      ...spec.fixed,
+    };
+  }
   if (opts.referenceUrls !== undefined && spec.references?.body === 'contents') {
     return {
       contents: referenceContents(spec, opts.prompt ?? '', opts.referenceUrls),
@@ -288,6 +340,14 @@ function referenceContents(spec: AiVideoModelSpec, prompt: string, urls: AiVideo
     })),
   );
   return [{ type: 'prompt', text: prompt }, ...refs];
+}
+
+/** H3 Flex: görseller, videolar, sesler sırayla; istemdeki "Image 1" tür içindeki sıraya karşılık gelir. */
+function referenceList(spec: AiVideoModelSpec, urls: AiVideoReferenceUrls) {
+  const types = spec.references!.fields;
+  return (['image', 'video', 'audio'] as const).flatMap((kind) =>
+    urls[kind].map((url) => ({ type: types[kind], url })),
+  );
 }
 
 function referenceFields(spec: AiVideoModelSpec, urls: AiVideoReferenceUrls) {
