@@ -25,6 +25,10 @@ export interface AiVideoModelSpec {
   aspectRatios: { text: string[]; image: string[] };
   durationField: string;
   imageField: string;
+  /** Görselden üretim ucu var mı (yoksa istemci görsel eklemez, sunucu image kipini reddeder). */
+  supportsImage: boolean;
+  /** Görselden üretimde de istem zorunlu mu (sağlayıcı istemsiz görseli reddediyorsa). */
+  imagePromptRequired: boolean;
   /** Ses: none = sessiz, default = varsayılan açık, always = her zaman sesli. */
   audio: 'none' | 'default' | 'always';
   /** Her gövdeye eklenen sabit alanlar. */
@@ -47,6 +51,8 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     aspectRatios: { text: ['16:9', '9:16', '1:1', '4:3'], image: [] },
     durationField: 'duration_s',
     imageField: 'image',
+    supportsImage: true,
+    imagePromptRequired: false,
     audio: 'none',
     fixed: {},
     references: null,
@@ -64,6 +70,8 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     },
     durationField: 'duration',
     imageField: 'first_frame_url',
+    supportsImage: true,
+    imagePromptRequired: false,
     audio: 'default',
     fixed: { watermark: false },
     references: {
@@ -73,7 +81,8 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
         video: 'reference_video_urls',
         audio: 'reference_audio_urls',
       },
-      max: { image: 4, video: 2, audio: 2 },
+      // 2026-11-22: sağlayıcının üst sınırı (WanOmniVideoRequest maxItems 10/5/5), sahip isteği.
+      max: { image: 10, video: 5, audio: 5 },
       videoTotalMaxS: 15,
       videoMaxS: 15,
       audioMaxS: 30,
@@ -90,6 +99,60 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     aspectRatios: { text: ['16:9', '9:16', '1:1'], image: [] },
     durationField: 'duration',
     imageField: 'image_url',
+    supportsImage: true,
+    imagePromptRequired: false,
+    audio: 'always',
+    fixed: {},
+    references: null,
+  },
+  // 2026-11-22: sesli modeller (Pika şemasında `native_audio`). Referans ucu olanlar ilk turda referanssız:
+  // kabul ettikleri dosya türü/süre kuralları Wan'dan farklı (ör. Seedance sesi yalnız wav/mp3, en az 2 sn).
+  {
+    key: 'seedance-2.5',
+    label: 'Seedance 2.5',
+    apiBase: 'bytedance/seedance-2.5',
+    durations: secondsRange(5, 15),
+    resolutions: ['480p', '720p'],
+    aspectField: 'ratio',
+    // Görselden üretimde oran sabit 'adaptive' (görselin oranı): alan gönderilmez.
+    aspectRatios: { text: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], image: [] },
+    durationField: 'duration',
+    imageField: 'image_url',
+    supportsImage: true,
+    imagePromptRequired: true,
+    audio: 'default',
+    fixed: { watermark: false },
+    references: null,
+  },
+  {
+    key: 'veo-3.1-fast',
+    label: 'Veo 3.1 Fast',
+    apiBase: 'google/veo-3.1-fast',
+    durations: [4, 6, 8],
+    resolutions: ['720p'],
+    aspectField: 'aspect_ratio',
+    aspectRatios: { text: ['16:9', '9:16'], image: [] },
+    durationField: 'duration',
+    imageField: '',
+    // Pika'da yalnız text-to-video ucu var.
+    supportsImage: false,
+    imagePromptRequired: true,
+    audio: 'default',
+    fixed: {},
+    references: null,
+  },
+  {
+    key: 'kling-4.0',
+    label: 'Kling 4.0',
+    apiBase: 'kling/kling-4.0',
+    durations: secondsRange(5, 15),
+    resolutions: ['720p'],
+    aspectField: 'aspect_ratio',
+    aspectRatios: { text: ['16:9', '9:16', '1:1', '21:9'], image: [] },
+    durationField: 'duration',
+    imageField: 'image_url',
+    supportsImage: true,
+    imagePromptRequired: false,
     audio: 'always',
     fixed: {},
     references: null,

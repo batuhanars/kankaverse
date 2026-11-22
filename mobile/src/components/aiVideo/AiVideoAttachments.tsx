@@ -66,24 +66,28 @@ export function AiVideoAttachments({ refs, items, labels, thumbs, mode, error, d
   const count = (k: RefItem['kind']) => items.filter((i) => i.kind === k).length;
   const mediaFull = count('image') >= refs.max.image && count('video') >= refs.max.video;
   const audioFull = count('audio') >= refs.max.audio;
+  // Referans ucu olmayan modelde (Pika, Kling, Seedance) tek görsel: menü, sayaç ve video/ses dili gereksiz.
+  const imageOnly = refs.max.video === 0 && refs.max.audio === 0;
   return (
     <View style={styles.group}>
       <Pressable
-        onPress={() => setMenu((m) => !m)}
+        onPress={() => (imageOnly ? onPickMedia() : setMenu((m) => !m))}
         disabled={disabled}
         style={[styles.ghost, disabled && styles.off]}
         accessibilityRole="button"
         accessibilityState={{ disabled, expanded: menu }}
       >
         <Ionicons name="attach" size={18} color={theme.colors.textSecondary} />
-        <Text style={styles.ghostText}>{t('mobile.aiVideoRefs.add')}</Text>
+        <Text style={styles.ghostText}>
+          {t(imageOnly ? 'mobile.aiVideoRefs.addImage' : 'mobile.aiVideoRefs.add')}
+        </Text>
       </Pressable>
       {error ? (
         <Text style={styles.error} accessibilityRole="alert">
           {error}
         </Text>
       ) : null}
-      {menu ? (
+      {menu && !imageOnly ? (
         <View style={styles.menu}>
           <Pressable
             onPress={() => {
@@ -120,21 +124,23 @@ export function AiVideoAttachments({ refs, items, labels, thumbs, mode, error, d
               <Card key={it.id} item={it} label={labels[i]} thumb={thumbs[it.id]} onRemove={() => onRemove(it.id)} />
             ))}
           </ScrollView>
-          <Text style={styles.hint}>
-            {t('mobile.aiVideoRefs.counter', {
+          {imageOnly ? null : (
+            <Text style={styles.hint}>
+              {t('mobile.aiVideoRefs.counter', {
               image: count('image'),
               imageMax: refs.max.image,
               video: count('video'),
               videoMax: refs.max.video,
               audio: count('audio'),
               audioMax: refs.max.audio,
-            })}
-          </Text>
+              })}
+            </Text>
+          )}
           <Text style={styles.note}>{t(mode === 'image' ? 'mobile.aiVideoRefs.modeImage' : 'mobile.aiVideoRefs.modeReference')}</Text>
           <Text style={styles.hint}>{t('mobile.aiVideoRefs.rule')}</Text>
         </>
       ) : (
-        <Text style={styles.hint}>{t('mobile.aiVideoRefs.hint')}</Text>
+        <Text style={styles.hint}>{t(imageOnly ? 'mobile.aiVideoRefs.hintImage' : 'mobile.aiVideoRefs.hint')}</Text>
       )}
     </View>
   );

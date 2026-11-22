@@ -223,6 +223,18 @@ describe('AiVideoService.create (teklif + tavan + gonderim)', () => {
     });
   });
 
+  it('2026-11-22: istem zorunlu modelde (Seedance) gorsel + bos istem reddedilir, Pika cagrilmaz', async () => {
+    const { service, pika, values } = setup();
+    values['aiVideo.models'] = ['seedance-2.5'];
+    await expect(
+      service.create(
+        'u1',
+        dto({ model: 'seedance-2.5', prompt: '', inputKey: `ai-input/u1/${UUID}.png` }),
+      ),
+    ).rejects.toMatchObject({ response: { error: 'AI_VIDEO_PROMPT_REQUIRED' } });
+    expect(pika.quote).not.toHaveBeenCalled();
+  });
+
   it('C43: gunluk tavan yok; ayni gun cok harcamis ama hakki yeten kullanici reddedilmez', async () => {
     const { service, prisma, pika } = setup({}, [
       { status: AiVideoStatus.COMPLETED, costMicroUsd: 9_000_000, quoteMicroUsd: 200_000 },
@@ -324,6 +336,37 @@ describe('AiVideoService.estimate / options', () => {
     expect(prisma.aiVideoGeneration.create).not.toHaveBeenCalled();
   });
 
+  it('2026-11-22: gorselden uretimi olmayan model (Veo) image kipini reddeder, Pika cagrilmaz', async () => {
+    const { service, pika, values } = setup();
+    values['aiVideo.models'] = ['veo-3.1-fast'];
+    const q = { model: 'veo-3.1-fast', resolution: '720p', durationS: 8 };
+    await expect(service.estimate({ ...q, withImage: true })).rejects.toMatchObject({
+      response: { error: 'AI_VIDEO_INVALID_OPTION' },
+    });
+    expect(pika.quote).not.toHaveBeenCalled();
+    await service.estimate({ ...q, withImage: false });
+    expect(pika.quote).toHaveBeenCalledWith('google/veo-3.1-fast/text-to-video', {
+      prompt: 'x',
+      resolution: '720p',
+      duration: 8,
+    });
+  });
+
+  it('2026-11-22: istem zorunlu modelde (Seedance) gorselden teklif istemle gider', async () => {
+    const { service, pika, values } = setup();
+    values['aiVideo.models'] = ['seedance-2.5'];
+    await service.estimate({
+      model: 'seedance-2.5',
+      resolution: '720p',
+      durationS: 5,
+      withImage: true,
+    });
+    expect(pika.quote).toHaveBeenCalledWith(
+      'bytedance/seedance-2.5/image-to-video',
+      expect.objectContaining({ prompt: 'x', duration: 5, watermark: false }),
+    );
+  });
+
   it('gecersiz secenek 400', async () => {
     const { service } = setup();
     await expect(
@@ -342,7 +385,10 @@ describe('AiVideoService.estimate / options', () => {
     ]);
     const res = await service.options('u1');
     expect(res.models.map((m) => m.key)).toEqual(['pika-2.5', 'wan-3.0', 'kling-3.0-turbo']);
-    expect(res.models[2]).toMatchObject({ durations: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], resolutions: ['720p'] });
+    expect(res.models[2]).toMatchObject({
+      durations: [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      resolutions: ['720p'],
+    });
     expect(res.grant).toMatchObject({ usedCredits: 40, budgetCredits: 100_000 });
     expect(res).toMatchObject({
       dailyCapCredits: 100_000,

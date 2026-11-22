@@ -1,4 +1,20 @@
-import type { AiVideoRefKind, AiVideoReferencesOption } from '@/api/aiVideo';
+import type { AiVideoModelOption, AiVideoRefKind, AiVideoReferencesOption } from '@/api/aiVideo';
+
+/** Referans ucu olmayan ama görselden üretebilen model (Pika, Kling, Seedance): tek görsel (web `IMAGE_ONLY` eşdeğeri). */
+export const IMAGE_ONLY: AiVideoReferencesOption = {
+  max: { image: 1, video: 0, audio: 0 },
+  videoTotalMaxS: 0,
+  videoMaxS: 0,
+  audioMaxS: 0,
+  aspectRatios: [],
+  inputTypes: { image: ['image/png', 'image/jpeg', 'image/webp'], video: [], audio: [] },
+};
+
+/** Modelin ek sınırları; ne referans ne görsel kabul eden modelde (Veo) null = ek eklenemez. */
+export function refsLimitsOf(model: AiVideoModelOption | null): AiVideoReferencesOption | null {
+  if (!model) return null;
+  return model.references ?? (model.supportsImage ? IMAGE_ONLY : null);
+}
 
 /** Sunucu süre toleransı (sözleşme §1.3): istemci ön denetimi aynı sınırı kullanır. */
 export const DURATION_TOLERANCE_S = 0.5;

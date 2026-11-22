@@ -8,7 +8,7 @@ import { syncActiveAiVideo, useAiVideoViewerStore } from '@/stores/aiVideoViewer
 import { t } from '@/i18n';
 import { aiVideoErrorText, aiVideoFailText, DOWNLOAD_PENDING } from './aiVideoErrors';
 import { useAiVideoForm } from './useAiVideoForm';
-import { retagPrompt } from './aiVideoRefs';
+import { refsLimitsOf, retagPrompt } from './aiVideoRefs';
 import { useAiVideoRefs } from './useAiVideoRefs';
 
 const POLL_MS = 4000;
@@ -44,7 +44,7 @@ export function useAiVideo() {
   const locked = useAuthStore((s) => s.user?.aiVideoAllowed !== true);
   const kinds = refs.items.map((i) => i.kind);
   const form = useAiVideoForm(refs.mode, kinds, locked);
-  refsOption.current = form.current?.references ?? null;
+  refsOption.current = refsLimitsOf(form.current);
   const jobRef = useRef<AiVideoDto | null>(null);
   const alive = useRef(true);
 

@@ -18,6 +18,7 @@ import {
   AI_INPUT_KINDS,
   AI_INPUT_TYPES,
   AI_PROMPT_MAX,
+  AI_REFERENCES_MAX,
 } from '../ai-video.constants';
 import type { AiInputKind } from '../ai-video.constants';
 
@@ -75,7 +76,7 @@ export class EstimateAiVideoDto {
   })
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(8)
+  @ArrayMaxSize(AI_REFERENCES_MAX)
   @IsIn(AI_INPUT_KINDS, { each: true })
   referenceKinds?: AiInputKind[];
 
@@ -123,7 +124,7 @@ export class CreateAiVideoDto {
   })
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(8)
+  @ArrayMaxSize(AI_REFERENCES_MAX)
   @ValidateNested({ each: true })
   @Type(() => AiVideoReferenceDto)
   references?: AiVideoReferenceDto[];
