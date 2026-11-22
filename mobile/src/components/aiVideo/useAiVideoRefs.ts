@@ -20,14 +20,22 @@ const DENIAL_KEY: Record<AddDenial, string> = {
   full: 'mobile.aiVideoRefs.errors.full',
   type: 'mobile.aiVideoRefs.errors.type',
   size: 'mobile.aiVideoRefs.errors.size',
+  tooShort: 'mobile.aiVideoRefs.errors.tooShort',
   tooLong: 'mobile.aiVideoRefs.errors.tooLong',
   totalLong: 'mobile.aiVideoRefs.errors.totalLong',
+  audioTotal: 'mobile.aiVideoRefs.errors.audioTotal',
 };
 
 let nextId = 0;
 
 function limitParams(refs: AiVideoReferencesOption): Record<string, number> {
-  return { video: refs.videoMaxS, total: refs.videoTotalMaxS, audio: refs.audioMaxS };
+  return {
+    video: refs.videoMaxS,
+    total: refs.videoTotalMaxS,
+    audio: refs.audioMaxS,
+    audioTotal: refs.audioTotalMaxS,
+    min: refs.minS,
+  };
 }
 
 /**

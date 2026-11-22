@@ -89,7 +89,7 @@ describe('model tablosu: kipler ve govde', () => {
   });
 });
 
-function setup() {
+function setup(models: string[] = ['pika-2.5', 'wan-3.0']) {
   const row = {
     id: 'g1',
     userId: 'u1',
@@ -135,7 +135,7 @@ function setup() {
     downloadToFile: jest.fn().mockResolvedValue(undefined),
   };
   const values: Record<string, unknown> = {
-    'aiVideo.models': ['pika-2.5', 'wan-3.0'],
+    'aiVideo.models': models,
   };
   const config = { get: (k: string) => values[k] };
   let uploads = 0;
@@ -420,6 +420,8 @@ describe('GET /ai-video/options references (C42 §1.7)', () => {
       videoTotalMaxS: 15,
       videoMaxS: 15,
       audioMaxS: 30,
+      audioTotalMaxS: 150,
+      minS: 0,
       aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
       inputTypes: {
         image: ['image/png', 'image/jpeg', 'image/webp'],
@@ -445,6 +447,104 @@ describe('AiVideoInputService.presignInput (C42)', () => {
     });
     await expect(s.input.presignInput('u1', 'application/pdf', 10)).rejects.toMatchObject({
       response: { error: 'UNSUPPORTED_TYPE' },
+    });
+  });
+});
+
+// 2026-11-22: Seedance 2.5 referans ucu (reference-to-video); kurallar model tablosundan.
+describe('Seedance 2.5 referans kipi', () => {
+  const sdDto = (over: Record<string, unknown> = {}) => ({
+    model: 'seedance-2.5',
+    resolution: '720p',
+    durationS: 5,
+    prompt: '@Görsel1 ile @Video1, @Ses1 fonda',
+    ...over,
+  });
+  const mixed = [
+    { kind: 'image' as const, key: key(0, 'png') },
+    { kind: 'video' as const, key: key(1, 'mp4') },
+    { kind: 'audio' as const, key: key(2, 'wav') },
+  ];
+
+  it('gecerli: reference-to-video, alanlar image_urls/video_urls/audio_urls, etiket @Image1', async () => {
+    probeDurations(5, 5);
+    const s = setup(['seedance-2.5']);
+    await s.service.create('u1', sdDto({ references: mixed }));
+    expect(s.pika.submit.mock.calls[0][0]).toBe('bytedance/seedance-2.5/reference-to-video');
+    expect(s.pika.submit.mock.calls[0][1]).toMatchObject({
+      prompt: '@Image1 ile @Video1, @Audio1 fonda',
+      image_urls: ['https://pika/u1'],
+      video_urls: ['https://pika/u2'],
+      audio_urls: ['https://pika/u3'],
+    });
+  });
+
+  it('m4a ses: 400 AI_VIDEO_INPUT_TYPE, Pika cagrilmaz', async () => {
+    const s = setup(['seedance-2.5']);
+    await expect(
+      s.service.create(
+        'u1',
+        sdDto({ prompt: 'x', references: [{ kind: 'audio', key: key(0, 'm4a') }] }),
+      ),
+    ).rejects.toMatchObject({ status: 400, response: { error: 'AI_VIDEO_INPUT_TYPE' } });
+    expect(s.pika.quote).not.toHaveBeenCalled();
+  });
+
+  it('ayni m4a Wan da kabul edilir', async () => {
+    probeDurations(5);
+    const s = setup();
+    await s.service.create(
+      'u1',
+      wanDto({ prompt: 'x', references: [{ kind: 'audio', key: key(0, 'm4a') }] }),
+    );
+    expect(s.pika.submit).toHaveBeenCalled();
+  });
+
+  it('1,4 sn video: 400 AI_VIDEO_INPUT_TOO_SHORT', async () => {
+    probeDurations(1.4);
+    const s = setup(['seedance-2.5']);
+    await expect(
+      s.service.create(
+        'u1',
+        sdDto({ prompt: 'x', references: [{ kind: 'video', key: key(0, 'mp4') }] }),
+      ),
+    ).rejects.toMatchObject({ response: { error: 'AI_VIDEO_INPUT_TOO_SHORT' } });
+  });
+
+  it('ses toplami 30 sn asilirsa (20 + 20): 400 AI_VIDEO_INPUT_TOO_LONG, mesaj modelin sinirini soyler', async () => {
+    probeDurations(20, 20);
+    const s = setup(['seedance-2.5']);
+    await expect(
+      s.service.create(
+        'u1',
+        sdDto({
+          prompt: 'x',
+          references: [0, 1].map((i) => ({ kind: 'audio' as const, key: key(i, 'mp3') })),
+        }),
+      ),
+    ).rejects.toMatchObject({
+      response: { error: 'AI_VIDEO_INPUT_TOO_LONG', message: expect.stringContaining('toplam 30') },
+    });
+  });
+
+  it('25 sn tek video Seedance da gecer (Wan da 15 sn sinir)', async () => {
+    probeDurations(25);
+    const s = setup(['seedance-2.5']);
+    await s.service.create(
+      'u1',
+      sdDto({ prompt: 'x', references: [{ kind: 'video', key: key(0, 'mp4') }] }),
+    );
+    expect(s.pika.submit).toHaveBeenCalled();
+  });
+
+  it('options: Seedance referans sinirlari ve kabul edilen turler', async () => {
+    const s = setup(['seedance-2.5']);
+    const res = await s.service.options('u1');
+    expect(res.models[0].references).toMatchObject({
+      max: { image: 30, video: 10, audio: 10 },
+      audioTotalMaxS: 30,
+      minS: 2,
+      inputTypes: { video: ['video/mp4', 'video/quicktime'], audio: ['audio/mpeg', 'audio/wav'] },
     });
   });
 });

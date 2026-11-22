@@ -28,6 +28,10 @@ export interface AiVideoReferencesOption {
   videoTotalMaxS: number
   videoMaxS: number
   audioMaxS: number
+  /** 2026-11-22: seslerin toplam süresi. */
+  audioTotalMaxS: number
+  /** 2026-11-22: video/ses için en kısa süre (0 = sınır yok). */
+  minS: number
   aspectRatios: string[]
   inputTypes: Record<AiVideoRefKind, string[]>
 }

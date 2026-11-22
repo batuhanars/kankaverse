@@ -1,6 +1,7 @@
 import { AiVideoGeneration, AiVideoStatus } from '@prisma/client';
 import { AiVideoReferenceSpec, modelKeyOfApiId } from './ai-video.models';
 import { ACTIVE_STATUSES, AiVideoError, aiInputTypesOf, MICRO } from './ai-video.constants';
+import type { AiInputKind } from './ai-video.constants';
 
 /** Pika `error.code` → bizim hata kodumuz (istemci i18n'i koda göre). Bilinmeyen her şey PROVIDER_ERROR. */
 export function mapPikaErrorCode(code: string | null | undefined): string {
@@ -29,17 +30,23 @@ export const AI_VIDEO_MESSAGES: Record<string, string> = {
 };
 
 /** `GET /ai-video/options` → model.references: istemci sınırları ve kabul edilen türleri buradan okur (C42 §1.7). */
+/** Modelin türe göre kabul ettiği içerik türleri (verilmeyen tür = genel tablo). */
+export const referenceInputTypes = (r: AiVideoReferenceSpec, kind: AiInputKind): string[] =>
+  r.inputTypes?.[kind] ?? aiInputTypesOf(kind);
+
 export const toReferencesOption = (r: AiVideoReferenceSpec | null) =>
   r && {
     max: r.max,
     videoTotalMaxS: r.videoTotalMaxS,
     videoMaxS: r.videoMaxS,
     audioMaxS: r.audioMaxS,
+    audioTotalMaxS: r.audioTotalMaxS,
+    minS: r.minS,
     aspectRatios: r.aspectRatios,
     inputTypes: {
-      image: aiInputTypesOf('image'),
-      video: aiInputTypesOf('video'),
-      audio: aiInputTypesOf('audio'),
+      image: referenceInputTypes(r, 'image'),
+      video: referenceInputTypes(r, 'video'),
+      audio: referenceInputTypes(r, 'audio'),
     },
   };
 

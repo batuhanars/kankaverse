@@ -6,6 +6,8 @@ export const IMAGE_ONLY: AiVideoReferencesOption = {
   videoTotalMaxS: 0,
   videoMaxS: 0,
   audioMaxS: 0,
+  audioTotalMaxS: 0,
+  minS: 0,
   aspectRatios: [],
   inputTypes: { image: ['image/png', 'image/jpeg', 'image/webp'], video: [], audio: [] },
 };
@@ -128,7 +130,7 @@ export function modeOf(items: RefItem[]): RefMode {
   return items.length === 1 && items[0].kind === 'image' ? 'image' : 'reference';
 }
 
-export type AddDenial = 'full' | 'type' | 'size' | 'tooLong' | 'totalLong';
+export type AddDenial = 'full' | 'type' | 'size' | 'tooShort' | 'tooLong' | 'totalLong' | 'audioTotal';
 
 /** Yeni ekin erken denetimi (sunucu yine denetler). Süre bilinmiyorsa (null) süre denetimi atlanır. */
 export function denyAdd(
@@ -141,12 +143,17 @@ export function denyAdd(
   if (!refs.inputTypes[kind].includes(cand.contentType)) return 'type';
   if (cand.size > MAX_BYTES[kind]) return 'size';
   const d = cand.durationS;
+  if (d !== null && kind !== 'image' && d < refs.minS - DURATION_TOLERANCE_S) return 'tooShort';
   if (d !== null && kind === 'video') {
     if (d > refs.videoMaxS + DURATION_TOLERANCE_S) return 'tooLong';
     const total = items.reduce((sum, i) => sum + (i.kind === 'video' ? (i.durationS ?? 0) : 0), 0) + d;
     if (total > refs.videoTotalMaxS + DURATION_TOLERANCE_S) return 'totalLong';
   }
-  if (d !== null && kind === 'audio' && d > refs.audioMaxS + DURATION_TOLERANCE_S) return 'tooLong';
+  if (d !== null && kind === 'audio') {
+    if (d > refs.audioMaxS + DURATION_TOLERANCE_S) return 'tooLong';
+    const total = items.reduce((sum, i) => sum + (i.kind === 'audio' ? (i.durationS ?? 0) : 0), 0) + d;
+    if (total > refs.audioTotalMaxS + DURATION_TOLERANCE_S) return 'audioTotal';
+  }
   return null;
 }
 

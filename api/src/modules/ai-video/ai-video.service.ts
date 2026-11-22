@@ -179,7 +179,12 @@ export class AiVideoService {
     }
     // C42 §1.4: var olmayan referansa etiket, dosya indirmeden (ffprobe) önce reddedilir.
     const kinds: AiInputKind[] = refs?.map((r) => r.kind) ?? (dto.inputKey ? ['image'] : []);
-    const prompt = translatePromptTags(dto.prompt, mode, countKinds(kinds));
+    const prompt = translatePromptTags(
+      dto.prompt,
+      mode,
+      countKinds(kinds),
+      spec.references?.tagFormat,
+    );
     if (dto.inputKey !== undefined) {
       await this.input.assertInputKey(userId, dto.inputKey);
       // Görselden video yolu yalnız görsel kabul eder (video/ses anahtarı ilk kare olamaz).
@@ -315,7 +320,7 @@ export class AiVideoService {
     const kinds: AiInputKind[] =
       refs.length > 0 ? refs.map((r) => r.kind) : row.inputKey ? ['image'] : [];
     const opts = {
-      prompt: translatePromptTags(row.prompt, mode, countKinds(kinds)),
+      prompt: translatePromptTags(row.prompt, mode, countKinds(kinds), spec.references?.tagFormat),
       resolution: row.resolution,
       durationS: row.durationS,
       aspectRatio: row.aspectRatio ?? undefined,
