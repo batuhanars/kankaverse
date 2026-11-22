@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { AiVideoError } from './ai-video.constants';
 import { AI_VIDEO_MESSAGES } from './ai-video.mapper';
-import { AiVideoMode } from './ai-video.models';
+import { AiVideoMode, PROVIDER_KIND_WORD } from './ai-video.models';
 
 /** Etiket sayıları: türü içinde kaç referans var (etiketin geçerli üst sınırı). */
 export interface PromptTagCounts {
@@ -21,8 +21,6 @@ export function countKinds(kinds: ('image' | 'video' | 'audio')[]): PromptTagCou
 const TAG_PATTERN = /(?<![\p{L}\p{N}])@(Görsel|Video|Ses)(\d+)/giu;
 
 const KIND_OF_WORD = { görsel: 'image', video: 'video', ses: 'audio' } as const;
-/** Sağlayıcı yazımındaki tür adı (`tagFormat` içindeki `{Kind}`). */
-const PROVIDER_WORD = { image: 'Image', video: 'Video', audio: 'Audio' } as const;
 /** Wan omni yazımı (C42 §0; ses yazımı belgede yok, varsayım). Model tablosunda `references.tagFormat`. */
 export const DEFAULT_TAG_FORMAT = '{Kind} {n}';
 
@@ -48,6 +46,6 @@ export function translatePromptTags(
       });
     }
     if (mode === 'image') return 'görsel';
-    return tagFormat.replace('{Kind}', PROVIDER_WORD[kind]).replace('{n}', String(n));
+    return tagFormat.replace('{Kind}', PROVIDER_KIND_WORD[kind]).replace('{n}', String(n));
   });
 }

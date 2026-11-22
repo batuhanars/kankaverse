@@ -548,3 +548,78 @@ describe('Seedance 2.5 referans kipi', () => {
     });
   });
 });
+
+// 2026-11-22: Kling 4.0 omni-video, `contents` gövdesi; güvenli sınır 4 görsel + 1 video (3-10 sn), ses yok.
+describe('Kling 4.0 referans kipi', () => {
+  const klDto = (over: Record<string, unknown> = {}) => ({
+    model: 'kling-4.0',
+    resolution: '720p',
+    durationS: 5,
+    prompt: '@Görsel2 kostümüyle @Video1 gibi dans',
+    ...over,
+  });
+
+  it('gecerli: omni-video, contents dizisi, kimlikler istem etiketiyle eslesir', async () => {
+    probeDurations(5);
+    const s = setup(['kling-4.0']);
+    await s.service.create(
+      'u1',
+      klDto({
+        references: [
+          { kind: 'image', key: key(0, 'png') },
+          { kind: 'image', key: key(1, 'jpg') },
+          { kind: 'video', key: key(2, 'mp4') },
+        ],
+      }),
+    );
+    expect(s.pika.submit.mock.calls[0][0]).toBe('kling/kling-4.0/omni-video');
+    const body = s.pika.submit.mock.calls[0][1];
+    expect(body.prompt).toBeUndefined();
+    expect(body.contents).toEqual([
+      { type: 'prompt', text: '@Image2 kostümüyle @Video1 gibi dans' },
+      { type: 'refer_image', url: 'https://pika/u1', id: 'Image1' },
+      { type: 'refer_image', url: 'https://pika/u2', id: 'Image2' },
+      { type: 'feature_video', url: 'https://pika/u3', id: 'Video1' },
+    ]);
+    expect(body).toMatchObject({ resolution: '720p', duration: 5 });
+    expect(s.pika.quote.mock.calls[0][1].contents).toHaveLength(4);
+  });
+
+  it.each([
+    ['5 gorsel', Array.from({ length: 5 }, (_v, i) => ({ kind: 'image', key: key(i, 'png') }))],
+    ['2 video', [0, 1].map((i) => ({ kind: 'video', key: key(i, 'mp4') }))],
+    ['ses', [{ kind: 'audio', key: key(0, 'mp3') }]],
+  ])('sinir disi (%s): 400, Pika cagrilmaz', async (_n, references) => {
+    const s = setup(['kling-4.0']);
+    await expect(s.service.create('u1', klDto({ prompt: 'x', references }))).rejects.toMatchObject({
+      response: { error: 'AI_VIDEO_INVALID_OPTION' },
+    });
+    expect(s.pika.quote).not.toHaveBeenCalled();
+  });
+
+  it('2,4 sn video: 400 AI_VIDEO_INPUT_TOO_SHORT', async () => {
+    probeDurations(2.4);
+    const s = setup(['kling-4.0']);
+    await expect(
+      s.service.create(
+        'u1',
+        klDto({ prompt: 'x', references: [{ kind: 'video', key: key(0, 'mp4') }] }),
+      ),
+    ).rejects.toMatchObject({ response: { error: 'AI_VIDEO_INPUT_TOO_SHORT' } });
+  });
+
+  it('webm video: 400 AI_VIDEO_INPUT_TYPE, mesajda ses gecmez', async () => {
+    const s = setup(['kling-4.0']);
+    await expect(
+      s.service.create(
+        'u1',
+        klDto({ prompt: 'x', references: [{ kind: 'video', key: key(0, 'webm') }] }),
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        error: 'AI_VIDEO_INPUT_TYPE',
+        message: expect.not.stringContaining('ses'),
+      },
+    });
+  });
+});

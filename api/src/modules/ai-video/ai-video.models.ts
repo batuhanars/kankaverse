@@ -7,6 +7,11 @@ export type AiVideoMode = 'text' | 'image' | 'reference';
 /** C42 §1.1: çoklu referans yeteneği (yoksa null). Sınırlar bizim tavanımız, sağlayıcınınkinden küçük. */
 export interface AiVideoReferenceSpec {
   apiFunction: string;
+  /**
+   * 2026-11-22: gövde biçimi. `fields` (Wan, Seedance) = tür başına dizi alanı (`fields` alan adıdır);
+   * `contents` (Kling 4.0) = istem + her referans tek `contents` dizisinde (`fields` içerik türüdür, ör. refer_image).
+   */
+  body?: 'fields' | 'contents';
   fields: { image: string; video: string; audio: string };
   max: { image: number; video: number; audio: number };
   videoTotalMaxS: number;
@@ -182,7 +187,23 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     imagePromptRequired: false,
     audio: 'always',
     fixed: {},
-    references: null,
+    // Kling4OmniVideoRequest: `contents` dizisi; görsel `refer_image`, video `feature_video`, istemde `@id`.
+    // Pika şeması adet vermiyor; Kling omni belgesindeki sınır (4 görsel + 1 video, video 3-10 sn) güvenli
+    // başlangıç, canlı denemeyle yükseltilebilir. Ses referansı yok (yalnız hazır ses kimliği).
+    references: {
+      apiFunction: 'omni-video',
+      body: 'contents',
+      fields: { image: 'refer_image', video: 'feature_video', audio: '' },
+      max: { image: 4, video: 1, audio: 0 },
+      videoTotalMaxS: 10,
+      videoMaxS: 10,
+      audioMaxS: 0,
+      audioTotalMaxS: 0,
+      minS: 3,
+      aspectRatios: ['16:9', '9:16', '1:1', '21:9'],
+      inputTypes: { video: ['video/mp4', 'video/quicktime'], audio: [] },
+      tagFormat: '@{Kind}{n}',
+    },
   },
 ];
 
@@ -217,6 +238,15 @@ export function buildPikaBody(
     referenceUrls?: AiVideoReferenceUrls;
   },
 ): Record<string, unknown> {
+  if (opts.referenceUrls !== undefined && spec.references?.body === 'contents') {
+    return {
+      contents: referenceContents(spec, opts.prompt ?? '', opts.referenceUrls),
+      resolution: opts.resolution,
+      [spec.durationField]: opts.durationS,
+      ...(opts.aspectRatio !== undefined && { [spec.aspectField]: opts.aspectRatio }),
+      ...spec.fixed,
+    };
+  }
   return {
     ...(opts.prompt !== undefined && opts.prompt.length > 0 && { prompt: opts.prompt }),
     resolution: opts.resolution,
@@ -226,6 +256,22 @@ export function buildPikaBody(
     ...(opts.referenceUrls !== undefined && referenceFields(spec, opts.referenceUrls)),
     ...spec.fixed,
   };
+}
+
+/** Sağlayıcı yazımındaki tür adı (istem etiketi ve `contents` kimliği aynı adı kullanır). */
+export const PROVIDER_KIND_WORD = { image: 'Image', video: 'Video', audio: 'Audio' } as const;
+
+/** Kling 4.0: istem + referanslar; kimlik `Image1`/`Video1`, istemdeki `@Image1` bu kimliğe bağlanır. */
+function referenceContents(spec: AiVideoModelSpec, prompt: string, urls: AiVideoReferenceUrls) {
+  const types = spec.references!.fields;
+  const refs = (['image', 'video', 'audio'] as const).flatMap((kind) =>
+    urls[kind].map((url, i) => ({
+      type: types[kind],
+      url,
+      id: `${PROVIDER_KIND_WORD[kind]}${i + 1}`,
+    })),
+  );
+  return [{ type: 'prompt', text: prompt }, ...refs];
 }
 
 function referenceFields(spec: AiVideoModelSpec, urls: AiVideoReferenceUrls) {

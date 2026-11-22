@@ -46,8 +46,12 @@ const tooLongMessage = (s: AiVideoReferenceSpec) =>
   `Video en fazla ${s.videoMaxS} saniye (toplam ${s.videoTotalMaxS}), sesler en fazla ${s.audioMaxS} saniye (toplam ${s.audioTotalMaxS}) olabilir.`;
 const tooShortMessage = (s: AiVideoReferenceSpec) =>
   `Bu modelde video ve sesler en az ${s.minS} saniye olmalı.`;
+const KIND_NAME = { image: 'görsel', video: 'video', audio: 'ses' } as const;
+/** Yalnız modelin kabul ettiği türler sayılır (Kling'de ses yok). */
 const typeMessage = (s: AiVideoReferenceSpec) =>
-  `Bu model yalnız şu dosyaları kabul ediyor: video ${extsOf(referenceInputTypes(s, 'video'))}, ses ${extsOf(referenceInputTypes(s, 'audio'))}.`;
+  `Bu model yalnız şu dosyaları kabul ediyor: ${AI_INPUT_KINDS.filter((k) => s.max[k] > 0)
+    .map((k) => `${KIND_NAME[k]} ${extsOf(referenceInputTypes(s, k))}`)
+    .join('; ')}.`;
 
 /**
  * C42 §1.3 — çoklu referans doğrulaması: tür başına sayı tavanı, tür ↔ uzantı uyumu, anahtar sahipliği/boyut

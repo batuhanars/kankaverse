@@ -183,5 +183,5 @@ hepsi model tablosundan gelir, servis model adına göre dallanmaz:
 |---|---|---|---|---|---|
 | Wan 3.0 | `omni-video` | 10 / 5 / 5 | tekil 15, toplam 15 sn | tekil 30 sn | yok |
 | Seedance 2.5 | `reference-to-video` | 30 / 10 / 10 | mp4, mov; tekil 30, toplam 30 sn | wav, mp3; tekil 30, toplam 30 sn | 2 sn |
-| Kling 4.0 | `omni-video` (`contents` dizisi) | ayrı tur | | | |
+| Kling 4.0 | `omni-video` (`contents` dizisi, `body: contents`) | 4 / 1 / 0 (güvenli başlangıç, canlıda sınanacak) | mp4, mov; 3-10 sn | yok | 3 sn |
 | Veo 3.1 Fast | yok (yalnız metinden) | yok | | | |
