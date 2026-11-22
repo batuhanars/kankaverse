@@ -29,4 +29,13 @@ describe('webProvider <-> pureProvider', () => {
     const r = await groupOf(pure).decrypt(m.ciphertext, 'W')
     expect(r.payload.kind).toBe('text')
   })
+
+  it('E8: web ve saf cihaz aynı arama anahtarını türetir (telefon ↔ tarayıcı araması)', async () => {
+    const web = await makePeer(webProvider, 'W')
+    const pure = await makePeer(pureProvider, 'P')
+    await setupGroup(web, [pure])
+    const [w, p] = await Promise.all([groupOf(web).exportCallKey('dm-1'), groupOf(pure).exportCallKey('dm-1')])
+    expect(Buffer.from(p.key).toString('hex')).toBe(Buffer.from(w.key).toString('hex'))
+    expect(p.epoch).toBe(w.epoch)
+  })
 })

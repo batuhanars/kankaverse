@@ -10,6 +10,7 @@ import {
   getLeafNodeAt,
   getOwnLeafNode,
   mlsMessageDecoder,
+  mlsExporter,
   mlsMessageEncoder,
   nodeTypes,
   processMessage,
@@ -18,6 +19,7 @@ import {
   type ClientState,
 } from 'ts-mls'
 import { pack, unpack } from './bytes'
+import { utf8 } from './utf8'
 import {
   buildCommit,
   addProposal,
@@ -47,6 +49,9 @@ import { decodePayload, encodePayload, type DecodedPayload, type TextPayload } f
 import type { CryptoProvider } from './provider'
 
 const GROUP_FORMAT = 1
+/** E8: arama anahtarının MLS exporter etiketi. Mesaj şifrelemesiyle karışmaz; biçim değişirse `v2`. */
+const CALL_KEY_LABEL = 'kankaverse call v1'
+const CALL_KEY_BYTES = 32
 
 export interface EncryptResult {
   ciphertext: Uint8Array
@@ -243,6 +248,22 @@ export class Group {
       return { payload: decodePayload(result.message), senderDeviceId }
     } catch (e) {
       throw wrapMlsError(e, DecryptError)
+    }
+  }
+
+  /**
+   * E8 — bu epoch'un arama anahtarı (RFC 9420 §8.5 MLS exporter). Gruptaki her cihaz aynı anahtarı
+   * kendi başına türetir, anahtar ağa çıkmaz. Bağlam `channelId`: aynı grup sırrı başka kanalda işe yaramaz.
+   * Salt okunur: `encrypt`'in aksine durum ilerlemez, anahtar tüketilmez. Gruptan çıkarılmış cihaz türetemez.
+   */
+  async exportCallKey(channelId: string): Promise<{ key: Uint8Array; epoch: number }> {
+    this.assertActive()
+    const suite = await this.provider.loadSuite()
+    try {
+      const key = await mlsExporter(this.state.keySchedule.exporterSecret, CALL_KEY_LABEL, utf8(channelId), CALL_KEY_BYTES, suite)
+      return { key, epoch: this.epoch }
+    } catch (e) {
+      throw wrapMlsError(e)
     }
   }
 
