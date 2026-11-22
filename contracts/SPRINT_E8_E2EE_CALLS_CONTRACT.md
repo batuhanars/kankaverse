@@ -97,7 +97,7 @@ callKey(channelId: string, serverEpoch: number): Promise<{ key: Uint8Array; epoc
 ## §5 İstemciler
 
 ### §5.1 Web + masaüstü (`web/src/stores/voice.ts`)
-- Destek kontrolü: `isE2EESupported()` (livekit-client). Desteklenmiyorsa ve kanal DM/grup ise token isteği yapılmaz, §6 mesajı. (Ortam kanalı etkilenmez.)
+- Destek kontrolü: `isE2EESupported()` (livekit-client). Desteklenmiyorsa token isteği `callE2ee` OLMADAN yapılır: arama şifreliyse sunucu 426 döner ve istemci `unsupportedBrowser` metnini gösterir; şifresizse (bayrak kapalı, grubu olmayan DM) bugünkü gibi bağlanır. (Rev.2, 2026-11-22: ilk metin "token isteği yapılmaz" diyordu; bayrak kapalıyken eski tarayıcıyı da aramadan keserdi, §7.1 "bayrak kapalı = bugünkü gibi" ile çelişiyordu.) (Ortam kanalı etkilenmez.)
 - Token isteği DM/grup kanalında `{ callE2ee: true }` gönderir (destek varsa).
 - `e2ee: true` ise: `ExternalE2EEKeyProvider` + `e2ee: { keyProvider, worker: new Worker(new URL('livekit-client/e2ee-worker', import.meta.url)) }` ile `new Room`, `callKey` → `setKey`, `room.setE2EEEnabled(true)`, sonra `connect`.
 - Worker'ın Vite üretim derlemesinde ayrı dosya olarak çıktığını `dist/` içinde teyit et; Caddy'nin `/assets/` yolu kapsıyor mu bak.

@@ -1,6 +1,7 @@
 import type { Socket } from 'socket.io-client';
 import { loadDeviceNotices } from '@/stores/e2eeNotices';
 import { openE2eeChannel, useE2eeStore } from '@/stores/e2ee';
+import { refreshCallKey } from '@/stores/voice';
 import {
   checkPendingTransfer,
   onTransferAccepted,
@@ -21,7 +22,12 @@ export function bindE2eeSocket(socket: Socket): void {
     void useE2eeStore
       .getState()
       .engine?.onWelcome()
-      .then((joined) => joined.forEach((id) => void openE2eeChannel(id)))
+      .then((joined) =>
+        joined.forEach((id) => {
+          void openE2eeChannel(id);
+          refreshCallKey(id); // E8 §4.2: aramadayken gruba (yeniden) katıldık
+        }),
+      )
       .catch(log);
   });
 
@@ -31,7 +37,10 @@ export function bindE2eeSocket(socket: Socket): void {
     void useE2eeStore
       .getState()
       .engine?.onGroupChanged(channelId)
-      .then(() => loadDeviceNotices(channelId))
+      .then(() => {
+        refreshCallKey(channelId); // E8 §4.2: epoch ilerlediyse açık aramanın anahtarı yenilenir
+        return loadDeviceNotices(channelId);
+      })
       .catch(log);
   };
   socket.on('e2ee:commit', sync);

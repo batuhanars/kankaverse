@@ -6,6 +6,7 @@ import { useDmStore } from '@/stores/dm'
 import { useE2eeBackupStore } from '@/stores/e2eeBackup'
 import { useE2eeNoticesStore } from '@/stores/e2eeNotices'
 import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
+import { CallKeyUnavailableError } from '@kankaverse/e2ee-client'
 import type {
   ChannelInfo,
   E2eeEngine,
@@ -309,6 +310,19 @@ export const useE2eeStore = defineStore('e2ee', () => {
     return engine.value.collectEvidence(channelId, targetId, older)
   }
 
+  /**
+   * E8 §4.1: arama anahtarı. Motor yoksa (E2EE kapalı/başlamadı) bu cihaz şifreli aramaya giremez: NOT_MEMBER.
+   * Anahtar yalnız bellekte döner; hata çağırana gider (arama şifresiz bağlanmaz).
+   */
+  async function callKey(
+    channelId: string,
+    serverEpoch: number,
+  ): Promise<{ key: Uint8Array; epoch: number }> {
+    await ready
+    if (!engine.value) throw new CallKeyUnavailableError('NOT_MEMBER')
+    return engine.value.callKey(channelId, serverEpoch)
+  }
+
   return {
     engine,
     warnings,
@@ -329,5 +343,6 @@ export const useE2eeStore = defineStore('e2ee', () => {
     editEncrypted,
     collectEvidence,
     forgetMessage,
+    callKey,
   }
 })

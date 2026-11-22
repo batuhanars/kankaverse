@@ -2,6 +2,7 @@ import type { Socket } from 'socket.io-client'
 import { useE2eeStore } from '@/stores/e2ee'
 import { useE2eeNoticesStore } from '@/stores/e2eeNotices'
 import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
+import { useVoiceStore } from '@/stores/voice'
 
 /**
  * E1 §2.7 — şifreleme soket olayları. Hepsi motorun sıralı kuyruğundan geçer; olay sırası korunur
@@ -9,13 +10,19 @@ import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
  */
 export function bindE2eeSocket(socket: Socket): void {
   const store = useE2eeStore()
+  const voice = useVoiceStore()
   const log = (e: unknown) => console.error('[e2ee] olay işlenemedi', e)
 
   // Yeni Welcome: gruba katıl; açık/yeni kanalın şifreli bilgisini (ayraç zamanı) tazele.
   socket.on('e2ee:welcome', () => {
     void store.engine
       ?.onWelcome()
-      .then((joined) => joined.forEach((id) => void store.openChannel(id)))
+      .then((joined) =>
+        joined.forEach((id) => {
+          void store.openChannel(id)
+          voice.refreshCallKey(id) // E8 §4.2: aramadayken gruba (yeniden) katıldık
+        }),
+      )
       .catch(log)
   })
 
@@ -25,7 +32,10 @@ export function bindE2eeSocket(socket: Socket): void {
   const sync = ({ channelId }: { channelId: string }) => {
     void store.engine
       ?.onGroupChanged(channelId)
-      .then(() => notices.load(channelId))
+      .then(() => {
+        voice.refreshCallKey(channelId) // E8 §4.2: epoch ilerlediyse açık aramanın anahtarı yenilenir
+        return notices.load(channelId)
+      })
       .catch(log)
   }
   socket.on('e2ee:commit', sync)

@@ -32,6 +32,13 @@ import {
 // okuma, yalnız `handleAppStateChange`'in 'background' dalında kullanılır (bkz. o fonksiyondaki yorum).
 import { setPipCallActive, isPipCurrentlyActive } from '@modules/picture-in-picture';
 import { t } from '@/i18n';
+import {
+  CALL_E2EE_UPDATE_REQUIRED,
+  CallE2eeError,
+  prepareCallCrypto,
+  watchDecryptErrors,
+  type CallCrypto,
+} from '@/utils/callE2ee';
 
 /**
  * M4a-1 sözleşme §3 — LiveKit ses store'u: yalnız YEREL BAĞLANTI (`Room` yaşam döngüsü, mikrofon,
@@ -149,6 +156,10 @@ interface VoiceState {
    * feedback modalı görünmeden biterdi.
    */
   emergencyPending: boolean;
+  /** E8 §6 — bu arama uçtan uca şifreli (arama ekranında kilit rozeti). Ortam kanalında hep false. */
+  callEncrypted: boolean;
+  /** E8 §6 — çözme hatası kesintisiz sürüyor ("şifresi çözülemiyor" satırı). */
+  callDecryptFailing: boolean;
   /**
    * Sprint M4j (D55) 🔴 — moderatör başka ses kanalına taşıdığında (`voice.moved`, `realtime/socket.ts`
    * dinler) sunucu bizi kaynak LiveKit odasından ÖNCEDEN çıkarıyor (`voice.service.ts`
@@ -382,6 +393,14 @@ interface VoiceState {
 
 // Yerel bağlantı nesnesi — reaktif değil (web voice.ts ile aynı gerekçe, kompleks/mutable nesne).
 let room: Room | null = null;
+// E8 — şifreli aramanın anahtar düzeni ve ait olduğu kanal (bağlanırken de dolu: commit o arada gelebilir)
+let callCrypto: CallCrypto | null = null;
+let callCryptoChannelId: string | null = null;
+
+/** E8 §4.2 — kanalın MLS grubu değişti (commit/cihaz/Welcome): o kanalda şifreli arama varsa anahtarı tazele. */
+export function refreshCallKey(channelId: string): void {
+  if (callCrypto && callCryptoChannelId === channelId) void callCrypto.refresh();
+}
 // 🔴 "Ayrılış bizden mi başladı" bayrağı (sahip cihaz turu 2026-08-06). `leave()` içindeki
 // `room.disconnect()` LiveKit'in `Disconnected` olayını tetikliyor; o dinleyici bunu BEKLENMEDİK
 // kopma sanıp ikinci bir `leave()` başlatıyor ve `disconnectReason`ı "Bağlantı kesildi" ile
@@ -495,6 +514,8 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
   guildId: null,
   isGeneralVoiceChannel: false,
   emergencyPending: false,
+  callEncrypted: false,
+  callDecryptFailing: false,
   movePending: false,
   pendingCallScreen: false,
   isMuted: false,
@@ -626,7 +647,8 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     }
 
     try {
-      const data = await voiceApi.getToken(channelId);
+      // E8 §5.2 — DM/grup aramasında "şifreleyebilirim" (native çerçeve şifreleyici her sürümde var).
+      const data = await voiceApi.getToken(channelId, isGuild ? undefined : { callE2ee: true });
 
       await AudioSession.configureAudio({
         android: { audioTypeOptions: AndroidAudioTypePresets.communication },
@@ -647,10 +669,23 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
         // yoksay — platform varsayılanı geçerli kalır, seçici açılınca kendi listesini okur
       }
 
+      // 🔴 E8 §4.3 (R7) — şifreli arama: anahtar türetilip yuvaya yazılır, Room şifreleme yöneticisiyle kurulur,
+      // şifreleme connect'ten ÖNCE açılır. Herhangi biri tutmazsa fırlar → catch → bağlanılmaz (geri düşme yok).
+      if (data.e2ee) {
+        callCryptoChannelId = channelId;
+        callCrypto = await prepareCallCrypto(channelId, data.e2eeEpoch ?? 0);
+      }
       room = new Room({
         publishDefaults: { audioPreset: { maxBitrate: (data.bitrate ?? 64) * 1000 } },
+        ...callCrypto?.roomOptions,
       });
       wireRoom(room, channelId, set, get);
+      if (callCrypto) {
+        const onFailing = (failing: boolean) => set({ callDecryptFailing: failing });
+        room.on(RoomEvent.EncryptionError, watchDecryptErrors(channelId, callCrypto, onFailing));
+        await room.setE2EEEnabled(true);
+        set({ callEncrypted: true });
+      }
       await room.connect(data.url, data.token);
 
       // 🔴 PM incelemesi (2026-08-06) — bu iki satır eksikti: `wireRoom`in `ParticipantConnected`
@@ -768,7 +803,15 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       return { ok: true };
     } catch (e: unknown) {
       const code = extractErrorCode(e);
-      const message = code === 'CHANNEL_FULL' ? t('voice.channelFull') : extractErrorMessage(e);
+      // E8 §6 — şifreli aramaya girilemedi: metin istemcide (web ile aynı anahtarlar), sessizce düşmez.
+      const message =
+        e instanceof CallE2eeError
+          ? t(e.i18nKey)
+          : code === CALL_E2EE_UPDATE_REQUIRED
+            ? t('call.e2ee.updateRequired')
+            : code === 'CHANNEL_FULL'
+              ? t('voice.channelFull')
+              : extractErrorMessage(e);
       // §8 istisnası — sinyal gönderildiyse geri al (odaya hiç giremedik, karşı taraf boşuna çalıyor).
       // 🔴 M4z §F: grup dalı artık ATLANMIYOR, kendi iptalini (`voice:group_call_cancel`) gönderiyor.
       // Buradaki gönderim `leave()`teki ile ÇAKIŞMAZ: bu yolda `connectedChannelId` hiç dolmadığı
@@ -863,11 +906,17 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     // Dev-fix: LiveKit webhook'u yakalayamazsa diğer istemcilerin presence'ı güncellensin.
     if (channelId) voiceApi.leave(channelId).catch(() => {});
 
+    // E8 — anahtar yalnız yöneticinin/native şifreleyicinin belleğindeydi; oda kapanınca düşer.
+    callCrypto = null;
+    callCryptoChannelId = null;
+
     set({
       connectedChannelId: null,
       connecting: false,
       connectedAt: null,
       isLeaving: false,
+      callEncrypted: false,
+      callDecryptFailing: false,
       didInvite: false,
       noAnswer: false, // Sprint D71 §2 — diğer kozmetik sıfırlamalarla AYNI ders.
       // §7 — bir sonraki aramanın türünü bu oturumdan kalma değer belirlemesin (bugün

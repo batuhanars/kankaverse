@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { CallKeyUnavailableError } from '@kankaverse/e2ee-client';
 import type { ChannelInfo, E2eeEngine, EvidenceItem, SentCipher, WarningKind } from '@kankaverse/e2ee-client';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { startMobileEngine } from '@/e2ee/startEngine';
@@ -104,6 +105,17 @@ export async function openE2eeChannel(channelId: string): Promise<void> {
     console.error('[E2EE] kanal açılamadı', e instanceof Error ? e.name : '');
   }
   void loadDeviceNotices(channelId); // E2 §3.3: yerel depodan "yeni cihaz eklendi" satırları (web açılış davranışı)
+}
+
+/**
+ * E8 §4.1: arama anahtarı. Motor yoksa (E2EE kapalı/başlamadı) bu cihaz şifreli aramaya giremez: NOT_MEMBER.
+ * Anahtar yalnız bellekte döner; hata çağırana gider (arama şifresiz bağlanmaz).
+ */
+export async function callKeyFor(channelId: string, serverEpoch: number): Promise<{ key: Uint8Array; epoch: number }> {
+  await ready;
+  const engine = get().engine;
+  if (!engine) throw new CallKeyUnavailableError('NOT_MEMBER');
+  return engine.callKey(channelId, serverEpoch);
 }
 
 /** Mesajlar çözüldükten sonra: eksik commit'leri işle, üyelik farkını kapat (yerel grup yoksa no-op). */
