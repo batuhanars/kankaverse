@@ -47,6 +47,8 @@ const view = ref<'form' | 'preview'>('form')
 const previewRow = ref<AiVideoDto | null>(null)
 const picking = ref(false) // C49 R1: view kipinde hedef seçici açık
 let previewOpenedAt = 0
+// 2026-11-22: önizleme "Son üretimler"den açıldıysa kapatınca arkadaki forma dönülür (tüm diyalog kapanmaz)
+const previewFromList = ref(false)
 const STALE_MS = 10 * 60 * 1000 // presigned adres 15 dk; 10 dk sonra tazele
 
 // Boş istem yalnız tek görsel (inputKey) kipinde serbest; referans kipinde sunucu 400 döner (C42)
@@ -71,8 +73,9 @@ const modelLabel = computed(() =>
     : undefined,
 )
 
-function showPreview(row: AiVideoDto) {
+function showPreview(row: AiVideoDto, fromList = false) {
   ai.error.value = ''
+  previewFromList.value = fromList
   previewRow.value = row
   previewOpenedAt = Date.now()
   view.value = 'preview'
@@ -139,8 +142,16 @@ function newOne() {
 
 /** Satır tıklaması: biten → önizleme; süren → formda ilerleme. Başarısız satır tıklanmaz. */
 async function onRecent(r: AiVideoDto) {
-  if (r.status === 'COMPLETED' && r.videoUrl) showPreview(await refreshed(r))
+  if (r.status === 'COMPLETED' && r.videoUrl) showPreview(await refreshed(r), true)
   else if (r.status === 'QUEUED' || r.status === 'RUNNING') ai.open(r)
+}
+
+/** Önizleme kapatma: listeden açıldıysa forma dön, aksi halde (bildirim, yeni biten üretim) diyalog kapanır. */
+function closePreview() {
+  if (!previewFromList.value) return emit('close')
+  previewRow.value = null
+  previewFromList.value = false
+  view.value = 'form'
 }
 
 /** Silinen satır önizlemedeyse önizleme kapanır, forma dönülür. */
@@ -202,7 +213,7 @@ async function onPickTarget(channelId: string) {
     :busy="ai.busy.value"
     :error="ai.error.value"
     :model-label="modelLabel"
-    @close="emit('close')"
+    @close="closePreview"
     @save="onSave"
     @primary="onPrimary"
     @new="newOne"
