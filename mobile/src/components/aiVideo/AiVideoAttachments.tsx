@@ -102,6 +102,8 @@ export function AiVideoAttachments({ refs, items, labels, thumbs, mode, error, d
             <Text style={styles.ghostText}>{t('mobile.aiVideoRefs.addMedia')}</Text>
             {mediaFull ? <Text style={styles.hint}>{t('mobile.aiVideoRefs.errors.full')}</Text> : null}
           </Pressable>
+          {/* Ses referansı almayan modelde (Kling 4.0) seçenek yok. */}
+          {refs.max.audio > 0 ? (
           <Pressable
             onPress={() => {
               setMenu(false);
@@ -115,6 +117,7 @@ export function AiVideoAttachments({ refs, items, labels, thumbs, mode, error, d
             <Text style={styles.ghostText}>{t('mobile.aiVideoRefs.addAudio')}</Text>
             {audioFull ? <Text style={styles.hint}>{t('mobile.aiVideoRefs.errors.full')}</Text> : null}
           </Pressable>
+          ) : null}
         </View>
       ) : null}
       {items.length ? (
