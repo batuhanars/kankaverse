@@ -38,6 +38,17 @@ describe('RealtimeService.removeUserFromRoom', () => {
     expect([...(nsp.adapter.rooms.get('room:c2') ?? [])]).toEqual(['a1']);
   });
 
+  it('D102 (E8): ses presence odasından (voice:<kanal>) da çıkar; başka kanalın presence odası kalır', () => {
+    const { nsp, addSocket, service } = setup();
+    addSocket('a1', ['user:u1', 'room:c1', 'voice:c1', 'voice:c2']);
+    addSocket('b1', ['user:u2', 'voice:c1']);
+
+    service.removeUserFromRoom('u1', 'c1');
+
+    expect([...(nsp.adapter.rooms.get('voice:c1') ?? [])]).toEqual(['b1']);
+    expect([...(nsp.adapter.rooms.get('voice:c2') ?? [])]).toEqual(['a1']);
+  });
+
   it('sunucu henüz bağlanmadıysa (setServer yok) sessizce geçer', () => {
     expect(() => new RealtimeService().removeUserFromRoom('u1', 'c1')).not.toThrow();
   });

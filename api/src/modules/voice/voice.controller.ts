@@ -16,6 +16,7 @@ import type { Request } from 'express';
 import { VoiceService } from './voice.service';
 import { MoveParticipantDto } from './dto/move-participant.dto';
 import { TargetUserDto } from './dto/target-user.dto';
+import { VoiceTokenDto } from './dto/voice-token.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -33,8 +34,13 @@ export class VoiceController {
   @ApiOperation({
     summary: 'Ses kanalına katılım tokeni (LiveKit; audio + koşullu video/ekran, BUILD-DARK)',
   })
-  mintToken(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
-    return this.voiceService.mintToken(user.id, channelId);
+  // E8 §3.1 — gövde isteğe bağlı (`callE2ee`); eski istemci göndermez.
+  mintToken(
+    @CurrentUser() user: { id: string },
+    @Param('id') channelId: string,
+    @Body() dto: VoiceTokenDto,
+  ) {
+    return this.voiceService.mintToken(user.id, channelId, dto.callE2ee === true);
   }
 
   // C3 — Anlık katılımcılar (LiveKit room state)

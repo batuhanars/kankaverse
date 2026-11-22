@@ -9,6 +9,7 @@ import {
 } from './voice.controller';
 import { VoiceCallsController } from './voice-calls.controller';
 import { VoiceService } from './voice.service';
+import { E2eeFlagService } from '../e2ee/e2ee-flag.service';
 
 // SharedModule MembershipService + RealtimeService export eder (erişim kapısı + WS yayını).
 @Module({
@@ -20,7 +21,8 @@ import { VoiceService } from './voice.service';
     VoiceInspectController,
     VoiceCallsController,
   ],
-  providers: [VoiceService],
+  // E2eeFlagService yalnız ConfigService'e bağlı; diğer modüller gibi doğrudan sağlanır (E8 §3.5).
+  providers: [VoiceService, E2eeFlagService],
   exports: [VoiceService], // A4: EmergencyModule self-pull + bağlam yakalama için VoiceService'i kullanır
 })
 export class VoiceModule {}
