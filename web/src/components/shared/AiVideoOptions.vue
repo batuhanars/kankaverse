@@ -48,18 +48,21 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
   <div class="flex flex-wrap items-end gap-x-4 gap-y-3 min-w-0">
     <!-- C42 §2: tek model açıkken model adı ve sesli/sessiz bilgisi gösterilmez; seçici yalnız birden çok modelde -->
     <div v-if="models.length > 1" class="min-w-0 w-full">
-      <label class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);" for="ai-video-model">
-        {{ t('aiVideo.modelLabel') }}
-      </label>
-      <select
-        id="ai-video-model"
-        :value="model"
-        class="w-full rounded-[var(--kv-radius-md)] px-3 py-2 text-[14px] outline-none border border-[var(--kv-border-subtle)] bg-[var(--kv-bg-content)] cursor-pointer"
-        style="color: var(--kv-text-primary);"
-        @change="emit('update:model', ($event.target as HTMLSelectElement).value)"
-      >
-        <option v-for="m in models" :key="m.key" :value="m.key">{{ m.audio === 'none' ? t('aiVideo.audioNone', { label: m.label }) : m.label }}</option>
-      </select>
+      <span class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);">{{ t('aiVideo.modelLabel') }}</span>
+      <!-- 2026-11-22: açılır liste yerine mobildeki gibi düğmeler (sahip isteği); dar ekranda satır sarar -->
+      <div class="flex flex-wrap gap-1.5" role="radiogroup" :aria-label="t('aiVideo.modelLabel')">
+        <button
+          v-for="m in models"
+          :key="m.key"
+          type="button"
+          role="radio"
+          :aria-checked="m.key === model"
+          :class="[segBase, m.key === model ? segOn : segOff]"
+          @click="emit('update:model', m.key)"
+        >
+          {{ m.audio === 'none' ? t('aiVideo.audioNone', { label: m.label }) : m.label }}
+        </button>
+      </div>
     </div>
 
     <!-- C14f: görsel + istem model bilgisinin altında, seçeneklerin üstünde (sahip sırası) -->
