@@ -26,14 +26,23 @@ export function useAiVideoForm(kinds: AiVideoRefKind[], locked = false) {
 
   const current: AiVideoModelOption | null = options?.models.find((m) => m.key === model) ?? null;
   // Kip modeli bilmeli: görselden üretimi olmayan modelde (Veo) tek görsel referanstır (ek hook'u modeli bilmez).
-  const mode = modeOf(kinds, current?.supportsImage !== false);
+  const baseMode = modeOf(kinds, current?.supportsImage !== false);
+  // 2026-11-22: tek görselde sağlayıcı ölçü almıyor ama referans kipi alıyorsa (Seedance, Kling 4.0) referans ölçüleri
+  // sunulur; ölçü seçilince görsel ilk kare değil referans olarak gider (sahip kararı, web ile aynı).
+  const ratioMakesReference =
+    baseMode === 'image' &&
+    (current?.aspectRatios.image.length ?? 0) === 0 &&
+    (current?.references?.aspectRatios.length ?? 0) > 0;
+  const mode = ratioMakesReference && aspectRatio ? 'reference' : baseMode;
   // 2026-11-22: referans kipinin kendi süreleri olabilir (Veo referansla yalnız 8 sn).
   const durations = (mode === 'reference' && current?.references?.durations) || current?.durations || [];
   const durationsKey = durations.join(',');
   // Liste sunucudan; model ya da görsel durumu değişince ve seçili ölçü listede yoksa Otomatik'e döner.
   // C42: referans kipinde liste omni ölçüleridir (`references.aspectRatios`).
   const aspectRatios =
-    mode === 'reference' ? (current?.references?.aspectRatios ?? []) : (current?.aspectRatios[mode] ?? []);
+    mode === 'reference' || ratioMakesReference
+      ? (current?.references?.aspectRatios ?? [])
+      : (current?.aspectRatios[mode] ?? []);
   const kindsKey = kinds.join(',');
 
   const pickModel = useCallback((key: string, from: AiVideoOptionsDto) => {
@@ -104,6 +113,7 @@ export function useAiVideoForm(kinds: AiVideoRefKind[], locked = false) {
   return {
     options,
     mode,
+    ratioMakesReference,
     durations,
     model,
     resolution,

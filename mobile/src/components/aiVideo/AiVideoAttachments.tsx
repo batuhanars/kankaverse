@@ -52,7 +52,7 @@ function Card({ item, label, thumb, onRemove }: { item: RefItem; label: string; 
           accessibilityRole="button"
           accessibilityLabel={t('mobile.aiVideoRefs.remove', { label })}
         >
-          <Ionicons name="close" size={14} color={theme.colors.textPrimary} />
+          <Ionicons name="close" size={18} color={theme.colors.textPrimary} />
         </Pressable>
       </View>
       {item.status === 'error' ? <Text style={styles.cardErrorText}>{item.error}</Text> : null}
@@ -224,12 +224,14 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 4,
     top: 4,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: theme.colors.bgOverlay,
+    borderWidth: 1,
+    borderColor: theme.colors.textMuted,
   },
   error: { color: theme.colors.danger, fontSize: theme.fontSize.sm },
   hint: { color: theme.colors.textMuted, fontSize: theme.fontSize.xs },

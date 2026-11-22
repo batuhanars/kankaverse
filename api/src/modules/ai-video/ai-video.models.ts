@@ -233,8 +233,11 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     // 480p/768p doğal; 1080p ve üstü 768p'den büyütme (ek ücret), şimdilik verilmez.
     resolutions: ['480p', '768p'],
     aspectField: 'aspect_ratio',
-    // Görselden üretimde oran verilmezse ilk kareyi izler: alan gönderilmez.
-    aspectRatios: { text: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'], image: [] },
+    // Görselden üretimde de oran kabul ediliyor (ilk kare kırpılır); Otomatik = ilk kareyi izler.
+    aspectRatios: {
+      text: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+      image: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+    },
     durationField: 'duration',
     imageField: 'image',
     supportsImage: true,

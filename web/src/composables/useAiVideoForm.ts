@@ -34,15 +34,32 @@ export function useAiVideoForm(
   const current = computed<AiVideoModelOption | null>(
     () => options.value?.models.find((m) => m.key === model.value) ?? null,
   )
+  /**
+   * 2026-11-22: tek görselde sağlayıcı ölçü almıyor ama model referans kipinde alıyorsa (Seedance, Kling 4.0)
+   * referans ölçüleri sunulur; ölçü seçilince görsel ilk kare değil referans olarak gider (sahip kararı).
+   */
+  const ratioMakesReference = computed(
+    () =>
+      withImage.value &&
+      !referenceKinds.value &&
+      (current.value?.aspectRatios.image.length ?? 0) === 0 &&
+      (current.value?.references?.aspectRatios.length ?? 0) > 0,
+  )
+  const asReference = computed(() => ratioMakesReference.value && aspectRatio.value !== '')
+  /** Teklif ve süreler için etkin referans türleri (tek görsel referansa çevrildiyse ['image']). */
+  const effectiveKinds = computed<AiVideoRefKind[] | null>(
+    () => referenceKinds.value ?? (asReference.value ? ['image'] : null),
+  )
   /** Seçili model + kipe göre ölçü listesi (sunucudan; görselde boş olabilir). */
   const aspectRatios = computed(() => {
-    if (referenceKinds.value) return current.value?.references?.aspectRatios ?? []
+    if (referenceKinds.value || ratioMakesReference.value)
+      return current.value?.references?.aspectRatios ?? []
     return current.value?.aspectRatios[withImage.value ? 'image' : 'text'] ?? []
   })
   /** 2026-11-22: referans kipinin kendi süreleri olabilir (Veo referansla yalnız 8 sn). */
   const durations = computed(
     () =>
-      (referenceKinds.value && current.value?.references?.durations) ||
+      (effectiveKinds.value && current.value?.references?.durations) ||
       current.value?.durations ||
       [],
   )
@@ -84,8 +101,8 @@ export function useAiVideoForm(
           durationS: durationS.value,
           ...(aspectRatio.value && { aspectRatio: aspectRatio.value }),
         },
-        withImage.value,
-        referenceKinds.value ?? undefined,
+        withImage.value && !asReference.value,
+        effectiveKinds.value ?? undefined,
       )
       if (id === seq) estimateCredits.value = data.estimateCredits
     } catch {
@@ -110,7 +127,7 @@ export function useAiVideoForm(
       durationS,
       aspectRatio,
       withImage,
-      () => referenceKinds.value?.join(),
+      () => effectiveKinds.value?.join(),
       locked,
     ],
     () => {
@@ -135,6 +152,8 @@ export function useAiVideoForm(
     durationS,
     aspectRatio,
     aspectRatios,
+    ratioMakesReference,
+    asReference,
     durations,
     current,
     estimateCredits,

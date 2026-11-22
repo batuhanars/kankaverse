@@ -47,6 +47,8 @@ export function useAiVideo() {
   const withImage = refs.singleImage
   const referenceKinds = computed(() => (refs.referenceMode.value ? refs.kinds.value : null))
   const form = useAiVideoForm(withImage, referenceKinds, locked)
+  /** Tek görsel ilk kare mi (ölçü seçilip referansa çevrilmediyse). */
+  const firstFrame = computed(() => refs.singleImage.value && !form.asReference.value)
   const { setActive, clearActive } = useAiVideoViewer()
   const job = ref<AiVideoDto | null>(null)
   const recent = ref<AiVideoDto[]>([])
@@ -139,7 +141,7 @@ export function useAiVideo() {
     try {
       const uploaded = refs.uploaded()
       // Tek görsel → eski yol (inputKey); diğer her bileşim → references (§0 kip kuralı)
-      const input = refs.singleImage.value
+      const input = firstFrame.value
         ? { inputKey: uploaded[0].key }
         : uploaded.length
           ? { references: uploaded }
@@ -259,6 +261,7 @@ export function useAiVideo() {
     refs,
     form,
     withImage,
+    firstFrame,
     job,
     recent,
     busy,

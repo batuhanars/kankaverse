@@ -1993,6 +1993,7 @@
     "aspectLabel": "Ölçü",
     "aspectAuto": "Otomatik",
     "aspectFromImage": "Ölçü görselden alınır",
+    "aspectMakesReference": "Ölçü seçersen görsel ilk kare olmaz, referans olarak kullanılır.",
     "ratio": {
       "r16x9": "16:9 Yatay",
       "r9x16": "9:16 Dikey",

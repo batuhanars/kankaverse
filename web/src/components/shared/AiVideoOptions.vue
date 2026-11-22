@@ -19,6 +19,8 @@ const props = defineProps<{
   /** Kipe göre süreler (referansta modelinkinden farklı olabilir). */
   durations: number[]
   withImage: boolean
+  /** 2026-11-22: tek görselde ölçü seçmek görseli referansa çevirir (Seedance, Kling 4.0). */
+  ratioMakesReference?: boolean
 }>()
 const emit = defineEmits<{
   'update:model': [key: string]
@@ -140,6 +142,7 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
         </button>
       </div>
       <p v-if="lockedAuto" class="text-[12px] mt-1" style="color: var(--kv-text-muted);">{{ t('aiVideo.aspectFromImage') }}</p>
+      <p v-else-if="ratioMakesReference" class="text-[12px] mt-1" style="color: var(--kv-text-muted);">{{ t('aiVideo.aspectMakesReference') }}</p>
     </div>
   </div>
 </template>

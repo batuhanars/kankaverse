@@ -61,6 +61,8 @@ function Options({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
           />
           {form.mode === 'image' && form.aspectRatios.length === 0 ? (
             <Text style={styles.hint}>{t('aiVideo.aspectFromImage')}</Text>
+          ) : form.ratioMakesReference ? (
+            <Text style={styles.hint}>{t('aiVideo.aspectMakesReference')}</Text>
           ) : null}
         </>
       ) : null}

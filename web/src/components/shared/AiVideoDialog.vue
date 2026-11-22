@@ -55,7 +55,7 @@ const canSubmit = computed(
     !ai.busy.value &&
     !refs.uploading.value &&
     refs.allReady.value &&
-    (ai.prompt.value.trim().length > 0 || refs.singleImage.value),
+    (ai.prompt.value.trim().length > 0 || ai.firstFrame.value),
 )
 const statusText = computed(() => {
   if (ai.saving.value) return t('aiVideo.saving')
@@ -242,6 +242,7 @@ async function onPickTarget(channelId: string) {
           :aspect-ratios="form.aspectRatios.value"
           :durations="form.durations.value"
           :with-image="ai.withImage.value"
+          :ratio-makes-reference="form.ratioMakesReference.value"
           @update:model="form.pickModel"
           @update:resolution="form.resolution.value = $event"
           @update:duration-s="form.durationS.value = $event"
@@ -259,7 +260,7 @@ async function onPickTarget(channelId: string) {
             :counts="refs.counts.value"
             :limits="refs.limits.value"
             :accept="refs.accept.value"
-            :single-image="refs.singleImage.value"
+            :single-image="ai.firstFrame.value"
             :error="refs.addError.value"
             :locked="ai.locked.value"
             @add="refs.addFiles"

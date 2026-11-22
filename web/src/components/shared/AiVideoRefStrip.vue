@@ -75,19 +75,21 @@ const sec = (v: number) => t('aiVideo.durationOption', { sec: Math.round(v) })
           </svg>
           <span v-if="it.durationS !== null" class="absolute right-1 bottom-6 rounded px-1 text-[10px] bg-black/70 text-white">{{ sec(it.durationS) }}</span>
           <span v-if="it.status === 'uploading'" class="absolute inset-x-0 top-0 h-16 flex items-center justify-center text-[11px] bg-black/55 text-white">{{ t('aiVideo.refs.uploading') }}</span>
-        </div>
-        <div class="flex items-center justify-between gap-1 px-1.5 py-1">
-          <span class="truncate text-[12px] font-medium" :style="{ color: TAG_COLOR[it.kind] }">{{ it.label }}</span>
+          <!-- 2026-11-22: kaldır düğmesi küçük resmin köşesinde, belirgin (etiket satırındaki küçük × gözden kaçıyordu) -->
           <button
             type="button"
-            class="shrink-0 text-[14px] leading-none cursor-pointer px-1"
-            style="color: var(--kv-text-muted);"
+            class="absolute top-1 right-1 z-10 h-6 w-6 flex items-center justify-center rounded-full bg-black/75 text-white border border-white/30 cursor-pointer transition-colors hover:bg-[var(--kv-danger)]"
             :aria-label="`${t('aiVideo.refs.remove')}: ${it.label}`"
             :title="t('aiVideo.refs.remove')"
             @click="emit('remove', it.uid)"
           >
-            &times;
+            <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
           </button>
+        </div>
+        <div class="px-1.5 py-1">
+          <span class="block truncate text-[12px] font-medium" :style="{ color: TAG_COLOR[it.kind] }">{{ it.label }}</span>
         </div>
         <p v-if="it.status === 'error'" class="px-1.5 pb-1 text-[11px] break-words" style="color: var(--kv-danger);">{{ it.error }}</p>
       </li>
