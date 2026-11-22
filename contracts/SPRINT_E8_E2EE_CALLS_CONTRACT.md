@@ -165,3 +165,15 @@ Her adım: `tsc`, ilgili testler, web için `vue-tsc -b` (6 bilinen hata dışı
 10. LiveKit sunucu logunda / `room` olaylarında içerik yok (yalnız teyit; SFU zaten saklamıyor).
 11. Acil butonu DM aramasında: rapor oluşur, kişi aramadan çekilir (davranış değişmedi).
 12. Bildirimden gelen aramayı kabul (uygulama kapalıyken): şifreli bağlanır.
+
+### §9 sonucu (yerel, 2026-11-22)
+
+- 1-9, 11: geçti. 10: atlandı (SFU yalnız şifreli kare taşır, anahtarı yok; teyit değeri düşük). 12: yerelde push kapalı,
+  canlıda ilk aşamada (izin listesindeki hesaplar) sınanacak.
+- Turda bulunan ve düzeltilen üç kusur:
+  - Telefon epoch değişiminde katılımcı başına anahtar yuvalarını güncellemiyordu (native sağlayıcı paylaşılan anahtarı
+    katılımcı başına kopyalıyor). Düzeltme: yenilemede odadaki her kimliğin yuvası da yazılır (`26f269f9`, madde 6).
+  - `e2ee:commit` yalnız kanal odasına gidiyordu; sohbet ekranı kapalı cihaz epoch değişimini duymadı, ses kalıcı
+    kesildi. Düzeltme: olay kanalın şimdiki üyelerinin kişisel odalarına da gider (`59a2e52a`, madde 5).
+  - Gruptan çıkarılanın ekranında arama simgesi kalıyordu (C62 kusuru, E8 dışı; `ec2b0939`).
+- Açık: telefonda çözme hatası JS'e ulaşmıyor (adım 0 B2 düzeltmesi cihazda çalışmadı) → PLAN D112.
