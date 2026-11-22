@@ -16,6 +16,8 @@ const IMAGE_ONLY: AiVideoReferencesOption = {
   videoTotalMaxS: 0,
   videoMaxS: 0,
   audioMaxS: 0,
+  audioTotalMaxS: 0,
+  minS: 0,
   aspectRatios: [],
   inputTypes: { image: ['image/png', 'image/jpeg', 'image/webp'], video: [], audio: [] },
 }
@@ -121,6 +123,9 @@ export function useAiVideoRefs(
     if (counts.value[kind] >= lim.max[kind])
       return t(`aiVideo.refs.errors.full.${kind}`, { max: lim.max[kind] })
     if (durationS === null) return ''
+    if (kind !== 'image' && durationS < lim.minS - DURATION_TOLERANCE_S) {
+      return t('aiVideo.refs.errors.tooShort', { sec: lim.minS })
+    }
     if (kind === 'video') {
       if (durationS > lim.videoMaxS + DURATION_TOLERANCE_S)
         return t('aiVideo.refs.errors.videoLong', { sec: lim.videoMaxS })
@@ -134,6 +139,15 @@ export function useAiVideoRefs(
     }
     if (kind === 'audio' && durationS > lim.audioMaxS + DURATION_TOLERANCE_S) {
       return t('aiVideo.refs.errors.audioLong', { sec: lim.audioMaxS })
+    }
+    if (kind === 'audio') {
+      const total = list.value.reduce(
+        (s, r) => s + (r.kind === 'audio' ? (r.durationS ?? 0) : 0),
+        0,
+      )
+      if (total + durationS > lim.audioTotalMaxS + DURATION_TOLERANCE_S) {
+        return t('aiVideo.refs.errors.audioTotal', { sec: lim.audioTotalMaxS })
+      }
     }
     return ''
   }

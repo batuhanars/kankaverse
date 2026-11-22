@@ -1,3 +1,5 @@
+import type { AiInputKind } from './ai-video.constants';
+
 /** C14b §1 — Pika model tablosu (tek kaynak). Gövde alan adları buradan gelir; servis model adına göre dallanmaz. */
 /** C42: istek kipi. text/image = mevcut uçlar; reference = çoklu referans (omni) ucu. */
 export type AiVideoMode = 'text' | 'image' | 'reference';
@@ -10,7 +12,15 @@ export interface AiVideoReferenceSpec {
   videoTotalMaxS: number;
   videoMaxS: number;
   audioMaxS: number;
+  /** 2026-11-22: seslerin toplam süresi (Seedance 30 sn). */
+  audioTotalMaxS: number;
+  /** 2026-11-22: video/ses için en kısa süre (Seedance 2 sn; 0 = sınır yok). */
+  minS: number;
   aspectRatios: string[];
+  /** 2026-11-22: türe göre kabul edilen içerik türleri (verilmeyen tür = genel tablo; Seedance ses yalnız wav/mp3). */
+  inputTypes?: Partial<Record<AiInputKind, string[]>>;
+  /** 2026-11-22: istem etiketinin sağlayıcı yazımı; `{Kind}` = Image/Video/Audio, `{n}` = türü içindeki sıra. */
+  tagFormat: string;
 }
 
 export interface AiVideoModelSpec {
@@ -86,7 +96,11 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
       videoTotalMaxS: 15,
       videoMaxS: 15,
       audioMaxS: 30,
+      // Wan'da ses toplamı sınırı yok: tavan = adet × tekil süre.
+      audioTotalMaxS: 5 * 30,
+      minS: 0,
       aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+      tagFormat: '{Kind} {n}',
     },
   },
   {
@@ -105,8 +119,7 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     fixed: {},
     references: null,
   },
-  // 2026-11-22: sesli modeller (Pika şemasında `native_audio`). Referans ucu olanlar ilk turda referanssız:
-  // kabul ettikleri dosya türü/süre kuralları Wan'dan farklı (ör. Seedance sesi yalnız wav/mp3, en az 2 sn).
+  // 2026-11-22: sesli modeller (Pika şemasında `native_audio`).
   {
     key: 'seedance-2.5',
     label: 'Seedance 2.5',
@@ -122,7 +135,21 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     imagePromptRequired: true,
     audio: 'default',
     fixed: { watermark: false },
-    references: null,
+    // Seedance25ReferenceToVideoRequest: 30 görsel, 10 video (mp4/mov), 10 ses (wav/mp3); her biri 2-30 sn,
+    // tür toplamı en fazla 30 sn. İstemde `@Image1`, `@Video1`, `@Audio1`. Sınırlar sağlayıcınınki (sahip isteği).
+    references: {
+      apiFunction: 'reference-to-video',
+      fields: { image: 'image_urls', video: 'video_urls', audio: 'audio_urls' },
+      max: { image: 30, video: 10, audio: 10 },
+      videoTotalMaxS: 30,
+      videoMaxS: 30,
+      audioMaxS: 30,
+      audioTotalMaxS: 30,
+      minS: 2,
+      aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+      inputTypes: { video: ['video/mp4', 'video/quicktime'], audio: ['audio/mpeg', 'audio/wav'] },
+      tagFormat: '@{Kind}{n}',
+    },
   },
   {
     key: 'veo-3.1-fast',

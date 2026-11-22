@@ -21,12 +21,14 @@ export function countKinds(kinds: ('image' | 'video' | 'audio')[]): PromptTagCou
 const TAG_PATTERN = /(?<![\p{L}\p{N}])@(Görsel|Video|Ses)(\d+)/giu;
 
 const KIND_OF_WORD = { görsel: 'image', video: 'video', ses: 'audio' } as const;
-/** Omni ucunun istemde beklediği yazım (türü içinde numaralı). Ses yazımı belgede yok, varsayım (C42 §0). */
-const OMNI_WORD = { image: 'Image', video: 'Video', audio: 'Audio' } as const;
+/** Sağlayıcı yazımındaki tür adı (`tagFormat` içindeki `{Kind}`). */
+const PROVIDER_WORD = { image: 'Image', video: 'Video', audio: 'Audio' } as const;
+/** Wan omni yazımı (C42 §0; ses yazımı belgede yok, varsayım). Model tablosunda `references.tagFormat`. */
+export const DEFAULT_TAG_FORMAT = '{Kind} {n}';
 
 /**
  * C42 §1.4: kullanıcının yazdığı etiketleri sağlayıcı yazımına çevirir (saf fonksiyon, satırda ham istem saklanır).
- * - reference: `@Görsel2` → `Image 2`, `@Video1` → `Video 1`, `@Ses1` → `Audio 1`
+ * - reference: `tagFormat`e göre; Wan `@Görsel2` → `Image 2`, Seedance `@Görsel2` → `@Image2`
  * - image (görselden video): `@Görsel1` → `görsel` (tek görsel, numara anlamsız)
  * - Var olmayan referansa etiket → 400 AI_VIDEO_INVALID_OPTION.
  */
@@ -34,6 +36,7 @@ export function translatePromptTags(
   prompt: string,
   mode: AiVideoMode,
   counts: PromptTagCounts,
+  tagFormat = DEFAULT_TAG_FORMAT,
 ): string {
   return prompt.replace(TAG_PATTERN, (_all, word: string, num: string) => {
     const kind = KIND_OF_WORD[word.toLowerCase() as keyof typeof KIND_OF_WORD];
@@ -44,6 +47,7 @@ export function translatePromptTags(
         error: AiVideoError.INVALID_OPTION,
       });
     }
-    return mode === 'image' ? 'görsel' : `${OMNI_WORD[kind]} ${n}`;
+    if (mode === 'image') return 'görsel';
+    return tagFormat.replace('{Kind}', PROVIDER_WORD[kind]).replace('{n}', String(n));
   });
 }

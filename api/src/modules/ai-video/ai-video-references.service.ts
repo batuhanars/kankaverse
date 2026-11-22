@@ -8,11 +8,12 @@ import { runBinary } from '../../shared/media/run-binary';
 import {
   AI_INPUT_DURATION_TOLERANCE_S,
   AI_INPUT_KINDS,
+  AI_INPUT_TYPES,
   AiInputKind,
   AiVideoError,
   inputTypeOfKey,
 } from './ai-video.constants';
-import { AI_VIDEO_MESSAGES } from './ai-video.mapper';
+import { AI_VIDEO_MESSAGES, referenceInputTypes } from './ai-video.mapper';
 import { AiVideoReferenceSpec } from './ai-video.models';
 import { AiVideoInputService } from './ai-video-input.service';
 
@@ -34,8 +35,19 @@ const PROBE_TIMEOUT_MS = 15_000;
 /** Süre okuma için indirme tavanı: en büyük girdi (video) kadar. */
 const PROBE_MAX_BYTES = 50 * 1024 * 1024;
 
-const invalid = (error: string) =>
-  new BadRequestException({ message: AI_VIDEO_MESSAGES[error], error });
+const invalid = (error: string, message = AI_VIDEO_MESSAGES[error]) =>
+  new BadRequestException({ message, error });
+
+/** Uzantı → kullanıcıya görünen ad (wav, mp3, mp4, mov). */
+const extsOf = (types: string[]) => types.map((t) => AI_INPUT_TYPES[t]?.ext ?? t).join(', ');
+
+/** Süre hata metinleri modelin kendi sınırlarından (Wan 15/30, Seedance 30/30). */
+const tooLongMessage = (s: AiVideoReferenceSpec) =>
+  `Video en fazla ${s.videoMaxS} saniye (toplam ${s.videoTotalMaxS}), sesler en fazla ${s.audioMaxS} saniye (toplam ${s.audioTotalMaxS}) olabilir.`;
+const tooShortMessage = (s: AiVideoReferenceSpec) =>
+  `Bu modelde video ve sesler en az ${s.minS} saniye olmalı.`;
+const typeMessage = (s: AiVideoReferenceSpec) =>
+  `Bu model yalnız şu dosyaları kabul ediyor: video ${extsOf(referenceInputTypes(s, 'video'))}, ses ${extsOf(referenceInputTypes(s, 'audio'))}.`;
 
 /**
  * C42 §1.3 — çoklu referans doğrulaması: tür başına sayı tavanı, tür ↔ uzantı uyumu, anahtar sahipliği/boyut
@@ -66,8 +78,10 @@ export class AiVideoReferenceService {
     }
     for (const ref of refs) {
       await this.input.assertInputKey(userId, ref.key);
-      if (inputTypeOfKey(ref.key)![1].kind !== ref.kind) {
-        throw invalid(AiVideoError.INVALID_OPTION);
+      const [contentType, type] = inputTypeOfKey(ref.key)!;
+      if (type.kind !== ref.kind) throw invalid(AiVideoError.INVALID_OPTION);
+      if (!referenceInputTypes(spec, ref.kind).includes(contentType)) {
+        throw invalid(AiVideoError.INPUT_TYPE, typeMessage(spec));
       }
     }
     await this.assertDurations(spec, refs);
@@ -77,11 +91,16 @@ export class AiVideoReferenceService {
     const videos = await this.durationsOf(refs.filter((r) => r.kind === 'video'));
     const audios = await this.durationsOf(refs.filter((r) => r.kind === 'audio'));
     const tol = AI_INPUT_DURATION_TOLERANCE_S;
+    const sum = (list: number[]) => list.reduce((total, s) => total + s, 0);
+    if ([...videos, ...audios].some((s) => s < spec.minS - tol)) {
+      throw invalid(AiVideoError.INPUT_TOO_SHORT, tooShortMessage(spec));
+    }
     const tooLong =
       videos.some((s) => s > spec.videoMaxS + tol) ||
-      videos.reduce((sum, s) => sum + s, 0) > spec.videoTotalMaxS + tol ||
-      audios.some((s) => s > spec.audioMaxS + tol);
-    if (tooLong) throw invalid(AiVideoError.INPUT_TOO_LONG);
+      sum(videos) > spec.videoTotalMaxS + tol ||
+      audios.some((s) => s > spec.audioMaxS + tol) ||
+      sum(audios) > spec.audioTotalMaxS + tol;
+    if (tooLong) throw invalid(AiVideoError.INPUT_TOO_LONG, tooLongMessage(spec));
   }
 
   private durationsOf(refs: AiVideoReference[]): Promise<number[]> {

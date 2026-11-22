@@ -17,7 +17,8 @@ const KNOWN_ERRORS = [
 ];
 
 /** C42: referans kipinin hata kodları; metinler mobil ad alanında. */
-const REFERENCE_ERRORS = ['AI_VIDEO_INPUT_TOO_LONG', 'AI_VIDEO_PROMPT_REQUIRED'];
+// Süre/tür hataları (INPUT_TOO_LONG/SHORT, INPUT_TYPE) burada yok: sunucu modelin kendi sınırını yazar, o metin gösterilir.
+const REFERENCE_ERRORS = ['AI_VIDEO_PROMPT_REQUIRED'];
 
 const isKnown = (code: string | null | undefined): code is string =>
   !!code && (KNOWN_ERRORS.includes(code) || REFERENCE_ERRORS.includes(code));

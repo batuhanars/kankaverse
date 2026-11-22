@@ -8,8 +8,8 @@ export const AI_INPUT_MAX_BYTES = 10 * MB;
 export const AI_OUTPUT_MAX_BYTES = 50 * MB;
 /** C42: süre denetimi payı (sn); kapsayıcı süresi birkaç yüz ms taşabilir. */
 export const AI_INPUT_DURATION_TOLERANCE_S = 0.5;
-/** Bir istekteki toplam referans tavanı (DTO); tür başına sınır model tablosunda (en büyüğü Wan 10+5+5). */
-export const AI_REFERENCES_MAX = 20;
+/** Bir istekteki toplam referans tavanı (DTO); tür başına sınır model tablosunda (en büyüğü Seedance 30+10+10). */
+export const AI_REFERENCES_MAX = 50;
 /** İstem güvenlik tavanı; istemciler sınır göstermez, yalnız kötüye kullanıma karşı. */
 export const AI_PROMPT_MAX = 10000;
 /** Teklif (estimate) önbellek ömrü; önbellek tek instance bellek içi (C14b §6). */
@@ -75,6 +75,10 @@ export const AiVideoError = {
   IN_PROGRESS: 'AI_VIDEO_IN_PROGRESS',
   INVALID_OPTION: 'AI_VIDEO_INVALID_OPTION',
   INPUT_TOO_LONG: 'AI_VIDEO_INPUT_TOO_LONG',
+  /** 2026-11-22: modelin en kısa süresinin altında video/ses (Seedance 2 sn). */
+  INPUT_TOO_SHORT: 'AI_VIDEO_INPUT_TOO_SHORT',
+  /** 2026-11-22: modelin kabul etmediği dosya türü (Seedance sesi yalnız wav/mp3). */
+  INPUT_TYPE: 'AI_VIDEO_INPUT_TYPE',
   NOT_READY: 'AI_VIDEO_NOT_READY',
   PROVIDER_ERROR: 'AI_VIDEO_PROVIDER_ERROR',
   CONTENT_REJECTED: 'AI_VIDEO_CONTENT_REJECTED',

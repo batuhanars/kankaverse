@@ -1981,7 +1981,9 @@
         },
         "videoLong": "Video en fazla {sec} saniye olabilir.",
         "videoTotal": "Videoların toplamı en fazla {sec} saniye olabilir.",
-        "audioLong": "Ses en fazla {sec} saniye olabilir."
+        "audioLong": "Ses en fazla {sec} saniye olabilir.",
+    "tooShort": "Video ve ses en az {sec} saniye olmalı.",
+    "audioTotal": "Seslerin toplamı en fazla {sec} saniye olabilir."
       }
     },
     "modelLabel": "Model",
@@ -2048,7 +2050,6 @@
       "AI_VIDEO_TIMEOUT": "Üretim çok uzun sürdü ve iptal edildi.",
       "AI_VIDEO_DOWNLOAD_FAILED": "Video kaydedilemedi. Yeni bir üretim başlat.",
       "AI_VIDEO_BUSY": "Bu üretim şu an işleniyor. Biraz sonra tekrar dene.",
-      "AI_VIDEO_INPUT_TOO_LONG": "Video en fazla 15 saniye, sesler en fazla 30 saniye olabilir.",
       "AI_VIDEO_PROMPT_REQUIRED": "Referans eklediğinde istem yazman gerekir."
     }
   },
@@ -2478,9 +2479,10 @@
         "full": "Bu türde daha fazla dosya eklenemez.",
         "type": "Bu dosya türü desteklenmiyor.",
         "size": "Dosya çok büyük. Görsel ve ses en fazla 10 MB, video en fazla 50 MB olabilir.",
-        "tooLong": "Video en fazla {video} saniye, sesler en fazla {audio} saniye olabilir.",
+        "tooShort": "Video ve sesler en az {min} saniye olmalı.",
+    "tooLong": "Video en fazla {video} saniye, sesler en fazla {audio} saniye olabilir.",
         "totalLong": "Videoların toplam süresi en fazla {total} saniye olabilir.",
-        "AI_VIDEO_INPUT_TOO_LONG": "Video en fazla 15 saniye, sesler en fazla 30 saniye olabilir.",
+    "audioTotal": "Seslerin toplam süresi en fazla {audioTotal} saniye olabilir.",
         "AI_VIDEO_PROMPT_REQUIRED": "Dosya referansı varken istem yazmalısın."
       }
     },

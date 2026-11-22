@@ -164,3 +164,24 @@ gövdede alan adları tablodan; silmede tüm referans anahtarları; `options` ya
   6. Ek kaldırınca istemdeki etiketlerin yeniden numaralanması.
   7. 16 sn video ve 5. görsel reddediliyor (istemcide ve sunucuda).
   8. vc42 mobil (eski istemci) ile görselden video hâlâ çalışıyor (geri uyum).
+
+## Ek 2026-11-22: model başına referans kuralları (Seedance 2.5)
+
+Sahip isteği: her model sağlayıcının kabul ettiği kadar referans alır. `AiVideoReferenceSpec`e eklenen alanlar,
+hepsi model tablosundan gelir, servis model adına göre dallanmaz:
+
+- `audioTotalMaxS` (seslerin toplamı), `minS` (video/ses en kısa süresi, 0 = yok).
+- `inputTypes?` türe göre izinli içerik türleri; verilmeyen tür genel tabloyu kullanır.
+- `tagFormat` istem etiketinin sağlayıcı yazımı: Wan `{Kind} {n}` (`Image 2`), Seedance `@{Kind}{n}` (`@Image2`).
+- `GET /ai-video/options` → `references` içinde `audioTotalMaxS` ve `minS` (eklemeli; eski istemci yok sayar),
+  `inputTypes` artık modele göre.
+- Yeni hata kodları: `AI_VIDEO_INPUT_TOO_SHORT`, `AI_VIDEO_INPUT_TYPE`. `AI_VIDEO_INPUT_TOO_LONG` mesajı artık
+  modelin sınırını yazar; istemciler bu üç kodda sunucunun Türkçe mesajını gösterir.
+- İstek başına referans tavanı `AI_REFERENCES_MAX` = 50.
+
+| Model | Uç | Görsel / video / ses | Video | Ses | En kısa |
+|---|---|---|---|---|---|
+| Wan 3.0 | `omni-video` | 10 / 5 / 5 | tekil 15, toplam 15 sn | tekil 30 sn | yok |
+| Seedance 2.5 | `reference-to-video` | 30 / 10 / 10 | mp4, mov; tekil 30, toplam 30 sn | wav, mp3; tekil 30, toplam 30 sn | 2 sn |
+| Kling 4.0 | `omni-video` (`contents` dizisi) | ayrı tur | | | |
+| Veo 3.1 Fast | yok (yalnız metinden) | yok | | | |
