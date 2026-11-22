@@ -58,7 +58,7 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
         style="color: var(--kv-text-primary);"
         @change="emit('update:model', ($event.target as HTMLSelectElement).value)"
       >
-        <option v-for="m in models" :key="m.key" :value="m.key">{{ t(m.audio === 'none' ? 'aiVideo.audioNone' : 'aiVideo.audioOn', { label: m.label }) }}</option>
+        <option v-for="m in models" :key="m.key" :value="m.key">{{ m.audio === 'none' ? t('aiVideo.audioNone', { label: m.label }) : m.label }}</option>
       </select>
     </div>
 
