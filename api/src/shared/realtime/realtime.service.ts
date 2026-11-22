@@ -20,6 +20,14 @@ export class RealtimeService {
     }
   }
 
+  // Kanal odasına VE verilen kullanıcıların kişisel odalarına TEK yayın: iki odada birden olan soket olayı
+  // bir kez alır (socket.io oda birleşimi). E8: commit, sohbet ekranı kapalı cihaza da ulaşmalı.
+  emitToRoomAndUsers(channelId: string, userIds: string[], event: string, payload: unknown) {
+    this.server
+      ?.to([`room:${channelId}`, ...userIds.map((id) => `user:${id}`)])
+      .emit(event, payload);
+  }
+
   // Kanal room'una yay (room:<channelId>) — mesaj/typing + bağlı oda olayları için.
   emitToRoom(channelId: string, event: string, payload: unknown) {
     this.server?.to(`room:${channelId}`).emit(event, payload);

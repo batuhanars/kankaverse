@@ -144,7 +144,7 @@ export class E2eeGroupsService {
     });
     if (!accepted) throw await this.epochConflict(channelId);
 
-    this.notify.commit(channelId, dto.epoch);
+    void this.notify.commit(channelId, dto.epoch);
     if (targets.size > 0) this.notify.welcome([...targets.values()], channelId);
     return { epoch: dto.epoch + 1 };
   }

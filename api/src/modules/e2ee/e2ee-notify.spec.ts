@@ -27,3 +27,37 @@ describe('E2eeNotifyService.devicesChanged (E2 §2.4)', () => {
     ]);
   });
 });
+
+describe('E2eeNotifyService.commit (E8 §9)', () => {
+  it('kanal odasina ve simdiki uyelerin kisisel odalarina tek yayin', async () => {
+    const prisma = {
+      channelMember: {
+        findMany: jest.fn().mockResolvedValue([{ userId: 'u1' }, { userId: 'u2' }]),
+      },
+    };
+    const realtime = { emitToRoomAndUsers: jest.fn(), emitToRoom: jest.fn() };
+    const svc = new E2eeNotifyService(prisma as never, realtime as never);
+
+    await svc.commit('g1', 4);
+
+    expect(prisma.channelMember.findMany.mock.calls[0][0].where).toEqual({ channelId: 'g1' });
+    expect(realtime.emitToRoomAndUsers).toHaveBeenCalledWith('g1', ['u1', 'u2'], 'e2ee:commit', {
+      channelId: 'g1',
+      epoch: 4,
+    });
+    expect(realtime.emitToRoom).not.toHaveBeenCalled();
+  });
+
+  it('uyeler okunamazsa yine kanal odasina gider', async () => {
+    const prisma = { channelMember: { findMany: jest.fn().mockRejectedValue(new Error('db')) } };
+    const realtime = { emitToRoomAndUsers: jest.fn(), emitToRoom: jest.fn() };
+    const svc = new E2eeNotifyService(prisma as never, realtime as never);
+
+    await svc.commit('g1', 4);
+
+    expect(realtime.emitToRoom).toHaveBeenCalledWith('g1', 'e2ee:commit', {
+      channelId: 'g1',
+      epoch: 4,
+    });
+  });
+});
