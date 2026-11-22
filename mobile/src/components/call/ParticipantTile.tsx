@@ -5,7 +5,7 @@ import type { TrackPublication } from 'livekit-client';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
-type Variant = 'card' | 'full' | 'corner' | 'pip' | 'screen';
+type Variant = 'card' | 'full' | 'pip' | 'screen';
 
 interface Props {
   name: string;
@@ -37,9 +37,10 @@ interface Props {
   /** §3 — yalnız yerel ÖN kamera önizlemesinde true (kullanıcı kendini aynada gördüğü gibi görür;
    *  arka kameraya geçilince aynalama kalkar). Uzak taraf için hiç geçilmez. */
   mirror?: boolean;
-  /** §3.6 addendum — yalnız `'pip'` varyantında okunur: konu ekran paylaşımıysa `true`, `objectFit`
+  /** `'pip'` ve `'card'` varyantlarında okunur: konu ekran paylaşımıysa `true`, `objectFit`
    *  `'screen'` varyantıyla aynı gerekçeyle `contain` olur (kırpma metni/altyazıyı keser). Kamera/
-   *  avatar konusunda (varsayılan/`false`) davranış bugünküyle birebir aynı kalır: `cover`. */
+   *  avatar konusunda (varsayılan/`false`) davranış bugünküyle birebir aynı kalır: `cover`.
+   *  `'card'`ta sahne şeridindeki ekran kartı için (CallStage). */
   isScreenShare?: boolean;
   /**
    * M4d §3-R — düzen kamera durumundan TÜRETİLİR (`call.tsx`), bu bileşen kendi başına bir düzen
@@ -50,9 +51,6 @@ interface Props {
    * - `'full'` — kamera açıkken karşı taraf için TAM ALAN: video varsa uçtan uca kaplar, yoksa
    *   bugünkü avatar+ad büyütülmüş halde ortalanır. Mikrofon rozeti + "Çalıyor…" korunur, konuşma
    *   halkası YOK.
-   * - `'corner'` — sağ üst köşedeki küçük kendi-önizleme karesi. Yalnız kamera açıkken çağrılır
-   *   (kapı çağıran tarafta — kapalıyken köşe kutusu hiç render edilmez). Ad/ringing yok, konuşma
-   *   halkası VAR (§3-R: "iki-kutucuk düzeninde bugünkü gibi kalır").
    * - `'pip'` — M4p sözleşme §3: sistem PiP penceresi (~150dp). Video/avatar TAM ALAN kaplar, ad/
    *   mikrofon rozeti/konuşma kenarlığı/"Çalıyor…" YOK ("kontrol yok, metin yok" kırmızı çizgisi) —
    *   `CallPipOverlay`in TEK tükettiği varyant. §3.6 addendum — konu ekran paylaşımıysa `isScreenShare`
@@ -72,9 +70,6 @@ interface Props {
 const AVATAR_SIZE = 88;
 // §3-R — "büyük ortalanmış avatar" (video yoksa tam-alan karşı taraf görünümü).
 const FULL_AVATAR_SIZE = 160;
-// §3-R — sağ üst köşedeki küçük kendi-önizleme karesi (Discord'daki PIP oranına yakın dikey kare).
-const CORNER_WIDTH = 96;
-const CORNER_HEIGHT = 128;
 
 export function ParticipantTile({
   name,
@@ -163,22 +158,6 @@ export function ParticipantTile({
     );
   }
 
-  if (variant === 'corner') {
-    return (
-      <View style={[styles.cornerWrap, speaking && styles.cornerSpeaking]}>
-        {hasVideo ? (
-          <VideoTrack trackRef={trackRef} style={styles.cornerFill} mirror={mirror} objectFit="cover" />
-        ) : avatarUrl ? (
-          <Image source={{ uri: avatarUrl }} style={styles.cornerFill} />
-        ) : (
-          <View style={[styles.cornerFill, styles.avatarFallback]}>
-            <Text style={styles.avatarFallbackText}>{name.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
-      </View>
-    );
-  }
-
   // 'card' — sözleşme §3, HİÇ VİDEOSUZ davranış değişmedi (iki-kutucuk DM + ızgara guild/grup).
   // M4e §3.2 🔴 — video geldiğinde (grup DM ızgarası) avatarın dairesel çerçevesi yerine dikey
   // dikdörtgene yakın bir video karesi çizilir (yüz görünsün); ad + mikrofon rozeti + konuşma
@@ -186,8 +165,13 @@ export function ParticipantTile({
   return (
     <View style={[styles.tile, dimmed && styles.tileDimmed]}>
       {hasVideo ? (
-        <View style={[styles.videoWrap, speaking && styles.videoSpeaking]}>
-          <VideoTrack trackRef={trackRef} style={styles.videoFill} mirror={mirror} objectFit="cover" />
+        <View style={[styles.videoWrap, isScreenShare && styles.videoScreenWrap, speaking && styles.videoSpeaking]}>
+          <VideoTrack
+            trackRef={trackRef}
+            style={styles.videoFill}
+            mirror={mirror}
+            objectFit={isScreenShare ? 'contain' : 'cover'}
+          />
           {micOff && (
             <View style={styles.videoMicBadge}>
               <Ionicons name="mic-off" size={14} color={theme.colors.textPrimary} />
@@ -294,6 +278,10 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     backgroundColor: theme.colors.bgElevated,
   },
+  // Ekran kartı: `contain` kenarlarda boşluk bırakır, siyah dolgu ('screen' varyantıyla aynı).
+  videoScreenWrap: {
+    backgroundColor: '#000',
+  },
   videoSpeaking: {
     borderColor: theme.colors.online,
   },
@@ -364,24 +352,6 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.sm,
-  },
-
-  // ── §3-R 'corner' — sağ üst köşedeki küçük kendi-önizleme karesi ─────────────
-  cornerWrap: {
-    width: CORNER_WIDTH,
-    height: CORNER_HEIGHT,
-    borderRadius: theme.radius.md,
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: 'transparent',
-    backgroundColor: theme.colors.bgElevated,
-  },
-  cornerSpeaking: {
-    borderColor: theme.colors.online,
-  },
-  cornerFill: {
-    width: '100%',
-    height: '100%',
   },
 
   // ── Sprint M5b §3.1 'screen' — paylaşılan ekranın büyük görünümü, TAM ALAN, contain ─────────

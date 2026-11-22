@@ -13,7 +13,7 @@ import { useOutgoingCallRing } from '@/hooks/useOutgoingCallRing';
 import { guildsApi } from '@/api/guilds';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { ParticipantTile } from '@/components/call/ParticipantTile';
-import { ScreenShareStage } from '@/components/call/ScreenShareStage';
+import { CallStage, buildStageItems, type StageItem } from '@/components/call/CallStage';
 import { CallControls } from '@/components/call/CallControls';
 import { OutputPickerSheet } from '@/components/call/OutputPickerSheet';
 import { VoiceContextSheet } from '@/components/call/VoiceContextSheet';
@@ -88,13 +88,12 @@ export default function CallScreen() {
   // `callKind` bazlı ayrı bir kapı YOK, tek kapı `canPublishCamera` (sunucu kararı,
   // `resolveVideoSources`). Guild daha önce burada bilinçli dışarıda tutuluyordu (masaüstü
   // kamerası C4/C7'den zaten çalışıyordu ama istemci tarafı yazılmamıştı) — bu sprint kapıyı açtı.
-  const isGroupCall = callKind === 'group';
   const canPublishCamera = useVoiceStore((s) => s.canPublishCamera);
   const isCameraOn = useVoiceStore((s) => s.isCameraOn);
   const cameraFacing = useVoiceStore((s) => s.cameraFacing);
   const localCameraPublication = useVoiceStore((s) => s.localCameraPublication);
-  // M4e §2 🔴 — userId anahtarlı çoğul map (tek kaynak). DM dalı da BURADAN türetir (aşağıda
-  // `peerCameraPublication`), paralel bir tek-slot state TUTULMAZ.
+  // M4e §2 🔴 — userId anahtarlı çoğul map (tek kaynak). Sahne öğeleri de BURADAN türetilir
+  // (`buildStageItems`), paralel bir tek-slot state TUTULMAZ.
   const remoteCameraPublications = useVoiceStore((s) => s.remoteCameraPublications);
   // Sprint M5b §2 🔴 — kameradan AYRI map (bkz. `stores/voice.ts` alan yorumu). Bu ÇİĞ (dondurulmamış)
   // değer yalnız odak/tam-ekran hesapları için (aşağıdaki effect'ler); RENDER'da `shown.remoteScreenPublications`
@@ -159,9 +158,6 @@ export default function CallScreen() {
   const [contextSheetOpen, setContextSheetOpen] = useState(false);
   // Sprint M4t §2 — kamera nudge modalı görünürlüğü (kapı/hatırlama `CameraNudgeModal.tsx`te).
   const [cameraNudgeVisible, setCameraNudgeVisible] = useState(false);
-  // Sprint M5b §3.2 🔴 — tek odak kuralı: kullanıcının şeritten yaptığı seçim korunur (yeni bir
-  // paylaşım başlayınca zıplamaz). `null` = henüz seçim yok (aşağıdaki effect ilk paylaşımı yazar).
-  const [focusedScreenUserId, setFocusedScreenUserId] = useState<string | null>(null);
   // Sprint M5b §3.3 — tam ekran izleme (üst bar/alt kontroller/şerit gizlenir + yatay yön açılır).
   const [screenFullscreen, setScreenFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -243,22 +239,6 @@ export default function CallScreen() {
     useVoiceStore.getState().clearCameraStoppedNotice();
     Alert.alert(cameraStoppedNotice);
   }, [cameraStoppedNotice]);
-
-  // Sprint M5b §3.2 🔴 — tek odak kuralı. Paylaşan kimse yoksa odak boşalır; paylaşan varsa VE
-  // mevcut odak hâlâ paylaşıyorsa (kullanıcının kendi seçimi) DOKUNULMAZ — yeni bir paylaşım
-  // başladığında (`remoteScreenPublications` değişir ama `focusedScreenUserId` hâlâ listede) odak
-  // ZIPLAMAZ. Odak yalnız (a) hiç seçim yokken ilk paylaşıma veya (b) seçili kişi paylaşmayı
-  // bıraktığında kalan ilk paylaşıma düşer (§3.2: "odak kalan ilk paylaşıma düşer").
-  useEffect(() => {
-    const ids = Object.keys(remoteScreenPublications);
-    if (ids.length === 0) {
-      if (focusedScreenUserId !== null) setFocusedScreenUserId(null);
-      return;
-    }
-    if (!focusedScreenUserId || !ids.includes(focusedScreenUserId)) {
-      setFocusedScreenUserId(ids[0]);
-    }
-  }, [remoteScreenPublications, focusedScreenUserId]);
 
   // Sprint M5b §3.3 🔴 — yatay yön yalnız BU görünümde: `app.json`daki global `"orientation":
   // "portrait"` kilidi DEĞİŞMİYOR, yalnız tam ekran AÇIKKEN kaldırılıyor (fiziksel çevirmenin
@@ -418,37 +398,35 @@ export default function CallScreen() {
   const peerName = peerMember?.username ?? peerFallback?.username ?? '';
   const peerAvatar = peerMember?.avatarUrl ?? peerFallback?.avatarUrl ?? null;
   const alone = shown.participants.length <= 1;
-  // M4d §3-R 🔴 — düzen kamera durumundan TÜRETİLİR, ayrı bir state TUTULMAZ. Uzak tarafın "kamerası
-  // açık" bilgisinin tek kaynağı, karşı tarafın map'teki kaydının gerçek bir track taşıması (niyet
-  // değil, gözlemlenen yayın — DM'de zaten başka bir sinyalimiz yok). Yalnız `isGridCall===false`
-  // (DM) dalında okunur; grup kendi hesabını aşağıda (`anyGroupCameraOn`) ayrı tutar.
-  //
-  // M4e §2 🔴 — `peerMember` henüz `roomParticipants`e düşmeden (katılma anındaki kısa pencere)
-  // `peerCameraPublication` `undefined` olabilir; `?? null` ile `TrackPublication | null` sözleşmesi
-  // korunur (`ParticipantTile`in `videoPublication` prop'u `null`i bekliyor, `undefined`i değil).
-  const peerCameraPublication = peerMember ? (shown.remoteCameraPublications[peerMember.userId] ?? null) : null;
-  const anyCameraOn = shown.isCameraOn || !!peerCameraPublication?.track;
-  // M4e §3.1 → M4f §2 🔴 — "en az bir kamera açıkken ızgara" hesabı artık guild'i de kapsıyor.
-  // Yeni bir hesap YAZILMADI, kısıt genişletildi (sözleşme §2: "`isGroupCall &&` kısıtı genişletilir").
-  // Kimsenin kamerası açık değilken guild görünümü bugünkü tek-sütun alt alta listeyle AYNEN kalır —
-  // bu ifade yalnız `false`tan `true`ya döndüğünde (biri kamera açtığında) ızgaraya geçişi tetikler.
-  const anyGroupCameraOn =
-    (isGroupCall || isGuildCall) &&
-    (shown.isCameraOn || Object.values(shown.remoteCameraPublications).some((p) => !!p?.track));
-  // Sprint M5b §3.1 🔴 — ekran paylaşımı sahnesi TÜM diğer düzenlerin ÖNÜNE geçer (aşağıdaki render
-  // ağacında ilk kontrol edilen dal budur — grid/tek-sütun/kamera-odaklı düzenlerin hiçbiri
-  // değiştirilmedi, yalnız önlerine yeni bir öncelik eklendi). `effectiveFocusId` odak state'i henüz
-  // ilk `useEffect` turunu almadan (bir render'lık pencere) de doğru tile'ı seçsin diye burada AYRICA
-  // hesaplanır — state'i beklemek bir kare boş/yanlış tile göstermek anlamına gelirdi.
-  const screenSharerIds = Object.keys(shown.remoteScreenPublications);
-  const effectiveFocusScreenId =
-    focusedScreenUserId && shown.remoteScreenPublications[focusedScreenUserId]
-      ? focusedScreenUserId
-      : screenSharerIds[0];
-  const focusedScreenPublication = effectiveFocusScreenId
-    ? (shown.remoteScreenPublications[effectiveFocusScreenId] ?? null)
-    : null;
-  const anyScreenShare = !!focusedScreenPublication;
+  // C71 — düzen kamera/ekran durumundan TÜRETİLİR, ayrı bir düzen state'i TUTULMAZ. "Kamera açık"
+  // bilgisinin tek kaynağı map'teki kaydın gerçek bir track taşıması (niyet değil, gözlemlenen yayın).
+  const anyCamera =
+    shown.isCameraOn || Object.values(shown.remoteCameraPublications).some((p) => !!p?.track);
+  const anyScreenShare = Object.keys(shown.remoteScreenPublications).length > 0;
+  // C71 (sahip, 2026-11-22) — DM'de (1-1 ve grup) kamera ya da ekran açıkken TEK düzen: sahne + altta
+  // kartlar, dokunulan büyür. Eski 1-1 "tam alan + köşede ben" ve grup DM ızgarası kalktı. Ortam
+  // aramasında sahne yalnız ekran paylaşımında (kameralarda ızgara aynen kalır; orada karta dokunmak
+  // moderasyon panelini açar, "dokununca büyüt" ile çakışırdı).
+  const showStage = anyScreenShare || (!isGuildCall && anyCamera);
+  const stageItems = showStage
+    ? buildStageItems({
+        participants: shown.participants,
+        screenPublications: shown.remoteScreenPublications,
+        cameraPublications: shown.remoteCameraPublications,
+        localCameraPublication: shown.localCameraPublication,
+        // 1-1'de karşı taraf henüz odada değilken ("görüntülü ara"ya bastın, kameran açık) sahnede onun
+        // yeri tutulur, "Çalıyor…" orada görünür (eski tam-alan düzenindeki davranış).
+        peerPlaceholder:
+          callKind === 'dm' && !peerMember
+            ? {
+                member: { userId: peerFallback?.id ?? 'peer', username: peerName, avatarUrl: peerAvatar, isLocal: false },
+                ringing: alone && didInvite,
+                noAnswer: alone && noAnswer,
+              }
+            : null,
+      })
+    : [];
+  const canFocusStageItem = (item: StageItem) => !isGuildCall || item.kind === 'screen';
   // Grup DM'de tek "karşı taraf" yok (N kişi) — başlık `peerName`e (ilk katılan kim ise o) değil,
   // grubun adına bağlanır (`stores/voice.ts` `startOrJoin` `kind==='group'`de `callChannelName`'i
   // guild gibi dolduruyor). DM dalında bu ifade `peerName`e eşit kalır — davranış DEĞİŞMEDİ.
@@ -636,38 +614,50 @@ export default function CallScreen() {
       )}
 
       {/*
-        Sprint M5b §3.1 🔴 — ekran paylaşımı sahnesi diğer TÜM düzenlerin (ızgara/kamera-odaklı/
-        klasik iki-kutucuk) ÖNÜNE geçer: odada en az bir paylaşım varken bu dal çizilir, aşağıdaki
-        `isGridCall`/`anyCameraOn` dalları SATIR SATIR değişmeden yerinde duruyor — yalnız bu yeni
-        kontrolün ARDINDAN sıraya giriyorlar (kimse paylaşmıyorsa bugünkü düzen aynen kalır, §3.1).
+        C71 — sahne diğer düzenlerin ÖNÜNE geçer (koşul `showStage`, yukarıda). Sahne yoksa: ortamda
+        kamera açıkken ızgara, kimsenin kamerası yokken alt alta liste (ortam + grup DM), 1-1 DM'de
+        iki kutucuk (sesli arama düzeni değişmedi).
       */}
-      {anyScreenShare ? (
-        <ScreenShareStage
-          participants={shown.participants}
-          focusedPublication={focusedScreenPublication}
-          screenPublications={shown.remoteScreenPublications}
-          cameraPublications={shown.remoteCameraPublications}
-          localCameraPublication={shown.localCameraPublication}
-          cameraFacing={shown.cameraFacing}
-          speakingUserIds={speakingUserIds}
-          mutedUserIds={mutedUserIds}
-          isMuted={isMuted}
-          fullscreen={screenFullscreen}
-          onToggleFullscreen={() => {
-            resetHideTimer();
-            setScreenFullscreen((v) => !v);
-          }}
-          onSelectFocus={setFocusedScreenUserId}
-          canModerate={canModerate}
-          onModerationTarget={setModerationTarget}
-        />
+      {showStage ? (
+        <View style={styles.stageArea}>
+          <CallStage
+            items={stageItems}
+            cameraFacing={shown.cameraFacing}
+            speakingUserIds={speakingUserIds}
+            mutedUserIds={mutedUserIds}
+            isMuted={isMuted}
+            fullscreen={screenFullscreen}
+            onToggleFullscreen={() => {
+              resetHideTimer();
+              setScreenFullscreen((v) => !v);
+            }}
+            canFocus={canFocusStageItem}
+            canModerate={canModerate}
+            onModerationTarget={setModerationTarget}
+          />
+          {alone && !screenFullscreen && (
+            // Akışta, sahnenin altında: kaplama yapılırsa büyük alandaki ortalanmış avatar+adla
+            // çakışır (PM incelemesi 2026-08-08).
+            <View style={styles.stageAloneNotice} pointerEvents="none">
+              <Text style={styles.aloneTitle}>
+                {callKind === 'dm' ? t('mobile.call.aloneTitle') : t('mobile.voice.guildAloneTitle')}
+              </Text>
+              <Text style={styles.aloneSubtitle}>
+                {callKind === 'dm'
+                  ? t('mobile.call.aloneSubtitle', { name: peerName })
+                  : t('mobile.voice.guildAloneSubtitle')}
+              </Text>
+            </View>
+          )}
+          {!shown.canPublish && <Text style={styles.listenerNotice}>{t('voice.listenerOnly')}</Text>}
+        </View>
       ) : isGridCall ? (
-        anyGroupCameraOn ? (
-          // M4e §3.1/§3.2 → M4f §2 🔴 — grup DM VE guild'de EN AZ BİR kamera açıkken iki sütunlu
+        anyCamera ? (
+          // C71 — artık yalnız ORTAM aramasına ulaşır (grup DM'de kamera açıkken sahne çizilir).
+          // M4e §3.1/§3.2 → M4f §2 🔴 — EN AZ BİR kamera açıkken iki sütunlu
           // ızgara (bakılan şey video aramasında yüz; tek-sütun tam-genişlik kartlar ekranda iki kişi
           // gösterip gerisini kaydırmaya iterdi). `ParticipantTile` yine 'card' varyantı (yeni varyant
-          // eklenmedi, video geldiğinde kendi içinde dikey dikdörtgene döner — bkz. bileşen). Kendi
-          // kutucuğun ızgaranın bir elemanı: 1-1'deki köşe önizlemesi burada YOK (§3.2).
+          // eklenmedi, video geldiğinde kendi içinde dikey dikdörtgene döner — bkz. bileşen).
           <View style={styles.tiles}>
             <ScrollView
               style={styles.listScroll}
@@ -718,7 +708,7 @@ export default function CallScreen() {
           // sırasını korur, mute/konuşma değişince yeniden sıralanmaz) — ayrıca sort gerekmez.
           //
           // 🔴 M4b — bu dal `isGridCall` (`kind!=='dm'`) ile guild VE group tarafından paylaşılıyor.
-          // M4e 🔴 — grup DM'de KİMSENİN kamerası açık değilken de bu dal çizilir (`anyGroupCameraOn`
+          // M4e 🔴 — grup DM'de KİMSENİN kamerası açık değilken de bu dal çizilir (`anyCamera`
           // false), sözleşme §3.1'in "sesli grup araması hiç değişmemeli" şartı budur.
           // "Tek başınasın" metni guild'inkiyle PAYLAŞILIYOR (yeni metin eklenmedi): DM'in
           // `aloneSubtitle`i `{name}` (tek kişi) parametreli, N kişilik bir gruba uymuyordu;
@@ -757,49 +747,6 @@ export default function CallScreen() {
             {!shown.canPublish && <Text style={styles.listenerNotice}>{t('voice.listenerOnly')}</Text>}
           </View>
         )
-      ) : anyCameraOn ? (
-        // M4d §3-R 🔴 — kamera açıkken Discord düzeni: tam alan = karşı taraf, sağ üst köşe = sen
-        // (yalnız SENİN kameran açıkken çizilir). Düzen `anyCameraOn`dan türetiliyor, ayrı bir state
-        // yok — kamera kapanınca bir render sonra aşağıdaki `else` dalına (klasik iki-kutucuk) döner.
-        <View style={styles.focusArea}>
-          <ParticipantTile
-            variant="full"
-            name={peerName}
-            avatarUrl={peerAvatar}
-            speaking={peerMember ? speakingUserIds.has(peerMember.userId) : false}
-            micOff={peerMember ? mutedUserIds.has(peerMember.userId) : false}
-            ringing={alone && didInvite && callKind === 'dm'}
-            noAnswer={alone && noAnswer && callKind === 'dm'}
-            videoPublication={peerCameraPublication}
-          />
-          {shown.isCameraOn && (
-            <View style={styles.selfCorner}>
-              <ParticipantTile
-                variant="corner"
-                name={localMember?.username ?? myUser?.username ?? t('voice.you')}
-                avatarUrl={localMember?.avatarUrl ?? myUser?.avatarUrl ?? null}
-                speaking={localMember ? speakingUserIds.has(localMember.userId) : false}
-                micOff={isMuted}
-                videoPublication={shown.localCameraPublication}
-                mirror={shown.cameraFacing === 'user'}
-              />
-            </View>
-          )}
-          {alone && (
-            // 🔴 PM incelemesi (2026-08-08) — bu blok ÖNCEDEN `absoluteFill` + ortalanmış bir
-            // kaplamaydı ve tam-alan kutusunun ORTALANMIŞ avatar+adıyla üst üste biniyordu. Çakışma
-            // en sık yaşanacak anda çıkıyordu: "görüntülü ara"ya bastın, kameran açık, karşı taraf
-            // henüz katılmadı. Eski iki-kutucuk düzeninde bu yazı akıştaydı (kutucukların altında);
-            // burada da akışa alındı — tam-alan kutusu `flex:1`, yazı altında kendi yüksekliğini alır.
-            <View style={styles.focusAloneNotice} pointerEvents="none">
-              <Text style={styles.aloneTitle}>{t('mobile.call.aloneTitle')}</Text>
-              <Text style={styles.aloneSubtitle}>{t('mobile.call.aloneSubtitle', { name: peerName })}</Text>
-            </View>
-          )}
-          {!shown.canPublish && (
-            <Text style={[styles.listenerNotice, styles.focusListenerNotice]}>{t('voice.listenerOnly')}</Text>
-          )}
-        </View>
       ) : (
         // Sözleşme §3/M4a — kimsenin kamerası açık değilken bugünkü iki-kutucuk düzeni AYNEN
         // (sesli arama regresyonu yasak, §3-R).
@@ -993,32 +940,17 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingHorizontal: theme.layout.panelGap * 2,
   },
-  // M4d §3-R — kamera açıkken tam-alan düzen. `tiles`ten farkı: tek büyük kutu (video/avatar
-  // uçtan uca), köşe kutusunun mutlak konumlanabilmesi için `position:'relative'`.
-  focusArea: {
+  // C71 — sahne + altındaki "tek başınasın"/dinleyici bildirimleri. Bildirimler akışta (sahnenin
+  // altında); kaplama yapılırsa büyük alandaki ortalanmış avatar+adla çakışır.
+  stageArea: {
     flex: 1,
-    position: 'relative',
-    paddingHorizontal: theme.layout.panelGap,
   },
-  selfCorner: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-  },
-  // "Tek başınasın" bildirimi `tiles` düzeninde akışın bir parçasıydı (kutucukların altında); tam
-  // alan düzeninde de akışta kalıyor — kaplama yapılırsa tam-alan kutusunun ortalanmış avatar+adıyla
-  // çakışıyor (PM incelemesi 2026-08-08, yukarıdaki yorum).
-  // `pointerEvents:'none'` — üst Pressable'ın kontrol çubuğu gizleme/gösterme dokunuşunu YUTMASIN.
-  focusAloneNotice: {
+  // `pointerEvents:'none'` (render'da) — üst Pressable'ın kontrol çubuğu dokunuşunu YUTMASIN.
+  stageAloneNotice: {
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 32,
     paddingTop: 16,
-  },
-  focusListenerNotice: {
-    position: 'absolute',
-    bottom: 16,
-    alignSelf: 'center',
   },
   // §14.2 — guild/grup katılımcı listesi: tek sütun, tam genişlik, alt alta. `listScroll` `flex:1`
   // ile `tiles`in tüm yüksekliğini kaplar (sınırlı bir yükseklik olmadan `ScrollView` kaydırmaz);
