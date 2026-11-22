@@ -26,6 +26,8 @@ interface VoicePresenceState {
   startedAtFor: (channelId: string) => number | null;
   addParticipant: (channelId: string, p: VoiceParticipantDto) => void;
   removeParticipant: (channelId: string, userId: string) => void;
+  /** Kanalın arama durumunu sıfırlar (gruptan ayrılınca/çıkarılınca güncelleme gelmez, eski görüntü kalmasın). */
+  clearChannel: (channelId: string) => void;
 }
 
 export const useVoicePresenceStore = create<VoicePresenceState>((set, get) => ({
@@ -84,5 +86,11 @@ export const useVoicePresenceStore = create<VoicePresenceState>((set, get) => ({
         startedAtByChannel: { ...s.startedAtByChannel, [channelId]: next.length === 0 ? null : s.startedAtByChannel[channelId] },
       };
     });
+  },
+  clearChannel(channelId) {
+    set((s) => ({
+      byChannel: { ...s.byChannel, [channelId]: [] },
+      startedAtByChannel: { ...s.startedAtByChannel, [channelId]: null },
+    }));
   },
 }));

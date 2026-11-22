@@ -342,6 +342,8 @@ function ensureSocket(): Socket {
   // C62 — gruptan ayrıldım/çıkarıldım (yalnız benim soketlerime): kanal eski grup olur, açık ekran kilitlenir.
   socket.on('dm.group_departed', (data: { channelId: string; reason: 'LEFT' | 'REMOVED'; leftAt: string }) => {
     useDmStore.getState().applyGroupDeparted(data);
+    // Sunucu bizi o kanalın arama odasından da çıkardı; bundan sonra güncelleme gelmez, eski simge/sayı kalmasın.
+    useVoicePresenceStore.getState().clearChannel(data.channelId);
   });
 
   // C64 - grup DM uyelik olayi (ekleme/ayrilma/cikarma): satir akisa eklenir, uye listesi aninda guncellenir.

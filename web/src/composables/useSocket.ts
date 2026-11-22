@@ -348,6 +348,8 @@ export function useSocket() {
       'dm.group_departed',
       (data: { channelId: string; reason: 'LEFT' | 'REMOVED'; leftAt: string }) => {
         void dmStore.applyGroupDeparted(data).catch(() => {})
+        // Sunucu bizi o kanalın arama odasından da çıkardı; bundan sonra güncelleme gelmez, eski simge/sayı kalmasın.
+        voiceStore.clearChannelPresence(data.channelId)
       },
     )
 

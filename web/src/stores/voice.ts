@@ -189,6 +189,12 @@ export const useVoiceStore = defineStore('voice', () => {
     )
   }
 
+  /** Kanalın arama durumunu sıfırlar (gruptan ayrılınca/çıkarılınca güncelleme gelmez, eski görüntü kalmasın). */
+  function clearChannelPresence(channelId: string) {
+    participantsByChannel.value[channelId] = []
+    channelStartedAt.value[channelId] = null
+  }
+
   /** E8 §4.2 — kanalın MLS grubu değişti (commit/cihaz/Welcome): o kanalda şifreli arama varsa anahtarı tazele. */
   function refreshCallKey(channelId: string) {
     if (callCrypto && callCryptoChannelId === channelId) void callCrypto.refresh()
@@ -966,6 +972,7 @@ export const useVoiceStore = defineStore('voice', () => {
     callEncrypted,
     callDecryptFailing,
     refreshCallKey,
+    clearChannelPresence,
     participantsByChannel,
     connectedChannelId,
     connecting,
