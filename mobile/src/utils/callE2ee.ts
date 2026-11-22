@@ -67,13 +67,23 @@ class CallE2EEManager extends RNE2EEManager {
   private readonly provider: RNKeyProvider;
   /** Gönderici oluştu ama yayın olayı henüz gelmedi: iz → şifreleyici. */
   private readonly early = new Map<Track, RTCFrameCryptor>();
+  /** Anahtar yenilemede odadaki kimlikler için (setup'ta kurulur). */
+  private callRoom: Room | null = null;
 
   constructor(provider: RNKeyProvider) {
     super(provider);
     this.provider = provider;
   }
 
+  /** Odadaki kimlikler: kendimiz + uzak katılımcılar (anahtar yenilemede her birinin yuvası yazılır). */
+  identities(): string[] {
+    const room = this.callRoom;
+    if (!room) return [];
+    return [room.localParticipant.identity, ...Array.from(room.remoteParticipants.keys())].filter(Boolean);
+  }
+
   override setup(room: Room): void {
+    this.callRoom = room;
     // Sıra önemli: bu dinleyiciler kütüphanenin kendi `LocalTrackPublished` dinleyicisinden ÖNCE kayıtlı olmalı.
     room.localParticipant
       .on(ParticipantEvent.LocalSenderCreated, (sender, track) => {
@@ -147,15 +157,24 @@ export async function prepareCallCrypto(channelId: string, serverEpoch: number):
 
   // Yenilemeler sıraya girer: iki olay üst üste gelse de yuvaya eski anahtar sonradan yazılmaz.
   let queue: Promise<void> = Promise.resolve();
+  const manager = new CallE2EEManager(provider);
+  // 🔴 §9 madde 6 bulgusu (2026-11-22): native anahtar sağlayıcı paylaşılan anahtarı her katılımcı için ilk
+  // kullanımda KOPYALAYIP saklıyor; sonraki `setSharedKey` yalnız ortak anahtarı değiştiriyor, kopyalar eskide
+  // kalıyordu (epoch değişince telefon eski anahtarla şifreleyip çözmeye devam etti, ses kesildi). Ortak anahtarın
+  // yanında odadaki her kimliğin yuvası da native `setKey` ile yazılır. RNKeyProvider.setKey paylaşılan modda
+  // bunu ortak anahtara yönlendirdiği için native sağlayıcı doğrudan çağrılır. Sonradan katılan, güncel ortak
+  // anahtarın kopyasını alır.
   const refreshOnce = async () => {
     const next = await callKeyFor(channelId, epoch);
     if (next.epoch === epoch) return;
-    await provider.setSharedKey(toB64(next.key), 0);
+    const key = toB64(next.key);
+    await provider.setSharedKey(key, 0);
+    await Promise.all(manager.identities().map((id) => provider.rtcKeyProvider.setKey(id, key, 0)));
     epoch = next.epoch;
   };
 
   return {
-    roomOptions: { e2ee: { e2eeManager: new CallE2EEManager(provider) } },
+    roomOptions: { e2ee: { e2eeManager: manager } },
     refresh: () => {
       // Çıkarıldıysak (NOT_MEMBER) sunucu zaten odadan atar; burada yalnız loglanır, anahtar/içerik yazılmaz.
       queue = queue.then(refreshOnce).catch((e: unknown) => {
