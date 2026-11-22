@@ -177,3 +177,13 @@ Her adım: `tsc`, ilgili testler, web için `vue-tsc -b` (6 bilinen hata dışı
     kesildi. Düzeltme: olay kanalın şimdiki üyelerinin kişisel odalarına da gider (`59a2e52a`, madde 5).
   - Gruptan çıkarılanın ekranında arama simgesi kalıyordu (C62 kusuru, E8 dışı; `ec2b0939`).
 - Açık: telefonda çözme hatası JS'e ulaşmıyor (adım 0 B2 düzeltmesi cihazda çalışmadı) → PLAN D112.
+
+### Canlı ilk aşama (2026-11-22)
+
+- `E2EE_CALLS=true` + `E2EE_CALLS_USER_IDS` (yalnız sahibin iki hesabı). Mesaj şifrelemesi herkese açık olduğu için
+  arama ayrı izin listesiyle başladı (`a1823d66`); liste boşaltılınca herkese açılır.
+- Canlıda geçti: madde 7 (Play vc81 bağlanamadı, güncelleme mesajı), web ↔ telefon vc83 şifreli arama,
+  madde 12 (uygulama kapalıyken bildirimden kabul, şifreli bağlandı).
+- Bulgu (E8 dışı): MIUI'de yeni kurulumda Otomatik başlatma kapalı; kapalı uygulamaya arama push'u 30 sn
+  ömrünü aşacak kadar gecikip düşüyor. İzin açılınca çalıştı.
+- Kalan: AAB 83 Play'de yayılsın → `E2EE_CALLS_USER_IDS` boşaltılır (herkese açılış).
