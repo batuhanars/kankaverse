@@ -36,6 +36,20 @@ export class E2eeFlagService {
     return this.enabled && this.config.get<boolean>('e2eeCalls') === true;
   }
 
+  /** E8 ilk aşama: arama şifrelemesi izin listesi dolu mu (doluysa kanal üyeleri ayrıca denetlenir). */
+  get callsRestricted(): boolean {
+    return (this.config.get<string[]>('e2eeCallUserIds') ?? []).length > 0;
+  }
+
+  /**
+   * E8 ilk aşama: bu üyelerle arama şifrelenebilir mi. Liste boş = evet; doluysa TÜM üyeler listede olmalı.
+   * Karar arayana değil kanala bağlı: aynı aramadaki herkes aynı sonucu alır (biri şifreli biri şifresiz olamaz).
+   */
+  callsAllowedFor(memberIds: string[]): boolean {
+    const allow = this.config.get<string[]>('e2eeCallUserIds') ?? [];
+    return allow.length === 0 || memberIds.every((id) => allow.includes(id));
+  }
+
   isEligible(userId: string): boolean {
     if (!this.enabled) return false;
     const allow = this.config.get<string[]>('e2eeUserIds') ?? [];

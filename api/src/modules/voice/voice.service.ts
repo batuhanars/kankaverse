@@ -274,15 +274,28 @@ export class VoiceService {
   /**
    * E8 §3.2 (R7) — arama şifreli mi. Şifreli = bayrak açık + DM/grup DM + kanalda MLS grubu var.
    * Şifreliyse istemcinin `callE2ee` bildirmesi ŞART; yoksa 426 (eski sürüm). Dönüş: grubun sunucuda kabul
-   * edilmiş epoch'u (şifreli) ya da null (şifresiz: ortam kanalı, bayrak kapalı, grubu olmayan DM).
+   * edilmiş epoch'u (şifreli) ya da null (şifresiz: ortam kanalı, bayrak kapalı, grubu olmayan DM, izin listesi
+   * doluyken listede olmayan üyesi olan kanal).
    */
-  private async resolveCallE2ee(type: string, channelId: string, callE2ee: boolean): Promise<number | null> {
+  private async resolveCallE2ee(
+    type: string,
+    channelId: string,
+    callE2ee: boolean,
+  ): Promise<number | null> {
     if (!this.e2eeFlag.calls || (type !== 'DM' && type !== 'GROUP_DM')) return null;
     const group = await this.prisma.e2eeGroup.findUnique({
       where: { channelId },
       select: { epoch: true },
     });
     if (!group) return null;
+    // İlk aşama izin listesi (E2EE_CALLS_USER_IDS): listede olmayan üyesi olan kanalda arama bugünkü gibi şifresiz.
+    if (this.e2eeFlag.callsRestricted) {
+      const members = await this.prisma.channelMember.findMany({
+        where: { channelId },
+        select: { userId: true },
+      });
+      if (!this.e2eeFlag.callsAllowedFor(members.map((m) => m.userId))) return null;
+    }
     if (!callE2ee) {
       throw new HttpException(
         {

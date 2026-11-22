@@ -179,6 +179,12 @@ export default () => {
     e2eeTransfer: process.env.E2EE_TRANSFER === 'true',
     // E8 — DM aramalarında uçtan uca şifreleme. Varsayılan KAPALI; kapatmak = geri alma (yeni aramalar şifresiz).
     e2eeCalls: process.env.E2EE_CALLS === 'true',
+    // E8 ilk aşama: dolu = arama yalnız kanalın TÜM üyeleri listedeyse şifreli; boş = şifreli grubu olan her DM.
+    // E2EE_USER_IDS'ten ayrı: mesaj şifrelemesi herkese açıkken aramayı önce dar bir grupta sınamak için.
+    e2eeCallUserIds: (process.env.E2EE_CALLS_USER_IDS ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0),
     e2eeUserIds: (process.env.E2EE_USER_IDS ?? '')
       .split(',')
       .map((id) => id.trim())

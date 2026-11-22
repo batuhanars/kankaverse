@@ -375,6 +375,79 @@ describe('VoiceService.mintToken — E8 şifreli arama', () => {
     expect(prismaMock.e2eeGroup.findUnique).not.toHaveBeenCalled();
   });
 
+  describe('ilk aşama izin listesi (E2EE_CALLS_USER_IDS)', () => {
+    const listed = (ids: string[]) => e2eeConfig({ e2eeCallUserIds: ids });
+
+    it('kanalın tüm üyeleri listede → şifreli', async () => {
+      dmChannel();
+      prismaMock.e2eeGroup.findUnique.mockResolvedValue({ epoch: 7 });
+      prismaMock.channelMember.findMany.mockResolvedValue([
+        { userId: USER_ID },
+        { userId: 'other-1' },
+      ]);
+
+      const res = await makeService(listed([USER_ID, 'other-1'])).mintToken(
+        USER_ID,
+        CHANNEL_ID,
+        true,
+      );
+
+      expect(prismaMock.channelMember.findMany).toHaveBeenCalledWith({
+        where: { channelId: CHANNEL_ID },
+        select: { userId: true },
+      });
+      expect(res.e2ee).toBe(true);
+    });
+
+    it('bir üye listede değil → şifresiz, yetenek bildirmeyen eski istemci de girer (426 yok)', async () => {
+      dmChannel();
+      prismaMock.e2eeGroup.findUnique.mockResolvedValue({ epoch: 7 });
+      prismaMock.channelMember.findMany.mockResolvedValue([
+        { userId: USER_ID },
+        { userId: 'other-1' },
+      ]);
+
+      const res = await makeService(listed([USER_ID])).mintToken(USER_ID, CHANNEL_ID);
+
+      expect(res.e2ee).toBe(false);
+      expect(res.e2eeEpoch).toBeNull();
+    });
+
+    it('karar arayana değil kanala bağlı: listede olmayan üye de şifreli aramaya şifreli girer', async () => {
+      dmChannel();
+      prismaMock.e2eeGroup.findUnique.mockResolvedValue({ epoch: 7 });
+      prismaMock.channelMember.findMany.mockResolvedValue([
+        { userId: USER_ID },
+        { userId: 'other-1' },
+      ]);
+
+      // Liste ikisini de içeriyor; isteyen USER_ID. Aynı kanal için other-1 de aynı sonucu alır.
+      const a = await makeService(listed([USER_ID, 'other-1'])).mintToken(
+        USER_ID,
+        CHANNEL_ID,
+        true,
+      );
+      const b = await makeService(listed([USER_ID, 'other-1'])).mintToken(
+        'other-1',
+        CHANNEL_ID,
+        true,
+      );
+
+      expect(a.e2ee).toBe(true);
+      expect(b.e2ee).toBe(true);
+    });
+
+    it('liste boş → üyeler sorgulanmaz (bugünkü davranış)', async () => {
+      dmChannel();
+      prismaMock.e2eeGroup.findUnique.mockResolvedValue({ epoch: 7 });
+
+      const res = await makeService(e2eeConfig()).mintToken(USER_ID, CHANNEL_ID, true);
+
+      expect(res.e2ee).toBe(true);
+      expect(prismaMock.channelMember.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   it.each([
     ['E2EE_CALLS kapalı', { e2eeCalls: false }],
     ['E2EE_ENABLED kapalı', { e2eeEnabled: false }],
@@ -1141,7 +1214,11 @@ describe('VoiceService.unmuteParticipant — R17 §2 canPublishSources', () => {
   // (resolveCanPublishSources) çağırıyor — aynı kanal/bayrak koşullarında ikisi de AYNI kaynak
   // setini üretmeli. Bu test gelecekte biri diğerinden kopyalanıp bağımsızlaşırsa (drift) kırılır.
   it('regresyon — mintToken ve unmuteParticipant aynı mediaEnabled=true kanalda AYNI canPublishSources üretir', async () => {
-    const channel = gvChannel({ ageGated: false, mediaEnabled: true, guild: { adultsOnly: false } });
+    const channel = gvChannel({
+      ageGated: false,
+      mediaEnabled: true,
+      guild: { adultsOnly: false },
+    });
     prismaMock.channel.findFirst.mockResolvedValue(channel);
     membershipMock.requireChannelAccess.mockResolvedValue(channel);
     prismaMock.guildMember.findUnique.mockResolvedValue(settledMember());
@@ -1621,12 +1698,7 @@ describe('VoiceService.stopBroadcast (R11B B2, R7)', () => {
     expect(mockMutePublishedTrack).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-cam', true);
     expect(mockMutePublishedTrack).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-scr', true);
     // Kritik: mikrofon track'i force-mute edilmez (ses kalır — sustur'dan fark)
-    expect(mockMutePublishedTrack).not.toHaveBeenCalledWith(
-      CHANNEL_ID,
-      TARGET_ID,
-      'trk-mic',
-      true,
-    );
+    expect(mockMutePublishedTrack).not.toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-mic', true);
     expect(mockMutePublishedTrack).toHaveBeenCalledTimes(2);
   });
 
@@ -1763,12 +1835,7 @@ describe('VoiceService.refreshChannelPermissions (§4 D54)', () => {
     );
     // asıl kazanç: izin güncellemesi tek başına canlı kamera track'ini kesmez — zorla kes
     expect(mockMutePublishedTrack).toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-cam', true);
-    expect(mockMutePublishedTrack).not.toHaveBeenCalledWith(
-      CHANNEL_ID,
-      TARGET_ID,
-      'trk-mic',
-      true,
-    );
+    expect(mockMutePublishedTrack).not.toHaveBeenCalledWith(CHANNEL_ID, TARGET_ID, 'trk-mic', true);
   });
 
   it('zaten sunucu-susturulmuş katılımcı → yalnız canPublish:false yeniden yazılır, track’lerine dokunulmaz', async () => {
@@ -1921,9 +1988,7 @@ describe('VoiceService.listParticipants — R16 §2 mutedUserIds', () => {
 
     expect(res.mutedUserIds).toEqual([TARGET_ID]);
     // var olan alanların şekli korunuyor
-    expect(res.participants).toEqual([
-      { userId: TARGET_ID, username: 'hedef', avatarUrl: null },
-    ]);
+    expect(res.participants).toEqual([{ userId: TARGET_ID, username: 'hedef', avatarUrl: null }]);
     expect(prismaMock.voiceMute.findMany).toHaveBeenCalledWith({
       where: { channelId: CHANNEL_ID },
       select: { userId: true },
