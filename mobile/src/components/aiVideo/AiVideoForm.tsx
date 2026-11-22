@@ -7,13 +7,13 @@ import { AiVideoPrompt } from './AiVideoPrompt';
 import { Segmented } from './Segmented';
 import type { useAiVideo } from './useAiVideo';
 
-/** Birden çok model açıksa seçici (etiket + sesli/sessiz); tek modelde bilgi gösterilmez (C42 §2). */
+/** Birden çok model açıksa seçici (etiket; sessiz modele "sessiz" eki); tek modelde bilgi gösterilmez (C42 §2). */
 function ModelRow({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
   const { form } = ai;
   const models = form.options?.models ?? [];
   if (models.length < 2) return null;
   const audioLabel = (m: { audio: string; label: string }) =>
-    t(m.audio === 'none' ? 'aiVideo.audioNone' : 'aiVideo.audioOn', { label: m.label });
+    m.audio === 'none' ? t('aiVideo.audioNone', { label: m.label }) : m.label;
   return (
     <Segmented
       label={t('aiVideo.modelLabel')}
