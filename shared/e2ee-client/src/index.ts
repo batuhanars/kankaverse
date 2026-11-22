@@ -17,6 +17,7 @@ export { serialLock } from './lock'
 export {
   BackupLockedError,
   BackupNotConfiguredError,
+  CallKeyUnavailableError,
   TransferPayloadError,
   TransferSessionError,
   TransferTooLargeError,

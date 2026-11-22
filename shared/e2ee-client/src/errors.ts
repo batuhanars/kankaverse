@@ -3,6 +3,21 @@ export function e2eeErrorCode(e: unknown): string | undefined {
   return (e as { response?: { data?: { error?: string } } }).response?.data?.error
 }
 
+/**
+ * E8: bu cihaz arama anahtarını türetemiyor; arama şifresiz bağlanmaz, kullanıcıya mesaj gösterilir.
+ * NOT_MEMBER = cihaz kanalın grubunda değil (henüz eklenmedi ya da çıkarıldı). STALE = eşitlemeden sonra
+ * hâlâ sunucunun epoch'unun gerisinde (commit henüz gelmedi), birkaç saniye sonra tekrar denenir.
+ */
+export class CallKeyUnavailableError extends Error {
+  readonly reason: 'NOT_MEMBER' | 'STALE'
+
+  constructor(reason: 'NOT_MEMBER' | 'STALE') {
+    super(`Arama anahtarı yok: ${reason}`)
+    this.name = 'CallKeyUnavailableError'
+    this.reason = reason
+  }
+}
+
 /** Yedek işlemi için BMK bu cihazda açık değil (önce `unlockBackup`/`setupBackup`). */
 export class BackupLockedError extends Error {
   constructor() {
