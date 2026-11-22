@@ -28,6 +28,14 @@ export class E2eeFlagService {
     return this.config.get<boolean>('e2eeTransfer') === true;
   }
 
+  /**
+   * E8: şifreli kanallarda (E2eeGroup olan DM/grup DM) arama da şifreli mi. Varsayılan false.
+   * Açıkken yeteneğini bildirmeyen istemci o aramaya giremez (426), şifresize düşme yok.
+   */
+  get calls(): boolean {
+    return this.enabled && this.config.get<boolean>('e2eeCalls') === true;
+  }
+
   isEligible(userId: string): boolean {
     if (!this.enabled) return false;
     const allow = this.config.get<string[]>('e2eeUserIds') ?? [];

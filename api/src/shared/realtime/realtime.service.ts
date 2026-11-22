@@ -20,16 +20,25 @@ export class RealtimeService {
     }
   }
 
+  // Kanal odasına VE verilen kullanıcıların kişisel odalarına TEK yayın: iki odada birden olan soket olayı
+  // bir kez alır (socket.io oda birleşimi). E8: commit, sohbet ekranı kapalı cihaza da ulaşmalı.
+  emitToRoomAndUsers(channelId: string, userIds: string[], event: string, payload: unknown) {
+    this.server
+      ?.to([`room:${channelId}`, ...userIds.map((id) => `user:${id}`)])
+      .emit(event, payload);
+  }
+
   // Kanal room'una yay (room:<channelId>) — mesaj/typing + bağlı oda olayları için.
   emitToRoom(channelId: string, event: string, payload: unknown) {
     this.server?.to(`room:${channelId}`).emit(event, payload);
   }
 
-  // Kullanıcının TÜM soketlerini kanal odasından çıkarır (room:<channelId>). Gruptan çıkarılan/ayrılan
-  // üye bir sonraki `message.created` yayınını (şifreli yük dahil) almasın diye. `in().socketsLeave()`
-  // Redis adaptörüyle çok-instance'ta da çalışır. Yeniden `channel:join` üyelik kapısından geçer.
+  // Kullanıcının TÜM soketlerini kanal odasından (room:<channelId>) VE ses presence odasından
+  // (voice:<channelId>) çıkarır. Gruptan çıkarılan/ayrılan üye bir sonraki `message.created` yayınını
+  // (şifreli yük dahil) ve ses katılım/presence olaylarını (D102) almasın diye. `in().socketsLeave()`
+  // Redis adaptörüyle çok-instance'ta da çalışır. Yeniden `channel:join` / `voice:subscribe` üyelik kapısından geçer.
   removeUserFromRoom(userId: string, channelId: string) {
-    this.server?.in(`user:${userId}`).socketsLeave(`room:${channelId}`);
+    this.server?.in(`user:${userId}`).socketsLeave([`room:${channelId}`, `voice:${channelId}`]);
   }
 
   // Ses presence room'una yay (voice:<channelId>) — kanala bağlı olmasa da sidebar'da

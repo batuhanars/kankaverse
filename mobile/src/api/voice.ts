@@ -11,6 +11,8 @@ export interface VoiceTokenDto {
   bitrate?: number;
   canPublishCamera?: boolean;
   canPublishScreen?: boolean;
+  e2ee?: boolean; // E8 — arama uçtan uca şifreli (eski sunucu göndermez = şifresiz)
+  e2eeEpoch?: number | null; // E8 — sunucunun kabul ettiği MLS epoch'u
 }
 
 export interface VoiceParticipantDto {
@@ -29,8 +31,9 @@ export interface VoiceParticipantsDto {
 }
 
 export const voiceApi = {
-  async getToken(channelId: string): Promise<VoiceTokenDto> {
-    const res = await http.post<VoiceTokenDto>(`/channels/${channelId}/voice/token`);
+  // E8 §3.1 — `callE2ee`: istemci şifreli aramayı yapabilir (ortam kanalında sunucu yok sayar)
+  async getToken(channelId: string, body?: { callE2ee: boolean }): Promise<VoiceTokenDto> {
+    const res = await http.post<VoiceTokenDto>(`/channels/${channelId}/voice/token`, body);
     return res.data;
   },
   async getParticipants(channelId: string): Promise<VoiceParticipantsDto> {

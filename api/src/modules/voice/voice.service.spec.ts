@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { VoiceService } from './voice.service';
+import { E2eeFlagService } from '../e2ee/e2ee-flag.service';
 
 // ── LiveKit SDK mock ───────────────────────────────────────────────────────────
 // jest.mock fabrikası yalnız `mock` önekli dış değişkene erişebilir.
@@ -60,6 +61,7 @@ const prismaMock = {
   },
   auditLog: { create: jest.fn() },
   report: { count: jest.fn() },
+  e2eeGroup: { findUnique: jest.fn() },
 };
 
 const membershipMock = { requireChannelAccess: jest.fn(), requireNoDmBlock: jest.fn() };
@@ -93,6 +95,8 @@ function makeService(config = makeConfig()) {
     permissionsMock as any,
     realtimeMock as any,
     dmPermissionMock as any,
+    // Gerçek servis: yalnız config okur (E8 bayrağı `e2eeEnabled` + `e2eeCalls`).
+    new E2eeFlagService(config as any),
   );
 }
 
@@ -140,6 +144,8 @@ beforeEach(() => {
   // Zorla-susturma testleri override eder (tracks dolu döner).
   mockGetParticipant.mockResolvedValue({ tracks: [] });
   mockMutePublishedTrack.mockResolvedValue({});
+  // E8: varsayılan kanalın MLS grubu yok (şifreli arama testleri override eder).
+  prismaMock.e2eeGroup.findUnique.mockResolvedValue(null);
 });
 
 // ── VOICE_DISABLED ───────────────────────────────────────────────────────────
@@ -192,7 +198,7 @@ describe('VoiceService.mintToken', () => {
     const svc = makeService(); // cameraEnabled/screenEnabled=false (BUILD-DARK varsayılan)
     const res = await svc.mintToken(USER_ID, CHANNEL_ID);
 
-    // Sprint C4: canPublishCamera/Screen eklendi (bayraklar false → false)
+    // Sprint C4: canPublishCamera/Screen eklendi (bayraklar false → false). E8 §3.3: ortam kanalı şifresiz.
     expect(res).toEqual({
       token: 'jwt-token',
       url: 'wss://test.livekit.cloud',
@@ -200,6 +206,8 @@ describe('VoiceService.mintToken', () => {
       bitrate: 64,
       canPublishCamera: false,
       canPublishScreen: false,
+      e2ee: false,
+      e2eeEpoch: null,
     });
     expect(mockAddGrant).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -296,6 +304,89 @@ describe('VoiceService.mintToken — DM/grup', () => {
 
     expect(dmPermissionMock.canDm).not.toHaveBeenCalled();
     expect(res.canPublish).toBe(true);
+  });
+});
+
+// ── E8 §3 — DM aramalarında uçtan uca şifreleme kapısı (R7) ───────────────────
+describe('VoiceService.mintToken — E8 şifreli arama', () => {
+  const e2eeConfig = (overrides: Record<string, unknown> = {}) =>
+    makeConfig({ e2eeEnabled: true, e2eeCalls: true, ...overrides });
+
+  function dmChannel(type: 'DM' | 'GROUP_DM' = 'DM') {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel({ type, guildId: null }));
+    membershipMock.requireNoDmBlock.mockResolvedValue(undefined);
+    prismaMock.channelMember.findFirst.mockResolvedValue({ userId: 'other-1' });
+    dmPermissionMock.canDm.mockResolvedValue({ allowed: true });
+  }
+
+  it.each(['DM', 'GROUP_DM'] as const)(
+    '%s + grup var + istemci yetenek bildirmedi → 426, token/presence/VoiceSession YOK',
+    async (type) => {
+      dmChannel(type);
+      prismaMock.e2eeGroup.findUnique.mockResolvedValue({ epoch: 7 });
+
+      const svc = makeService(e2eeConfig());
+      await expect(svc.mintToken(USER_ID, CHANNEL_ID)).rejects.toMatchObject({
+        status: 426,
+        response: { error: 'CALL_E2EE_UPDATE_REQUIRED' },
+      });
+      expect(mockToJwt).not.toHaveBeenCalled();
+      expect(realtimeMock.emitToRoom).not.toHaveBeenCalled();
+      expect(realtimeMock.emitToVoicePresence).not.toHaveBeenCalled();
+      expect(prismaMock.voiceSession.findFirst).not.toHaveBeenCalled();
+      expect(prismaMock.voiceSession.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it("grup var + callE2ee=true → e2ee=true, e2eeEpoch sunucunun epoch'u", async () => {
+    dmChannel();
+    prismaMock.e2eeGroup.findUnique.mockResolvedValue({ epoch: 7 });
+
+    const res = await makeService(e2eeConfig()).mintToken(USER_ID, CHANNEL_ID, true);
+
+    expect(prismaMock.e2eeGroup.findUnique).toHaveBeenCalledWith({
+      where: { channelId: CHANNEL_ID },
+      select: { epoch: true },
+    });
+    expect(res.e2ee).toBe(true);
+    expect(res.e2eeEpoch).toBe(7);
+    expect(res.token).toBe('jwt-token');
+  });
+
+  it("DM'in MLS grubu yok → şifresiz (e2ee=false), yetenek bildirmeyen eski istemci de girer", async () => {
+    dmChannel();
+
+    const res = await makeService(e2eeConfig()).mintToken(USER_ID, CHANNEL_ID);
+
+    expect(res.e2ee).toBe(false);
+    expect(res.e2eeEpoch).toBeNull();
+  });
+
+  it('ortam ses kanalı → her zaman şifresiz, grup sorgulanmaz', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(voiceChannel());
+    prismaMock.guildMember.findUnique.mockResolvedValue({
+      joinedAt: new Date(Date.now() - 48 * 3600 * 1000),
+      role: 'MEMBER',
+    });
+
+    const res = await makeService(e2eeConfig()).mintToken(USER_ID, CHANNEL_ID, true);
+
+    expect(res.e2ee).toBe(false);
+    expect(prismaMock.e2eeGroup.findUnique).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['E2EE_CALLS kapalı', { e2eeCalls: false }],
+    ['E2EE_ENABLED kapalı', { e2eeEnabled: false }],
+  ])('%s → bugünkü gibi şifresiz, grup olsa da 426 yok (geri alma yolu)', async (_n, overrides) => {
+    dmChannel();
+    prismaMock.e2eeGroup.findUnique.mockResolvedValue({ epoch: 7 });
+
+    const res = await makeService(e2eeConfig(overrides)).mintToken(USER_ID, CHANNEL_ID);
+
+    expect(res.e2ee).toBe(false);
+    expect(res.e2eeEpoch).toBeNull();
+    expect(prismaMock.e2eeGroup.findUnique).not.toHaveBeenCalled();
   });
 });
 

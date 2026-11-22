@@ -17,6 +17,7 @@ import { useDmStore } from '@/stores/dm'
 import { useAuthStore } from '@/stores/auth'
 import VoiceControlBar from '@/components/shared/VoiceControlBar.vue'
 import VoiceTile from '@/components/shared/VoiceTile.vue'
+import E2eeLockIcon from '@/components/shared/E2eeLockIcon.vue'
 
 const props = defineProps<{ channelId: string }>()
 const { t } = useI18n()
@@ -204,7 +205,23 @@ async function toggleFullscreen() {
         {{ t('voice.connected') }}
       </span>
       <span class="text-[12px]" style="color: var(--kv-text-muted);">· {{ members.length }}</span>
+      <!-- E8 §6: yalnız şifreli aramada; ortam kanalında yok -->
+      <span
+        v-if="voiceStore.callEncrypted"
+        class="ml-auto inline-flex items-center gap-1 text-[11px]"
+        style="color: var(--kv-text-muted);"
+      >
+        <E2eeLockIcon />{{ t('call.e2ee.badge') }}
+      </span>
     </div>
+    <p
+      v-if="voiceStore.callDecryptFailing"
+      class="px-4 pt-1 text-[12px]"
+      style="color: var(--kv-danger);"
+      role="alert"
+    >
+      {{ t('call.e2ee.decryptFailing') }}
+    </p>
 
     <!-- Orta: video varsa sahne (ortada, dar) + altta şerit · yoksa kompakt avatar şeridi -->
     <div class="px-4 pt-3 overflow-hidden" :class="hasVideo ? 'kv-dm-voice-stage' : 'kv-dm-voice-avatars'">

@@ -66,6 +66,8 @@ export default function CallScreen() {
   const cameraStoppedNotice = useVoiceStore((s) => s.cameraStoppedNotice);
   const callKind = useVoiceStore((s) => s.callKind);
   const callChannelName = useVoiceStore((s) => s.callChannelName);
+  const callEncrypted = useVoiceStore((s) => s.callEncrypted);
+  const callDecryptFailing = useVoiceStore((s) => s.callDecryptFailing);
   const callGuildName = useVoiceStore((s) => s.callGuildName);
   // Sprint M5f §4 🔴 — giden arama zili. Koşul aşağıdaki `ringing={alone && didInvite &&
   // callKind === 'dm'}` prop'larıyla (§4 kontratı: "İKİNCİ bir doğruluk kaynağı üretme, o koşulu
@@ -576,6 +578,18 @@ export default function CallScreen() {
                 {nonGuildTitle}
               </Text>
               <Text style={styles.duration}>{duration}</Text>
+              {/* E8 §6 — yalnız şifreli DM/grup aramasında (ortam dalı ayrı, orada hiç yok). */}
+              {callEncrypted && (
+                <View style={styles.e2eeBadge}>
+                  <Ionicons name="lock-closed" size={11} color={theme.colors.textMuted} />
+                  <Text style={styles.e2eeBadgeText}>{t('call.e2ee.badge')}</Text>
+                </View>
+              )}
+              {callDecryptFailing && (
+                <Text style={styles.e2eeFailing} accessibilityRole="alert">
+                  {t('call.e2ee.decryptFailing')}
+                </Text>
+              )}
             </Pressable>
           )}
           {/* Sprint M5a §2 — hoparlör ikonu yerine üç nokta: çıkış seçimi artık panelin bir satırı
@@ -926,6 +940,23 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     fontSize: theme.fontSize.sm,
     marginTop: 2,
+  },
+  // E8 §6 — kilit + "Uçtan uca şifreli" (süre satırının altında, sönük).
+  e2eeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  e2eeBadgeText: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+  },
+  e2eeFailing: {
+    color: theme.colors.danger,
+    fontSize: theme.fontSize.xs,
+    marginTop: 2,
+    textAlign: 'center',
   },
   // Sprint M4t §3.3 — `topBar`in fade'inden BAĞIMSIZ ayrı satır (bkz. render'daki yorum).
   emergencyRow: {

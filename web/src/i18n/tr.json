@@ -1389,7 +1389,15 @@
     "joinGroup": "Sese katıl",
     "unreachable": "Kullanıcıya ulaşılamadı.",
     "rejected": "Arama reddedildi.",
-    "noAnswer": "Cevap vermedi."
+    "noAnswer": "Cevap vermedi.",
+    "e2ee": {
+      "badge": "Uçtan uca şifreli",
+      "updateRequired": "Bu arama uçtan uca şifreli. Katılmak için uygulamayı güncelle.",
+      "unsupportedBrowser": "Bu tarayıcı şifreli aramaları desteklemiyor. Güncel bir Chrome, Edge, Firefox ya da Safari kullan.",
+      "notMember": "Bu cihaz bu sohbette henüz şifreli değil. Sohbeti bir kez açıp tekrar dene.",
+      "stale": "Şifreli arama hazırlanamadı. Birkaç saniye sonra tekrar dene.",
+      "decryptFailing": "Bağlantının şifresi çözülemiyor. Aramadan çıkıp yeniden katıl."
+    }
   },
   "dm": {
     "sectionHeader": "MESAJLAR",

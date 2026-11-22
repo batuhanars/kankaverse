@@ -1,6 +1,7 @@
 import {
   Injectable,
   Logger,
+  HttpException,
   BadRequestException,
   ForbiddenException,
   ServiceUnavailableException,
@@ -13,6 +14,7 @@ import { MembershipService } from '../../shared/membership/membership.service';
 import { PermissionsService } from '../../shared/permissions/permissions.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { DmPermissionService } from '../../shared/dm-permission/dm-permission.service';
+import { E2eeFlagService } from '../e2ee/e2ee-flag.service';
 
 interface ParticipantMeta {
   avatarUrl?: string | null;
@@ -55,6 +57,7 @@ export class VoiceService {
     private permissions: PermissionsService,
     private realtime: RealtimeService,
     private dmPermission: DmPermissionService,
+    private e2eeFlag: E2eeFlagService,
   ) {
     this.apiKey = this.config.get<string>('livekit.apiKey') ?? '';
     this.apiSecret = this.config.get<string>('livekit.apiSecret') ?? '';
@@ -88,7 +91,7 @@ export class VoiceService {
    *   AGE_RESTRICTED her zaman fırlatılır — yaş kapısı moda da kapalı, bypass ASLA.
    *   Bypass-giriş AuditLog'a yazılır (voice.inspect). requireChannelAccess helper DEĞİŞTİRİLMEDİ.
    */
-  async mintToken(userId: string, channelId: string) {
+  async mintToken(userId: string, channelId: string, callE2ee = false) {
     this.assertEnabled();
 
     // Erişim + yaş + özel kanal/üyelik kapısı — mevcut helper, hata kodları sapmadan yayılır
@@ -179,6 +182,10 @@ export class VoiceService {
       });
     }
 
+    // E8 §3.2 (R7) — şifreli DM'de arama da şifreli. Kapı token basılmadan ve TÜM yan etkilerden (presence
+    // yayını, VoiceSession) ÖNCE: yeteneğini bildirmeyen istemci odaya hiç girmez, arama şifresize düşmez.
+    const e2eeEpoch = await this.resolveCallE2ee(channel.type, channelId, callE2ee);
+
     // Sprint C4 — video/ekran kaynak kararı (T&S, R7). BUILD-DARK: bayraklar false → [].
     // R17 §2 — paylaşılan hesap: resolveCanPublishSources (unmuteParticipant de AYNI metodu çağırır).
     const canPublishSources = await this.resolveCanPublishSources(userId, channel, otherDmUserId);
@@ -258,7 +265,34 @@ export class VoiceService {
       bitrate: channel.bitrate ?? 64,
       canPublishCamera: canPublishSources.includes(TrackSource.CAMERA),
       canPublishScreen: canPublishSources.includes(TrackSource.SCREEN_SHARE),
+      // E8 §3.3 — istemci kendi MLS grubunu `e2eeEpoch` ile karşılaştırır, anahtarı türetip öyle bağlanır.
+      e2ee: e2eeEpoch !== null,
+      e2eeEpoch,
     };
+  }
+
+  /**
+   * E8 §3.2 (R7) — arama şifreli mi. Şifreli = bayrak açık + DM/grup DM + kanalda MLS grubu var.
+   * Şifreliyse istemcinin `callE2ee` bildirmesi ŞART; yoksa 426 (eski sürüm). Dönüş: grubun sunucuda kabul
+   * edilmiş epoch'u (şifreli) ya da null (şifresiz: ortam kanalı, bayrak kapalı, grubu olmayan DM).
+   */
+  private async resolveCallE2ee(type: string, channelId: string, callE2ee: boolean): Promise<number | null> {
+    if (!this.e2eeFlag.calls || (type !== 'DM' && type !== 'GROUP_DM')) return null;
+    const group = await this.prisma.e2eeGroup.findUnique({
+      where: { channelId },
+      select: { epoch: true },
+    });
+    if (!group) return null;
+    if (!callE2ee) {
+      throw new HttpException(
+        {
+          message: 'Bu arama uçtan uca şifreli. Katılmak için uygulamayı güncelle.',
+          error: 'CALL_E2EE_UPDATE_REQUIRED',
+        },
+        426,
+      );
+    }
+    return group.epoch;
   }
 
   /** R11 — bu kanalda kullanıcı için kalıcı (server) mute kaydı var mı. mintToken bunu zorlar. */

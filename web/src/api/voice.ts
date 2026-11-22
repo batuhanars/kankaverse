@@ -7,6 +7,8 @@ export interface VoiceTokenDto {
   bitrate?: number // ses bit hızı (kbps) — istemci publish'te uygular
   canPublishCamera?: boolean // C4 — kamera grant (build-dark: default false)
   canPublishScreen?: boolean // C4 — ekran paylaşımı grant (build-dark: default false)
+  e2ee?: boolean // E8 — arama uçtan uca şifreli (eski sunucu göndermez = şifresiz)
+  e2eeEpoch?: number | null // E8 — sunucunun kabul ettiği MLS epoch'u; istemci kendi grubunu bununla karşılaştırır
 }
 
 export interface VoiceParticipantDto {
@@ -25,8 +27,9 @@ export interface VoiceParticipantsResponse {
 
 export const voiceApi = {
   // C1 — katılım tokeni (audio-only grant)
-  getToken(channelId: string) {
-    return http.post<VoiceTokenDto>(`/channels/${channelId}/voice/token`)
+  // E8 §3.1 — `callE2ee`: istemci şifreli aramayı yapabilir (ortam kanalında sunucu yok sayar)
+  getToken(channelId: string, body?: { callE2ee: boolean }) {
+    return http.post<VoiceTokenDto>(`/channels/${channelId}/voice/token`, body)
   },
   // C3 — anlık katılımcılar + kanal aktif-başlangıcı (LiveKit room state)
   getParticipants(channelId: string) {

@@ -19,6 +19,7 @@ import {
   type ChannelInfo,
 } from './channelSync'
 import { BackupManager } from './backup'
+import { deriveCallKey } from './callKey'
 import { TransferManager } from './transfer'
 import type { E2eeContext } from './context'
 import { previewInMemory, type PushCommit } from './commitPreview'
@@ -277,6 +278,14 @@ export class E2eeEngine {
     return this.run(async (ctx) => {
       await syncChannel(ctx, channelId)
     })
+  }
+
+  /**
+   * E8 §4.1: arama anahtarı (bellekte kalır, kalıcı yazılmaz). `serverEpoch` = token cevabındaki `e2eeEpoch`.
+   * Türetilemiyorsa `CallKeyUnavailableError` fırlatır; çağıran aramaya şifresiz BAĞLANMAZ.
+   */
+  callKey(channelId: string, serverEpoch: number): Promise<{ key: Uint8Array; epoch: number }> {
+    return this.run((ctx) => deriveCallKey(ctx, channelId, serverEpoch))
   }
 
   /**

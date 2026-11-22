@@ -24,6 +24,16 @@ import { useCallStore } from '@/stores/call'
 import { useCallSounds } from '@/composables/useCallSounds'
 import { i18n } from '@/i18n'
 import { recordRecentVoiceChannel } from '@/utils/recentVoiceChannels'
+import { useDmStore } from '@/stores/dm'
+import {
+  CALL_E2EE_UPDATE_REQUIRED,
+  CallE2eeError,
+  callE2eeSupported,
+  prepareCallCrypto,
+  updateRequiredKey,
+  watchDecryptErrors,
+  type CallCrypto,
+} from '@/utils/callE2ee'
 
 export interface VoiceParticipant {
   userId: string
@@ -154,6 +164,12 @@ export const useVoiceStore = defineStore('voice', () => {
 
   // LiveKit Room — reaktif değil (kompleks nesne)
   let room: Room | null = null
+  // E8 — bu arama uçtan uca şifreli mi (rozet) + çözme hatası kesintisiz sürüyor mu (§6 decryptFailing)
+  const callEncrypted = ref(false)
+  const callDecryptFailing = ref(false)
+  // E8 — şifreli aramanın anahtar düzeni ve ait olduğu kanal (bağlanırken de dolu: commit o arada gelebilir)
+  let callCrypto: CallCrypto | null = null
+  let callCryptoChannelId: string | null = null
   // Görüntülü arama niyeti: join() sonrası kamera açılacaksa true (tek seferlik)
   let pendingCameraStart = false
   // D52 (R17 §4) — `LocalTrackUnpublished` (kaynak Camera) SDK'nın BİZDEN mi (toggleCamera) yoksa
@@ -165,6 +181,24 @@ export const useVoiceStore = defineStore('voice', () => {
   const remoteAudioEls = new Set<HTMLMediaElement>()
   // Sağırlaştırma öncesi mute durumu (kaldırınca geri yükle)
   let muteBeforeDeafen = false
+
+  /** E8 — şifrelenebilen arama: 1-1 DM ya da grup DM (ortam ses kanalı değil). */
+  function isDmCall(channelId: string): boolean {
+    return useDmStore().channels.some(
+      (c) => c.id === channelId && (c.type === 'DM' || c.type === 'GROUP_DM'),
+    )
+  }
+
+  /** Kanalın arama durumunu sıfırlar (gruptan ayrılınca/çıkarılınca güncelleme gelmez, eski görüntü kalmasın). */
+  function clearChannelPresence(channelId: string) {
+    participantsByChannel.value[channelId] = []
+    channelStartedAt.value[channelId] = null
+  }
+
+  /** E8 §4.2 — kanalın MLS grubu değişti (commit/cihaz/Welcome): o kanalda şifreli arama varsa anahtarı tazele. */
+  function refreshCallKey(channelId: string) {
+    if (callCrypto && callCryptoChannelId === channelId) void callCrypto.refresh()
+  }
 
   function isConnectedTo(channelId: string): boolean {
     return connectedChannelId.value === channelId
@@ -288,16 +322,36 @@ export const useVoiceStore = defineStore('voice', () => {
     connectingChannelId.value = channelId
     error.value = ''
     try {
-      const { data } = await voiceApi.getToken(channelId)
+      // E8 §5.1 — DM/grup aramasında tarayıcı destekliyorsa "şifreleyebilirim" denir. Desteklemiyorsa
+      // denmez: arama şifreliyse sunucu 426 döner (tarayıcı mesajı), şifresizse bugünkü gibi bağlanılır.
+      const canEncrypt = isDmCall(channelId) && callE2eeSupported()
+      const { data } = await voiceApi.getToken(
+        channelId,
+        canEncrypt ? { callE2ee: true } : undefined,
+      )
       canPublish.value = data.canPublish
       canPublishCamera.value = data.canPublishCamera ?? false
       canPublishScreen.value = data.canPublishScreen ?? false
 
+      // 🔴 E8 §4.3 (R7) — şifreli arama: anahtar türetilip yuvaya yazılır, Room şifreleme işçisiyle kurulur,
+      // şifreleme connect'ten ÖNCE açılır. Herhangi biri tutmazsa fırlar → catch → bağlanılmaz (geri düşme yok).
+      if (data.e2ee) {
+        callCryptoChannelId = channelId
+        callCrypto = await prepareCallCrypto(channelId, data.e2eeEpoch ?? 0)
+      }
+
       // Bit hızı: kanal ayarı publish varsayılanına uygulanır (audio-only maxBitrate, kbps→bps)
       room = new Room({
         publishDefaults: { audioPreset: { maxBitrate: (data.bitrate ?? 64) * 1000 } },
+        ...callCrypto?.roomOptions,
       })
       wireRoom(room)
+      if (callCrypto) {
+        const onFailing = (failing: boolean) => (callDecryptFailing.value = failing)
+        room.on(RoomEvent.EncryptionError, watchDecryptErrors(channelId, callCrypto, onFailing))
+        await room.setE2EEEnabled(true)
+        callEncrypted.value = true
+      }
       await room.connect(data.url, data.token)
       // Tarayıcı autoplay kilidini katılım jesti açar; yine de garantiye al
       try {
@@ -374,11 +428,21 @@ export const useVoiceStore = defineStore('voice', () => {
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string; error?: string } } }
       const code = err.response?.data?.error
+      // E8 §6 — şifreli aramaya girilemedi: metin istemcide (web ve mobil aynı), toast ile görünür.
+      const e2eeKey =
+        e instanceof CallE2eeError
+          ? e.i18nKey
+          : code === CALL_E2EE_UPDATE_REQUIRED
+            ? updateRequiredKey()
+            : null
+      if (e2eeKey) useToastStore().error(i18n.global.t(e2eeKey))
       // R10 — ses kanalı dolu: toast ile bildir (token-mint 403 CHANNEL_FULL).
       if (code === 'CHANNEL_FULL') {
         useToastStore().error(err.response?.data?.message ?? i18n.global.t('voice.channelFull'))
       }
-      error.value = err.response?.data?.message ?? 'Ses kanalına bağlanılamadı.'
+      error.value = e2eeKey
+        ? i18n.global.t(e2eeKey)
+        : (err.response?.data?.message ?? 'Ses kanalına bağlanılamadı.')
       await leave()
     } finally {
       connecting.value = false
@@ -450,6 +514,12 @@ export const useVoiceStore = defineStore('voice', () => {
 
   function resetLocalState() {
     connectedChannelId.value = null
+    // E8 — şifreleme işçisi kapanır; anahtar yalnız onun belleğindeydi
+    callCrypto?.dispose()
+    callCrypto = null
+    callCryptoChannelId = null
+    callEncrypted.value = false
+    callDecryptFailing.value = false
     connectedAt.value = null // REV-13
     autoEndWhenAlone = false // REV-12
     pendingCameraStart = false
@@ -899,6 +969,10 @@ export const useVoiceStore = defineStore('voice', () => {
   )
 
   return {
+    callEncrypted,
+    callDecryptFailing,
+    refreshCallKey,
+    clearChannelPresence,
     participantsByChannel,
     connectedChannelId,
     connecting,

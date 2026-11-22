@@ -177,6 +177,8 @@ export default () => {
     // E5a — şifreli DM yedeği (yedek şifresi, sunucuda yalnız şifreli görüntü). Varsayılan KAPALI; izin listesi E1 ile aynı.
     e2eeBackup: process.env.E2EE_BACKUP === 'true',
     e2eeTransfer: process.env.E2EE_TRANSFER === 'true',
+    // E8 — DM aramalarında uçtan uca şifreleme. Varsayılan KAPALI; kapatmak = geri alma (yeni aramalar şifresiz).
+    e2eeCalls: process.env.E2EE_CALLS === 'true',
     e2eeUserIds: (process.env.E2EE_USER_IDS ?? '')
       .split(',')
       .map((id) => id.trim())

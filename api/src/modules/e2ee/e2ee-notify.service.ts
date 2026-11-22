@@ -17,8 +17,29 @@ export class E2eeNotifyService {
     private realtime: RealtimeService,
   ) {}
 
-  commit(channelId: string, epoch: number): void {
-    this.realtime.emitToRoom(channelId, E2EE_EVENT_COMMIT, { channelId, epoch });
+  /**
+   * `e2ee:commit` kanal odasına ve kanalın ŞİMDİKİ üyelerinin kişisel odalarına.
+   * 🔴 E8 §9 bulgusu (2026-11-22): yalnız kanal odasına gidince sohbet ekranı açık olmayan cihaz (ör. aramaya
+   * listeden katılan telefon) epoch değişimini duymuyor, arama anahtarını yenilemiyor, ses kalıcı kesiliyordu.
+   * Çıkarılan üye artık `ChannelMember` değil, olayı almaz. Üye okunamazsa en azından kanal odasına gider.
+   */
+  async commit(channelId: string, epoch: number): Promise<void> {
+    const payload = { channelId, epoch };
+    try {
+      const members = await this.prisma.channelMember.findMany({
+        where: { channelId },
+        select: { userId: true },
+      });
+      this.realtime.emitToRoomAndUsers(
+        channelId,
+        members.map((m) => m.userId),
+        E2EE_EVENT_COMMIT,
+        payload,
+      );
+    } catch (err) {
+      this.logger.error(`commit yayını üyelere gidemedi (kanal ${channelId})`, err);
+      this.realtime.emitToRoom(channelId, E2EE_EVENT_COMMIT, payload);
+    }
   }
 
   welcome(userIds: string[], channelId: string): void {
