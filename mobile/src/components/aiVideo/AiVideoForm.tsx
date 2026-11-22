@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 import { AiVideoAttachments } from './AiVideoAttachments';
+import { IMAGE_ONLY, refsLimitsOf } from './aiVideoRefs';
 import { AiVideoPrompt } from './AiVideoPrompt';
 import { Segmented } from './Segmented';
 import type { useAiVideo } from './useAiVideo';
@@ -77,19 +78,21 @@ export function AiVideoForm({
   onPromptLayout?: (y: number) => void;
 }) {
   const { refs } = ai;
-  const refsOption = ai.form.current?.references ?? null;
+  const limits = refsLimitsOf(ai.form.current);
   return (
     <View style={styles.group}>
       <ModelRow ai={ai} />
-      {refsOption ? (
+      {/* Ek kabul etmeyen modelde (Veo) şerit yok; önceki modelden kalan ek varsa kaldırılabilsin diye görünür
+          kalır, ekleme kapalı (sunucu o kipi zaten reddeder). */}
+      {limits || refs.items.length > 0 ? (
         <AiVideoAttachments
-          refs={refsOption}
+          refs={limits ?? IMAGE_ONLY}
           items={refs.items}
           labels={refs.labels}
           thumbs={refs.thumbs}
           mode={refs.mode}
           error={refs.addError}
-          disabled={ai.locked}
+          disabled={ai.locked || !limits}
           onPickMedia={() => void refs.pickMedia()}
           onPickAudio={() => void refs.pickAudio()}
           onRemove={ai.removeRef}

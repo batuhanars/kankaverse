@@ -246,7 +246,14 @@ async function onPickTarget(channelId: string) {
           @update:duration-s="form.durationS.value = $event"
           @update:aspect-ratio="form.aspectRatio.value = $event"
         >
+          <!-- Görselden üretimi de referansı da olmayan modelde (Veo) ek alanı yok; önceki modelden kalan ek
+               varsa kaldırılabilsin diye görünür kalır (sunucu o kipi zaten reddeder). -->
           <AiVideoRefStrip
+            v-if="
+              refs.items.value.length > 0 ||
+              form.current.value?.references ||
+              form.current.value?.supportsImage !== false
+            "
             :items="refs.items.value"
             :counts="refs.counts.value"
             :limits="refs.limits.value"

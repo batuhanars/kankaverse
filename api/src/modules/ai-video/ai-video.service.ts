@@ -94,7 +94,7 @@ export class AiVideoService {
         durations: m.durations,
         resolutions: m.resolutions,
         aspectRatios: m.aspectRatios,
-        supportsImage: true,
+        supportsImage: m.supportsImage,
         references: toReferencesOption(m.references),
         audio: m.audio,
       })),
@@ -154,7 +154,7 @@ export class AiVideoService {
 
     const micro = await this.quoteMicro(spec, dto, {
       mode,
-      prompt: mode === 'image' ? undefined : 'x',
+      prompt: mode === 'image' && !spec.imagePromptRequired ? undefined : 'x',
       referenceKinds: kinds,
     });
     this.estimateCache.set(cacheKey, { micro, expiresAt: Date.now() + AI_ESTIMATE_TTL_MS });
@@ -171,7 +171,7 @@ export class AiVideoService {
     if (refs !== undefined && dto.inputKey !== undefined) throw this.invalidOption();
     const mode: AiVideoMode = refs ? 'reference' : dto.inputKey !== undefined ? 'image' : 'text';
     const spec = this.resolveSpec(dto, mode);
-    if (dto.inputKey === undefined && dto.prompt.length === 0) {
+    if (dto.prompt.length === 0 && (dto.inputKey === undefined || spec.imagePromptRequired)) {
       throw new BadRequestException({
         message: 'İstem boş olamaz.',
         error: 'AI_VIDEO_PROMPT_REQUIRED',
@@ -368,6 +368,7 @@ export class AiVideoService {
       !spec.resolutions.includes(o.resolution) ||
       !spec.durations.includes(o.durationS) ||
       (mode === 'reference' && !spec.references) ||
+      (mode === 'image' && !spec.supportsImage) ||
       !ratioOk
     ) {
       throw this.invalidOption();

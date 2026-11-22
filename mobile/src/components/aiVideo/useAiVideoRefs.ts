@@ -109,7 +109,7 @@ export function useAiVideoRefs(getRefs: () => AiVideoReferencesOption | null) {
     const slots = refs.max.image + refs.max.video - used;
     if (slots <= 0) return setAddError(t(DENIAL_KEY.full));
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: refs.max.video > 0 ? ['images', 'videos'] : ['images'],
       allowsMultipleSelection: true,
       selectionLimit: slots,
     });

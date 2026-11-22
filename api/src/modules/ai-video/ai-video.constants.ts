@@ -8,6 +8,8 @@ export const AI_INPUT_MAX_BYTES = 10 * MB;
 export const AI_OUTPUT_MAX_BYTES = 50 * MB;
 /** C42: süre denetimi payı (sn); kapsayıcı süresi birkaç yüz ms taşabilir. */
 export const AI_INPUT_DURATION_TOLERANCE_S = 0.5;
+/** Bir istekteki toplam referans tavanı (DTO); tür başına sınır model tablosunda (en büyüğü Wan 10+5+5). */
+export const AI_REFERENCES_MAX = 20;
 /** İstem güvenlik tavanı; istemciler sınır göstermez, yalnız kötüye kullanıma karşı. */
 export const AI_PROMPT_MAX = 10000;
 /** Teklif (estimate) önbellek ömrü; önbellek tek instance bellek içi (C14b §6). */

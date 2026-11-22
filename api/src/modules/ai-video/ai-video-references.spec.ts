@@ -254,9 +254,10 @@ describe('AiVideoService.create referans kipi (C42)', () => {
   });
 
   it.each([
-    ['5 gorsel', Array.from({ length: 5 }, (_v, i) => ({ kind: 'image', key: key(i, 'png') }))],
-    ['3 video', [0, 1, 2].map((i) => ({ kind: 'video', key: key(i, 'mp4') }))],
-    ['3 ses', [0, 1, 2].map((i) => ({ kind: 'audio', key: key(i, 'mp3') }))],
+    // 2026-11-22: sinirlar 10/5/5; bir fazlasi reddedilir.
+    ['11 gorsel', Array.from({ length: 11 }, (_v, i) => ({ kind: 'image', key: key(i, 'png') }))],
+    ['6 video', Array.from({ length: 6 }, (_v, i) => ({ kind: 'video', key: key(i, 'mp4') }))],
+    ['6 ses', Array.from({ length: 6 }, (_v, i) => ({ kind: 'audio', key: key(i, 'mp3') }))],
   ])('sayi tavani (%s): 400, Pika cagrilmaz', async (_n, references) => {
     const s = setup();
     await expect(s.service.create('u1', wanDto({ prompt: 'x', references }))).rejects.toMatchObject(
@@ -398,7 +399,7 @@ describe('AiVideoService.estimate referans kipi (C42)', () => {
   it('tavan asimi / bos / referanssiz model: 400', async () => {
     const s = setup();
     await expect(
-      s.service.estimate({ ...q, referenceKinds: ['video', 'video', 'video'] }),
+      s.service.estimate({ ...q, referenceKinds: Array<'video'>(6).fill('video') }),
     ).rejects.toMatchObject({ response: { error: 'AI_VIDEO_INVALID_OPTION' } });
     await expect(s.service.estimate({ ...q, referenceKinds: [] })).rejects.toMatchObject({
       response: { error: 'AI_VIDEO_INVALID_OPTION' },
@@ -415,7 +416,7 @@ describe('GET /ai-video/options references (C42 §1.7)', () => {
     const res = await s.service.options('u1');
     expect(res.models.find((m) => m.key === 'pika-2.5')!.references).toBeNull();
     expect(res.models.find((m) => m.key === 'wan-3.0')!.references).toEqual({
-      max: { image: 4, video: 2, audio: 2 },
+      max: { image: 10, video: 5, audio: 5 },
       videoTotalMaxS: 15,
       videoMaxS: 15,
       audioMaxS: 30,
