@@ -422,6 +422,7 @@ describe('GET /ai-video/options references (C42 §1.7)', () => {
       audioMaxS: 30,
       audioTotalMaxS: 150,
       minS: 0,
+      durations: null,
       aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
       inputTypes: {
         image: ['image/png', 'image/jpeg', 'image/webp'],
@@ -621,5 +622,64 @@ describe('Kling 4.0 referans kipi', () => {
         message: expect.not.stringContaining('ses'),
       },
     });
+  });
+});
+
+// 2026-11-22: Veo 3.1 Fast, text-to-video ucunda reference_image_urls (3 görsel, süre 8 sn şart).
+describe('Veo 3.1 Fast referans kipi', () => {
+  const veoDto = (over: Record<string, unknown> = {}) => ({
+    model: 'veo-3.1-fast',
+    resolution: '720p',
+    durationS: 8,
+    prompt: '@Görsel1 sahilde yürüsün',
+    ...over,
+  });
+
+  it('tek gorsel referans olarak text-to-video ya gider, etiket Image 1', async () => {
+    const s = setup(['veo-3.1-fast']);
+    await s.service.create('u1', veoDto({ references: [{ kind: 'image', key: key(0, 'png') }] }));
+    expect(s.pika.submit.mock.calls[0][0]).toBe('google/veo-3.1-fast/text-to-video');
+    expect(s.pika.submit.mock.calls[0][1]).toMatchObject({
+      prompt: 'Image 1 sahilde yürüsün',
+      reference_image_urls: ['https://pika/u1'],
+      duration: 8,
+    });
+  });
+
+  it('referansla 4 sn: 400 AI_VIDEO_INVALID_OPTION (referans kipinde yalniz 8 sn)', async () => {
+    const s = setup(['veo-3.1-fast']);
+    await expect(
+      s.service.create(
+        'u1',
+        veoDto({ durationS: 4, references: [{ kind: 'image', key: key(0, 'png') }] }),
+      ),
+    ).rejects.toMatchObject({ response: { error: 'AI_VIDEO_INVALID_OPTION' } });
+    expect(s.pika.quote).not.toHaveBeenCalled();
+  });
+
+  it('referanssiz 4 sn teklifte hala gecerli', async () => {
+    const s = setup(['veo-3.1-fast']);
+    await s.service.estimate({ model: 'veo-3.1-fast', resolution: '720p', durationS: 4 } as any);
+    expect(s.pika.quote.mock.calls[0][1]).toMatchObject({ duration: 4 });
+  });
+
+  it.each([
+    ['4 gorsel', Array.from({ length: 4 }, (_v, i) => ({ kind: 'image', key: key(i, 'png') }))],
+    ['video', [{ kind: 'video', key: key(0, 'mp4') }]],
+  ])('sinir disi (%s): 400', async (_n, references) => {
+    const s = setup(['veo-3.1-fast']);
+    await expect(s.service.create('u1', veoDto({ prompt: 'x', references }))).rejects.toMatchObject(
+      { response: { error: 'AI_VIDEO_INVALID_OPTION' } },
+    );
+  });
+
+  it('options: referans sureleri [8]; Wan da null', async () => {
+    const s = setup(['veo-3.1-fast', 'wan-3.0']);
+    const res = await s.service.options('u1');
+    expect(res.models.find((m) => m.key === 'veo-3.1-fast')!.references).toMatchObject({
+      max: { image: 3, video: 0, audio: 0 },
+      durations: [8],
+    });
+    expect(res.models.find((m) => m.key === 'wan-3.0')!.references!.durations).toBeNull();
   });
 });

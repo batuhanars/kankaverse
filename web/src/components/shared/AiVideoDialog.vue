@@ -240,6 +240,7 @@ async function onPickTarget(channelId: string) {
           :duration-s="form.durationS.value"
           :aspect-ratio="form.aspectRatio.value"
           :aspect-ratios="form.aspectRatios.value"
+          :durations="form.durations.value"
           :with-image="ai.withImage.value"
           @update:model="form.pickModel"
           @update:resolution="form.resolution.value = $event"

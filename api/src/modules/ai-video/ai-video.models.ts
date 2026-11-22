@@ -26,6 +26,8 @@ export interface AiVideoReferenceSpec {
   inputTypes?: Partial<Record<AiInputKind, string[]>>;
   /** 2026-11-22: istem etiketinin sağlayıcı yazımı; `{Kind}` = Image/Video/Audio, `{n}` = türü içindeki sıra. */
   tagFormat: string;
+  /** 2026-11-22: referans kipinde izinli süreler (verilmezse modelin süreleri; Veo referansla yalnız 8 sn). */
+  durations?: number[];
 }
 
 export interface AiVideoModelSpec {
@@ -166,12 +168,26 @@ export const AI_VIDEO_MODEL_TABLE: AiVideoModelSpec[] = [
     aspectRatios: { text: ['16:9', '9:16'], image: [] },
     durationField: 'duration',
     imageField: '',
-    // Pika'da yalnız text-to-video ucu var.
+    // Pika'da görselden üretim ucu yok; tek görsel de referans olarak text-to-video'ya gider.
     supportsImage: false,
     imagePromptRequired: true,
     audio: 'default',
     fixed: {},
-    references: null,
+    // VeoTextToVideoRequest.reference_image_urls: en fazla 3 görsel, süre 8 sn şart. Video/ses referansı yok.
+    references: {
+      apiFunction: 'text-to-video',
+      fields: { image: 'reference_image_urls', video: '', audio: '' },
+      max: { image: 3, video: 0, audio: 0 },
+      videoTotalMaxS: 0,
+      videoMaxS: 0,
+      audioMaxS: 0,
+      audioTotalMaxS: 0,
+      minS: 0,
+      aspectRatios: ['16:9', '9:16'],
+      inputTypes: { video: [], audio: [] },
+      tagFormat: '{Kind} {n}',
+      durations: [8],
+    },
   },
   {
     key: 'kling-4.0',

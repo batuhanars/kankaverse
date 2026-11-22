@@ -6,7 +6,7 @@ import { createVideoThumbnail } from 'react-native-compressor';
 import { aiVideoApi, type AiVideoReferencesOption } from '@/api/aiVideo';
 import { t } from '@/i18n';
 import { audioDurationS, sizeOfFile, videoDurationS } from './aiVideoMedia';
-import { denyAdd, kindOfMime, labelsOf, modeOf, normalizeMime, type AddDenial, type RefItem } from './aiVideoRefs';
+import { denyAdd, kindOfMime, labelsOf, normalizeMime, type AddDenial, type RefItem } from './aiVideoRefs';
 
 interface Candidate {
   uri: string;
@@ -161,7 +161,6 @@ export function useAiVideoRefs(getRefs: () => AiVideoReferencesOption | null) {
     thumbs,
     addError,
     labels: labelsOf(items),
-    mode: modeOf(items),
     uploading: items.some((i) => i.status === 'uploading'),
     failed: items.some((i) => i.status === 'error'),
     pickMedia,

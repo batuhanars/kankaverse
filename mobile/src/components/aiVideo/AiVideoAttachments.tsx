@@ -143,7 +143,13 @@ export function AiVideoAttachments({ refs, items, labels, thumbs, mode, error, d
           <Text style={styles.hint}>{t('mobile.aiVideoRefs.rule')}</Text>
         </>
       ) : (
-        <Text style={styles.hint}>{t(imageOnly ? 'mobile.aiVideoRefs.hintImage' : 'mobile.aiVideoRefs.hint')}</Text>
+        <Text style={styles.hint}>
+          {!imageOnly
+            ? t('mobile.aiVideoRefs.hint')
+            : refs.max.image === 1
+              ? t('mobile.aiVideoRefs.hintImage')
+              : t('mobile.aiVideoRefs.hintImages', { max: refs.max.image })}
+        </Text>
       )}
     </View>
   );

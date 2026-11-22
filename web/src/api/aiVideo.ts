@@ -32,6 +32,8 @@ export interface AiVideoReferencesOption {
   audioTotalMaxS: number
   /** 2026-11-22: video/ses için en kısa süre (0 = sınır yok). */
   minS: number
+  /** 2026-11-22: referans kipinin süreleri (null = modelin süreleri; Veo [8]). */
+  durations: number[] | null
   aspectRatios: string[]
   inputTypes: Record<AiVideoRefKind, string[]>
 }

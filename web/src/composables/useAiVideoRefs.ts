@@ -18,6 +18,7 @@ const IMAGE_ONLY: AiVideoReferencesOption = {
   audioMaxS: 0,
   audioTotalMaxS: 0,
   minS: 0,
+  durations: null,
   aspectRatios: [],
   inputTypes: { image: ['image/png', 'image/jpeg', 'image/webp'], video: [], audio: [] },
 }
@@ -57,6 +58,8 @@ function readDuration(url: string, kind: AiVideoRefKind): Promise<number | null>
 export function useAiVideoRefs(
   spec: () => AiVideoReferencesOption | null | undefined,
   prompt: Ref<string>,
+  /** 2026-11-22: modelin görselden üretim ucu var mı; yoksa (Veo) tek görsel de referanstır. */
+  supportsImage: () => boolean = () => true,
 ) {
   const { t } = useI18n()
   const list = ref<AiVideoRef[]>([])
@@ -82,7 +85,9 @@ export function useAiVideoRefs(
   const kinds = computed(() => list.value.map((r) => r.kind))
   const hasVideo = computed(() => counts.value.video > 0)
   /** Yalnız 1 görsel (video/ses yok) → görselden video kipi, istek `inputKey` ile gider (§0 kip kuralı). */
-  const singleImage = computed(() => list.value.length === 1 && list.value[0].kind === 'image')
+  const singleImage = computed(
+    () => list.value.length === 1 && list.value[0].kind === 'image' && supportsImage(),
+  )
   const referenceMode = computed(() => list.value.length > 0 && !singleImage.value)
   const uploading = computed(() => list.value.some((r) => r.status === 'uploading'))
   const allReady = computed(() => list.value.every((r) => r.status === 'ready'))

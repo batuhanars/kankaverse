@@ -368,10 +368,11 @@ export class AiVideoService {
     const spec = this.enabledModels().find((m) => m.key === o.model);
     const ratios = mode === 'reference' ? spec?.references?.aspectRatios : spec?.aspectRatios[mode];
     const ratioOk = o.aspectRatio === undefined || ratios?.includes(o.aspectRatio) === true;
+    const durations = (mode === 'reference' && spec?.references?.durations) || spec?.durations;
     if (
       !spec ||
       !spec.resolutions.includes(o.resolution) ||
-      !spec.durations.includes(o.durationS) ||
+      !durations!.includes(o.durationS) ||
       (mode === 'reference' && !spec.references) ||
       (mode === 'image' && !spec.supportsImage) ||
       !ratioOk

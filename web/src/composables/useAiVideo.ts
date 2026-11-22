@@ -39,7 +39,11 @@ export function useAiVideo() {
   // Reaktif: açılışta tazelenen kullanıcıda hak gelmişse form kilitten çıkar (kredi sayfa yenilemeden görünür).
   const locked = computed(() => authStore.user?.aiVideoAllowed !== true)
   // C42: ekler (görsel + video + ses). Sınırlar seçili modelin `references` bilgisinden; form daha sonra kurulur (tembel okuma).
-  const refs = useAiVideoRefs(() => form.current.value?.references, prompt)
+  const refs = useAiVideoRefs(
+    () => form.current.value?.references,
+    prompt,
+    () => form.current.value?.supportsImage !== false,
+  )
   const withImage = refs.singleImage
   const referenceKinds = computed(() => (refs.referenceMode.value ? refs.kinds.value : null))
   const form = useAiVideoForm(withImage, referenceKinds, locked)

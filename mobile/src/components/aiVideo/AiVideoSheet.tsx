@@ -157,7 +157,7 @@ function SheetBody({
   const form = ai.form;
   const modelLabel = form.options?.models.find((m) => m.key === row?.model)?.label;
   // Boş istem yalnız tek görsel kipinde serbest (referans kipinde sunucu 400 AI_VIDEO_PROMPT_REQUIRED).
-  const promptOk = ai.prompt.trim().length > 0 || ai.refs.mode === 'image';
+  const promptOk = ai.prompt.trim().length > 0 || ai.form.mode === 'image';
   const canSubmit = !ai.busy && promptOk && !ai.refs.uploading && !ai.refs.failed;
   const others = ai.recent.filter((r) => r.id !== ai.job?.id);
 

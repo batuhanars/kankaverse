@@ -43,7 +43,7 @@ export function useAiVideo() {
   // C33: pasif tanıtım. Kilitliyken yalnız options çağrılır.
   const locked = useAuthStore((s) => s.user?.aiVideoAllowed !== true);
   const kinds = refs.items.map((i) => i.kind);
-  const form = useAiVideoForm(refs.mode, kinds, locked);
+  const form = useAiVideoForm(kinds, locked);
   refsOption.current = refsLimitsOf(form.current);
   const jobRef = useRef<AiVideoDto | null>(null);
   const alive = useRef(true);
@@ -124,9 +124,9 @@ export function useAiVideo() {
     try {
       // Tek görsel: eski `inputKey` yolu; başka her bileşim `references` (sıra = eklenme sırası).
       const input =
-        refs.mode === 'image'
+        form.mode === 'image'
           ? { inputKey: refs.items[0].key }
-          : refs.mode === 'reference'
+          : form.mode === 'reference'
             ? { references: refs.items.map((i) => ({ kind: i.kind, key: i.key! })) }
             : {};
       const sel = {
