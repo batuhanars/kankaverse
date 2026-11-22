@@ -39,13 +39,20 @@ export function useAiVideoForm(
     if (referenceKinds.value) return current.value?.references?.aspectRatios ?? []
     return current.value?.aspectRatios[withImage.value ? 'image' : 'text'] ?? []
   })
+  /** 2026-11-22: referans kipinin kendi süreleri olabilir (Veo referansla yalnız 8 sn). */
+  const durations = computed(
+    () =>
+      (referenceKinds.value && current.value?.references?.durations) ||
+      current.value?.durations ||
+      [],
+  )
 
   function pickModel(key: string) {
     model.value = key
     const m = current.value
     if (!m) return
     if (!m.resolutions.includes(resolution.value)) resolution.value = m.resolutions[0]
-    if (!m.durations.includes(durationS.value)) durationS.value = m.durations[0]
+    if (!durations.value.includes(durationS.value)) durationS.value = durations.value[0]
     resetAspectIfInvalid()
   }
 
@@ -93,6 +100,9 @@ export function useAiVideoForm(
   }
 
   watch([withImage, referenceKinds], resetAspectIfInvalid)
+  watch(durations, (list) => {
+    if (list.length && !list.includes(durationS.value)) durationS.value = list[0]
+  })
   watch(
     [
       model,
@@ -125,6 +135,7 @@ export function useAiVideoForm(
     durationS,
     aspectRatio,
     aspectRatios,
+    durations,
     current,
     estimateCredits,
     estimating,

@@ -16,6 +16,8 @@ const props = defineProps<{
   durationS: number
   aspectRatio: string // '' = Otomatik
   aspectRatios: string[]
+  /** Kipe göre süreler (referansta modelinkinden farklı olabilir). */
+  durations: number[]
   withImage: boolean
 }>()
 const emit = defineEmits<{
@@ -35,7 +37,7 @@ const ratioLabel = (r: string) => {
 /** Bundan uzun süre listesi açılır listeyle seçilir (düğmeler satırları şişirir). */
 const DURATION_BUTTONS_MAX = 6
 const durationOptions = computed(() =>
-  (props.current?.durations ?? []).map((d) => ({ value: String(d), label: t('aiVideo.durationOption', { sec: d }) })),
+  props.durations.map((d) => ({ value: String(d), label: t('aiVideo.durationOption', { sec: d }) })),
 )
 const lockedAuto = computed(() => props.withImage && props.aspectRatios.length === 0)
 const segBase =
@@ -87,7 +89,7 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
 
     <div v-if="current" class="min-w-0 w-full">
       <!-- 2026-11-07: uzun süre listesi (Wan 5-30) düğme olarak sığmıyor → açılır liste; kısa listede düğmeler kalır -->
-      <template v-if="current.durations.length > DURATION_BUTTONS_MAX">
+      <template v-if="durations.length > DURATION_BUTTONS_MAX">
         <span class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);">{{ t('aiVideo.durationLabel') }}</span>
         <!-- reka-ui listesi: tarayıcının açılır menüsü kaydırma çubuğunu koyu temada görünür çizmiyordu -->
         <KvSelect
@@ -97,9 +99,9 @@ const segOff = 'bg-[var(--kv-bg-content)] text-[var(--kv-text-secondary)] hover:
         />
       </template>
       <span v-else class="block text-[13px] font-medium mb-1" style="color: var(--kv-text-secondary);">{{ t('aiVideo.durationLabel') }}</span>
-      <div v-if="current.durations.length <= DURATION_BUTTONS_MAX" class="flex flex-wrap gap-1.5" role="radiogroup" :aria-label="t('aiVideo.durationLabel')">
+      <div v-if="durations.length <= DURATION_BUTTONS_MAX" class="flex flex-wrap gap-1.5" role="radiogroup" :aria-label="t('aiVideo.durationLabel')">
         <button
-          v-for="d in current.durations"
+          v-for="d in durations"
           :key="d"
           type="button"
           role="radio"

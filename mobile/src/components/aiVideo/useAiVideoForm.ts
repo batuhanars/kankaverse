@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { aiVideoApi, type AiVideoModelOption, type AiVideoOptionsDto, type AiVideoRefKind } from '@/api/aiVideo';
-import type { RefMode } from './aiVideoRefs';
+import { modeOf } from './aiVideoRefs';
 
 const ESTIMATE_DELAY_MS = 400;
 
@@ -11,7 +11,7 @@ const ESTIMATE_DELAY_MS = 400;
  * C33: `locked` (pasif tanıtım) iken yalnız `options` çağrılır (sunucu kilitliye açık, tutarlar 0); estimate atılmaz
  * (403 gürültüsü ve Pika çağrısı olmaz). Geçmiş ve yükleme de useAiVideo'da kilitli.
  */
-export function useAiVideoForm(mode: RefMode, kinds: AiVideoRefKind[], locked = false) {
+export function useAiVideoForm(kinds: AiVideoRefKind[], locked = false) {
   const [options, setOptions] = useState<AiVideoOptionsDto | null>(null);
   const [model, setModel] = useState('');
   const [resolution, setResolution] = useState('');
@@ -25,6 +25,11 @@ export function useAiVideoForm(mode: RefMode, kinds: AiVideoRefKind[], locked = 
   const loaded = useRef(false);
 
   const current: AiVideoModelOption | null = options?.models.find((m) => m.key === model) ?? null;
+  // Kip modeli bilmeli: görselden üretimi olmayan modelde (Veo) tek görsel referanstır (ek hook'u modeli bilmez).
+  const mode = modeOf(kinds, current?.supportsImage !== false);
+  // 2026-11-22: referans kipinin kendi süreleri olabilir (Veo referansla yalnız 8 sn).
+  const durations = (mode === 'reference' && current?.references?.durations) || current?.durations || [];
+  const durationsKey = durations.join(',');
   // Liste sunucudan; model ya da görsel durumu değişince ve seçili ölçü listede yoksa Otomatik'e döner.
   // C42: referans kipinde liste omni ölçüleridir (`references.aspectRatios`).
   const aspectRatios =
@@ -60,6 +65,11 @@ export function useAiVideoForm(mode: RefMode, kinds: AiVideoRefKind[], locked = 
     };
   }, [loadOptions]);
 
+  useEffect(() => {
+    const list = durationsKey.split(',').filter(Boolean).map(Number);
+    if (list.length) setDurationS((d) => (list.includes(d) ? d : list[0]));
+  }, [durationsKey]);
+
   const ratiosKey = aspectRatios.join(',');
   useEffect(() => {
     setAspectRatio((a) => (a && !ratiosKey.split(',').includes(a) ? '' : a));
@@ -93,6 +103,8 @@ export function useAiVideoForm(mode: RefMode, kinds: AiVideoRefKind[], locked = 
 
   return {
     options,
+    mode,
+    durations,
     model,
     resolution,
     durationS,

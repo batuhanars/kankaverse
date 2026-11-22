@@ -8,6 +8,7 @@ export const IMAGE_ONLY: AiVideoReferencesOption = {
   audioMaxS: 0,
   audioTotalMaxS: 0,
   minS: 0,
+  durations: null,
   aspectRatios: [],
   inputTypes: { image: ['image/png', 'image/jpeg', 'image/webp'], video: [], audio: [] },
 };
@@ -123,11 +124,14 @@ export function retagPrompt(prompt: string, kind: AiVideoRefKind, n: number): st
     .replace(/ {2,}/g, ' ');
 }
 
-/** Kip kuralı (sözleşme §0): yalnız tek görsel → eski görselden video; başka her bileşim → referans. */
+/**
+ * Kip kuralı (sözleşme §0): yalnız tek görsel → eski görselden video; başka her bileşim → referans.
+ * 2026-11-22: görselden üretim ucu olmayan modelde (Veo) tek görsel de referanstır (`imageOk` false).
+ */
 export type RefMode = 'text' | 'image' | 'reference';
-export function modeOf(items: RefItem[]): RefMode {
-  if (items.length === 0) return 'text';
-  return items.length === 1 && items[0].kind === 'image' ? 'image' : 'reference';
+export function modeOf(kinds: AiVideoRefKind[], imageOk = true): RefMode {
+  if (kinds.length === 0) return 'text';
+  return kinds.length === 1 && kinds[0] === 'image' && imageOk ? 'image' : 'reference';
 }
 
 export type AddDenial = 'full' | 'type' | 'size' | 'tooShort' | 'tooLong' | 'totalLong' | 'audioTotal';

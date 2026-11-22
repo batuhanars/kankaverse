@@ -2458,6 +2458,7 @@
       "hint": "İstersen görsel, video veya ses ekle.",
     "addImage": "Görsel ekle",
     "hintImage": "İstersen bir görsel ekle, video ondan başlar.",
+    "hintImages": "İstersen en fazla {max} görsel ekle, videoda referans olarak kullanılır.",
       "counter": "{image}/{imageMax} görsel · {video}/{videoMax} video · {audio}/{audioMax} ses",
       "modeImage": "Video bu görselden başlar.",
       "modeReference": "Eklediklerin videoda referans olarak kullanılır. İstemde {'@'} ile hangisini nerede istediğini belirt.",

@@ -42,6 +42,8 @@ export const toReferencesOption = (r: AiVideoReferenceSpec | null) =>
     audioMaxS: r.audioMaxS,
     audioTotalMaxS: r.audioTotalMaxS,
     minS: r.minS,
+    /** null = modelin süreleri geçerli. */
+    durations: r.durations ?? null,
     aspectRatios: r.aspectRatios,
     inputTypes: {
       image: referenceInputTypes(r, 'image'),

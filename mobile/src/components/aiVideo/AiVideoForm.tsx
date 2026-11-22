@@ -46,7 +46,7 @@ function Options({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
           />
           <Segmented
             label={t('aiVideo.durationLabel')}
-            options={form.current.durations.map((d) => ({ value: d, text: t('aiVideo.durationOption', { sec: d }) }))}
+            options={form.durations.map((d) => ({ value: d, text: t('aiVideo.durationOption', { sec: d }) }))}
             value={form.durationS}
             onChange={form.setDurationS}
           />
@@ -59,7 +59,7 @@ function Options({ ai }: { ai: ReturnType<typeof useAiVideo> }) {
             value={form.aspectRatio}
             onChange={form.setAspectRatio}
           />
-          {ai.refs.mode === 'image' && form.aspectRatios.length === 0 ? (
+          {form.mode === 'image' && form.aspectRatios.length === 0 ? (
             <Text style={styles.hint}>{t('aiVideo.aspectFromImage')}</Text>
           ) : null}
         </>
@@ -90,7 +90,7 @@ export function AiVideoForm({
           items={refs.items}
           labels={refs.labels}
           thumbs={refs.thumbs}
-          mode={refs.mode}
+          mode={ai.form.mode}
           error={refs.addError}
           disabled={ai.locked || !limits}
           onPickMedia={() => void refs.pickMedia()}
