@@ -113,13 +113,19 @@ export const e2eeApi = {
   transferCancel: (id: string) => http.post<TransferStep>(`/e2ee/transfer/${id}/cancel`),
   // E7 §3.2: kimlik ve cihaz imzası.
   userDevices: (userId: string) =>
-    http.get<{ identity: E2eeIdentityInfo | null; devices: E2eeUserDevice[] }>(`/e2ee/users/${userId}/devices`),
+    http.get<{ identity: E2eeIdentityInfo | null; devices: E2eeUserDevice[] }>(
+      `/e2ee/users/${userId}/devices`,
+    ),
   identityCreate: (body: IdentityMaterial) => http.put<{ version: number }>('/e2ee/identity', body),
-  identityReset: (body: IdentityMaterial & Reauth) => http.post<{ version: number }>('/e2ee/identity/reset', body),
+  identityReset: (body: IdentityMaterial & Reauth) =>
+    http.post<{ version: number }>('/e2ee/identity/reset', body),
   signDevice: (deviceId: string, body: { identityVersion: number; sig: string }) =>
     http.post<null>(`/e2ee/devices/${deviceId}/signature`, body),
-  backupPutIdentity: (body: { wrappedIdentity: string; identityVersion: number; keyVersion: number }) =>
-    http.put<null>('/e2ee/backup/identity', body),
+  backupPutIdentity: (body: {
+    wrappedIdentity: string
+    identityVersion: number
+    keyVersion: number
+  }) => http.put<null>('/e2ee/backup/identity', body),
 } satisfies E2eeApi
 
 /** C69 Oturumlarım: motor portunun parçası değil (yalnız ayarlar ekranı kullanır). */

@@ -35,6 +35,7 @@ import DateDivider from '@/components/shared/DateDivider.vue'
 import E2eeDeviceNotice from '@/components/shared/E2eeDeviceNotice.vue'
 import E2eeDivider from '@/components/shared/E2eeDivider.vue'
 import E2eeLockIcon from '@/components/shared/E2eeLockIcon.vue'
+import SafetyCodeModal from '@/components/shared/SafetyCodeModal.vue'
 import E2eeWarningBanner from '@/components/shared/E2eeWarningBanner.vue'
 import { useE2eeChannelView } from '@/composables/useE2eeChannelView'
 import { useE2eeStore } from '@/stores/e2ee'
@@ -226,6 +227,8 @@ const dmPresence = computed<PresenceStatus | null>(() =>
 )
 const dmPresenceColor = computed(() => (dmPresence.value ? PRESENCE_COLOR[dmPresence.value] : null))
 const groupChannel = computed(() => props.channel.type === 'GROUP_DM' ? props.channel : null)
+// E7 §4.7: başlıktaki kilit güvenlik kodunu açar (1-1: karşı taraf; grup: kişi seçilir). Üye kaynağı bahsetmelerle aynı.
+const safetyOpen = ref(false)
 // C62: ayrıldığım/çıkarıldığım grup = salt okunur (composer yerine band; yanıt/tepki/düzenle/sil/sabitle/arama/üye paneli kapalı)
 const departure = computed(() => groupChannel.value?.departed ?? null)
 const isDeparted = computed(() => !!departure.value)
@@ -911,7 +914,13 @@ const dayLabels = computed<(string | null)[]>(() =>
               <span class="text-[15px] font-semibold truncate leading-[1.25]" style="color: var(--kv-text-primary);">
                 {{ dmChannel.otherUser.username }}
               </span>
-              <E2eeLockIcon v-if="e2eeView.encrypted.value" />
+              <button
+                v-if="e2eeView.encrypted.value"
+                class="inline-flex items-center cursor-pointer rounded-[var(--kv-radius-sm)] p-0.5 hover:bg-[var(--kv-bg-elevated)]"
+                :title="t('e2ee.identity.openCode')"
+                :aria-label="t('e2ee.identity.openCode')"
+                @click="safetyOpen = true"
+              ><E2eeLockIcon /></button>
             </span>
             <span
               v-if="dmPresenceColor && dmPresence"
@@ -1063,8 +1072,15 @@ const dayLabels = computed<(string | null)[]>(() =>
             </div>
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-[15px] font-semibold truncate" style="color: var(--kv-text-primary);">
-              {{ groupDisplayName }}
+            <p class="flex items-center gap-1.5 min-w-0 text-[15px] font-semibold" style="color: var(--kv-text-primary);">
+              <span class="truncate">{{ groupDisplayName }}</span>
+              <button
+                v-if="e2eeView.encrypted.value"
+                class="inline-flex items-center cursor-pointer rounded-[var(--kv-radius-sm)] p-0.5 hover:bg-[var(--kv-bg-elevated)]"
+                :title="t('e2ee.identity.openCode')"
+                :aria-label="t('e2ee.identity.openCode')"
+                @click="safetyOpen = true"
+              ><E2eeLockIcon /></button>
             </p>
             <p class="text-[12px]" style="color: var(--kv-text-muted);">
               {{ t('group.memberCount', { n: groupChannel.members.length }) }}
@@ -1192,7 +1208,7 @@ const dayLabels = computed<(string | null)[]>(() =>
         <!-- C11: gün değişiminde ayraç (Bugün · Dün · 25 Ekim 2026) -->
         <DateDivider v-if="dayLabels[index]" :label="dayLabels[index] || ''" />
         <E2eeDivider v-if="e2eeView.dividerIndex.value === index" />
-        <E2eeDeviceNotice v-for="n in e2eeView.deviceNotices.value.get(index)" :key="`${n.userId}-${n.at}`" :name="noticeName(n.userId)" />
+        <E2eeDeviceNotice v-for="n in e2eeView.deviceNotices.value.get(index)" :key="`${n.userId}-${n.at}`" :name="noticeName(n.userId)" :kind="n.kind" />
         <GroupEventNotice v-for="ev in groupEventSlotMap.get(index)" :key="ev.id" :event="ev" />
         <MessageRow
           :message="msg"
@@ -1233,7 +1249,7 @@ const dayLabels = computed<(string | null)[]>(() =>
         <SeenAvatars v-if="seenByMessage.has(msg.id)" :readers="seenByMessage.get(msg.id) ?? []" />
         </template>
         <E2eeDivider v-if="e2eeView.dividerIndex.value === messages.length" />
-        <E2eeDeviceNotice v-for="n in e2eeView.deviceNotices.value.get(messages.length)" :key="`${n.userId}-${n.at}`" :name="noticeName(n.userId)" />
+        <E2eeDeviceNotice v-for="n in e2eeView.deviceNotices.value.get(messages.length)" :key="`${n.userId}-${n.at}`" :name="noticeName(n.userId)" :kind="n.kind" />
         <GroupEventNotice v-for="ev in groupEventSlotMap.get(messages.length)" :key="ev.id" :event="ev" />
       </div>
 
@@ -1434,4 +1450,6 @@ const dayLabels = computed<(string | null)[]>(() =>
     :message-id="reactionsMsgId"
     @close="reactionsMsgId = null"
   />
+
+  <SafetyCodeModal v-if="safetyOpen" :members="dmMentionMembers" @close="safetyOpen = false" />
 </template>

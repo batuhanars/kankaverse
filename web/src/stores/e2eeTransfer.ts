@@ -45,6 +45,9 @@ export const useE2eeTransferStore = defineStore('e2eeTransfer', () => {
     sas: '',
     expiresAt: '',
     received: 0,
+    /** E7 §4.5-3 "Bu cihazı doğrula": aynı el sıkışma, mesaj yazılmaz, yalnız kimlik alınır. */
+    identityOnly: false,
+    identityAdopted: false,
   })
   const o = reactive({
     phase: 'idle',
@@ -70,10 +73,18 @@ export const useE2eeTransferStore = defineStore('e2eeTransfer', () => {
 
   // ── Yeni cihaz ─────────────────────────────────────────────────────────────
 
-  async function startNew(): Promise<void> {
+  async function startNew(opts: { identityOnly?: boolean } = {}): Promise<void> {
     const t = tr()
     if (!t) return
-    Object.assign(n, { open: true, phase: 'starting', id: null, sas: '', received: 0 })
+    Object.assign(n, {
+      open: true,
+      phase: 'starting',
+      id: null,
+      sas: '',
+      received: 0,
+      identityOnly: opts.identityOnly === true,
+      identityAdopted: false,
+    })
     try {
       const r = await t.start()
       Object.assign(n, { id: r.id, expiresAt: r.expiresAt, phase: 'waiting' })
@@ -99,9 +110,12 @@ export const useE2eeTransferStore = defineStore('e2eeTransfer', () => {
     if (!t || n.id !== id || n.phase !== 'code' || !n.sas) return
     n.phase = 'receiving'
     try {
-      const r = await t.receive(id, dmIds())
+      // Yalnız kimlik: erişilebilir kanal listesi boş verilir, motor hiçbir mesaj kaydı yazmaz.
+      const r = await t.receive(id, n.identityOnly ? [] : dmIds())
       n.received = r.received
+      n.identityAdopted = r.identityAdopted
       n.phase = 'done'
+      if (n.identityOnly) return
       // Açık sohbet ve liste önizlemeleri yeni kayıtlarla yeniden okunsun.
       useE2eeBackupStore().restoreTick++
       useE2eeStore().plainTick++

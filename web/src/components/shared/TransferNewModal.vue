@@ -28,6 +28,9 @@ const finished = computed(() =>
 const resultText = computed(() => {
   switch (transfer.n.phase) {
     case 'done':
+      if (transfer.n.identityOnly) {
+        return transfer.n.identityAdopted ? t('e2ee.identity.verifyDone') : t('e2ee.identity.verifyFailed')
+      }
       return t('e2ee.backup.transfer.done', { n: transfer.n.received })
     case 'expired':
       return t('e2ee.backup.transfer.expired')
@@ -43,7 +46,10 @@ const canRestart = computed(() => ['expired', 'cancelled', 'error'].includes(tra
 </script>
 
 <template>
-  <KvModal :title="t('e2ee.backup.transfer.title')" @close="transfer.closeNew()">
+  <KvModal
+    :title="transfer.n.identityOnly ? t('e2ee.identity.verifyTitle') : t('e2ee.backup.transfer.title')"
+    @close="transfer.closeNew()"
+  >
     <div class="flex flex-col gap-4 text-[13px]" style="color: var(--kv-text-primary);">
       <template v-if="transfer.n.phase === 'starting' || transfer.n.phase === 'waiting'">
         <p class="m-0">{{ t('e2ee.backup.transfer.waiting') }}</p>
@@ -74,7 +80,11 @@ const canRestart = computed(() => ['expired', 'cancelled', 'error'].includes(tra
       <p v-else-if="finished" class="m-0" role="status">{{ resultText }}</p>
 
       <div class="flex flex-wrap gap-3 justify-end">
-        <KvButton v-if="canRestart" variant="ghost" @click="transfer.startNew()">
+        <KvButton
+          v-if="canRestart"
+          variant="ghost"
+          @click="transfer.startNew({ identityOnly: transfer.n.identityOnly })"
+        >
           {{ t('e2ee.backup.transfer.restart') }}
         </KvButton>
         <KvButton

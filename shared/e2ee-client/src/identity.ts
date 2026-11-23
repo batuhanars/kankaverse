@@ -75,6 +75,11 @@ export class IdentityManager {
     this.d = deps
   }
 
+  /** `/e2ee/status.identity`: kapalıyken arayüz kimlik bölümünü çizmez. */
+  get enabled(): boolean {
+    return this.d.enabled
+  }
+
   /**
    * Açılışta, yedek açılınca ve aktarım sonrası çağrılır; tekrar çağrılması güvenlidir (idempotent).
    * Sırası: (1) sunucuda kimlik yoksa kur (geçiş, §4.4); (2) yereldeki bayatsa düşür; (3) yerelde yoksa yedekten

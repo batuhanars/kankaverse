@@ -37,6 +37,7 @@ import MasaustuSection from './components/MasaustuSection.vue'
 import QuickReactionsSection from './components/QuickReactionsSection.vue'
 import ConnectionsSection from './components/ConnectionsSection.vue'
 import BackupSection from './components/BackupSection.vue'
+import IdentitySection from './components/IdentitySection.vue'
 import { integrationsApi } from '@/api/integrations'
 import AnimatedClipModal from '@/components/shared/AnimatedClipModal.vue'
 
@@ -680,6 +681,9 @@ async function toggleReadReceipts(next: boolean) {
 
                 <!-- E5a: Sohbet yedeği (yedek bayrağı kapalıysa çizilmez) -->
                 <BackupSection />
+
+                <!-- E7: Güvenlik kimliği (kimlik bayrağı kapalıysa çizilmez) -->
+                <IdentitySection />
 
                 <!-- Hesabı Sil -->
                 <section>
