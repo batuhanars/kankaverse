@@ -98,13 +98,10 @@ function SheetBody({
   const [picking, setPicking] = useState(false);
   const [sendingTo, setSendingTo] = useState(false);
   const [pickError, setPickError] = useState('');
+  // Web 2026-11-22 düzeltmesinin karşılığı: önizleme "Son üretimler"den açıldıysa kapatınca forma dönülür
+  // (sayfa kapanmaz). Bildirimden ya da yeni biten üretimden açılan önizleme sayfayı kapatır.
+  const [previewFromList, setPreviewFromList] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
-  backRef.current = () => {
-    if (!picking) return false;
-    setPicking(false);
-    setPickError('');
-    return true;
-  };
   const promptY = useRef(0);
   const actions = useAiVideoActions({
     mode,
@@ -114,6 +111,25 @@ function SheetBody({
     onUse: (m) => onUse?.(m),
   });
   const { row } = actions;
+
+  /** X, karartmaya dokunma ve geri tuşu: listeden açılan önizlemede forma dön, aksi halde sayfayı kapat. */
+  function closeOrBack(): boolean {
+    if (!row || !previewFromList) return false;
+    setPreviewFromList(false);
+    actions.show(null);
+    return true;
+  }
+  const close = () => {
+    if (!closeOrBack()) onClose();
+  };
+  backRef.current = () => {
+    if (picking) {
+      setPicking(false);
+      setPickError('');
+      return true;
+    }
+    return closeOrBack();
+  };
 
   // C49: açık sayfa sayısı (sohbet/medya/view hepsi). Ön plan bildirim süzgeci okur.
   // C49 R3: sayfa kapanırken süren üretim varsa kısa bilgi (uygulama içi toast, iki platformda aynı).
@@ -144,7 +160,10 @@ function SheetBody({
     aiVideoApi
       .get(initialId)
       .then((r) => {
-        if (!cancelled && r.status === 'COMPLETED' && r.videoUrl) actions.show(r);
+        if (!cancelled && r.status === 'COMPLETED' && r.videoUrl) {
+          setPreviewFromList(false);
+          actions.show(r);
+        }
       })
       .catch(() => {
         /* silinmiş ya da ağ hatası: normal form açık kalır */
@@ -164,7 +183,9 @@ function SheetBody({
   // Yoklamayla biten üretim önizlemeye geçer (form kapanır).
   const doneRow = ai.job?.status === 'COMPLETED' && ai.job.videoUrl ? ai.job : null;
   useEffect(() => {
-    if (doneRow) actions.show(doneRow);
+    if (!doneRow) return;
+    setPreviewFromList(false);
+    actions.show(doneRow);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnız biten satır değişince
   }, [doneRow?.id]);
 
@@ -201,17 +222,20 @@ function SheetBody({
 
   /** Biten satır → önizleme (taze adres); süren → forma ilerleme. Başarısız satır dokunulmaz. */
   function onOpen(r: AiVideoDto) {
-    if (r.status === 'COMPLETED' && r.videoUrl) void actions.showFresh(r);
+    if (r.status === 'COMPLETED' && r.videoUrl) {
+      setPreviewFromList(true);
+      void actions.showFresh(r);
+    }
     else if (r.status === 'QUEUED' || r.status === 'RUNNING') ai.open(r);
   }
 
   return (
     <KeyboardAvoidingView style={styles.backdrop} behavior="padding">
-      <Pressable style={styles.tap} onPress={onClose} />
+      <Pressable style={styles.tap} onPress={close} />
       <View style={[styles.sheet, { maxHeight: height * 0.92 }]}>
         <View style={styles.head}>
           <Text style={styles.title}>{t(row ? 'aiVideo.previewTitle' : 'aiVideo.title')}</Text>
-          <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
+          <Pressable onPress={close} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
             <Ionicons name="close" size={24} color={theme.colors.textSecondary} />
           </Pressable>
         </View>
