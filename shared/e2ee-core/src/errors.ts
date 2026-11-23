@@ -94,3 +94,9 @@ export class TransferKeyError extends E2eeError {}
 
 /** E5b: aktarım yükü açılamadı (yanlış anahtar/bağlam ya da kurcalanmış bayt). */
 export class TransferOpenError extends E2eeError {}
+
+/** E7: kimlik anahtarı ya da sürümü biçimce geçersiz (uzunluk, sürüm < 1). */
+export class IdentityKeyError extends E2eeError {}
+
+/** E7: yedekteki kimlik açılamadı (yanlış BMK/bağlam ya da kurcalanmış bayt). */
+export class IdentityOpenError extends E2eeError {}
