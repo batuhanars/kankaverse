@@ -7,12 +7,23 @@ export interface E2eeDeviceInfo {
   deviceId: string
   signatureKey: string
   revokedAt: string | null
+  /** E7: sahibin kimlik anahtarının bu cihaza attığı imza (base64); yoksa/bayrak kapalıysa null ya da alan yok. */
+  identitySig?: string | null
+  identityVersion?: number | null
+}
+
+/** E7: kullanıcının kimlik açık anahtarı (base64) ve sürümü. */
+export interface E2eeIdentityInfo {
+  publicKey: string
+  version: number
 }
 
 /** Kanal üyesi: cihazları (iptaller dahil) ve katılım zamanı (E2 §2.3; yalnız GROUP_DM'de dolu, 1-1'de null). */
 export interface E2eeMemberInfo {
   userId: string
   joinedAt?: string | null
+  /** E7: kimlik yoksa, bayrak kapalıysa ya da eski sunucuda null/yok: istemci bugünkü davranışa döner. */
+  identity?: E2eeIdentityInfo | null
   devices: E2eeDeviceInfo[]
 }
 
@@ -83,7 +94,30 @@ export interface BackupSnapshotInfo {
 /** `GET /e2ee/backup`: yedek kurulu değilse yalnız `configured: false` ve görüntü listesi. */
 export type BackupInfo =
   | { configured: false; snapshots: BackupSnapshotInfo[] }
-  | ({ configured: true; keyVersion: number; snapshots: BackupSnapshotInfo[] } & BackupKeyMaterial)
+  | ({
+      configured: true
+      keyVersion: number
+      snapshots: BackupSnapshotInfo[]
+      /** E7 §2.3: BMK ile sarılı kimlik (base64) ve sürümü; yoksa null/alan yok. */
+      wrappedIdentity?: string | null
+      identityVersion?: number | null
+    } & BackupKeyMaterial)
+
+/** E7: `GET /e2ee/users/:userId/devices` cihaz satırı (yalnız etkinler). */
+export interface E2eeUserDevice {
+  deviceId: string
+  platform: string
+  signatureKey: string
+  createdAt: string
+  identitySig: string | null
+  identityVersion: number | null
+}
+
+/** E7: kimlik kurulum/sıfırlama gövdesi. İmzalar yalnız çağıranın kendi etkin cihazlarına. */
+export interface IdentityMaterial {
+  publicKey: string
+  signatures: { deviceId: string; sig: string }[]
+}
 
 /** Görüntü yükleme/commit gövdesi: `sha256` şifreli baytların küçük harf hex özeti. */
 export interface SnapshotRef {
@@ -99,7 +133,9 @@ export interface SnapshotRef {
  */
 export interface E2eeApi {
   /** `franking`: E4 §2.2, true iken istemci v2 yük (parmak izi) gönderir; eski sunucuda yok = false. */
-  status(): Promise<Reply<{ enabled: boolean; franking?: boolean; backup?: boolean; transfer?: boolean }>>
+  status(): Promise<
+    Reply<{ enabled: boolean; franking?: boolean; backup?: boolean; transfer?: boolean; identity?: boolean }>
+  >
   /** Platform bilgisini (web/android) adaptör ekler; motor bilmez. */
   registerDevice(signatureKey: string): Promise<Reply<{ deviceId: string }>>
   available(): Promise<Reply<{ available: number }>>
@@ -157,6 +193,16 @@ export interface E2eeApi {
   transferBlob(id: string): Promise<Reply<{ url: string; size: number; sha256: string }>>
   transferDone(id: string): Promise<Reply<{ id: string; status: TransferStatus }>>
   transferCancel(id: string): Promise<Reply<{ id: string; status: TransferStatus }>>
+  /** E7 §3.2: kullanıcının kimliği ve etkin cihazları (kendisi ya da ortak DM). */
+  userDevices(userId: string): Promise<Reply<{ identity: E2eeIdentityInfo | null; devices: E2eeUserDevice[] }>>
+  /** İlk kurulum (sürüm 1). Kimlik varsa 409 E2EE_IDENTITY_EXISTS. */
+  identityCreate(body: IdentityMaterial): Promise<Reply<{ version: number }>>
+  /** Sıfırlama: reauth, sürüm sunucuda +1 (imzalar o sürümle atılmış olmalı). */
+  identityReset(body: IdentityMaterial & Reauth): Promise<Reply<{ version: number }>>
+  /** Kendi etkin cihazına imza. 409 E2EE_IDENTITY_VERSION, 404 E2EE_IDENTITY_NOT_FOUND. */
+  signDevice(deviceId: string, body: { identityVersion: number; sig: string }): Promise<Reply<null>>
+  /** Kimliği BMK ile sarılı olarak yedeğe yazar. 409 E2EE_BACKUP_KEY_VERSION / E2EE_IDENTITY_VERSION. */
+  backupPutIdentity(body: { wrappedIdentity: string; identityVersion: number; keyVersion: number }): Promise<Reply<null>>
 }
 
 /** E5b: cihaz bilgisi (onay ekranı). `name` oturumdaki cihaz adı ("Chrome, Windows"); IP yok. */

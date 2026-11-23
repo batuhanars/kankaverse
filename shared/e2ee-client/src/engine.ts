@@ -20,6 +20,7 @@ import {
 } from './channelSync'
 import { BackupManager } from './backup'
 import { deriveCallKey } from './callKey'
+import { IdentityManager } from './identity'
 import { TransferManager } from './transfer'
 import type { E2eeContext } from './context'
 import { previewInMemory, type PushCommit } from './commitPreview'
@@ -107,6 +108,10 @@ export class E2eeEngine {
   readonly backup: BackupManager | null
   /** E5b cihazdan cihaza aktarım: ağlı motorda ve `/e2ee/status.transfer` açıkken var. */
   readonly transfer: TransferManager | null
+  /** E7 kimlik: ağlı motorda her zaman var (okuma: kod ekranı, cihazlarım); yazma `/e2ee/status.identity` ile. */
+  readonly identity: IdentityManager | null
+  /** Açılıştaki kimlik eşitlemesi (hiç reddedilmez). Arayüz Cihazlar ekranında bekleyebilir; testler bekler. */
+  identitySynced: Promise<void> = Promise.resolve()
 
   private constructor(
     userId: string,
@@ -117,6 +122,7 @@ export class E2eeEngine {
     backup: Pick<EngineDeps, 'argon2' | 'blob'> | null = null,
     backupEnabled = false,
     transferEnabled = false,
+    identityEnabled = false,
   ) {
     this.userId = userId
     this.vault = vault
@@ -128,6 +134,16 @@ export class E2eeEngine {
     this.log = deps.log ?? ((m, e) => console.error(m, e))
     this.yieldToUi = deps.yieldToUi
     this.metric = deps.metric
+    this.identity = api
+      ? new IdentityManager({
+          userId,
+          api,
+          enabled: identityEnabled,
+          run: (task) => this.run(task),
+          log: this.log,
+        })
+      : null
+    const identity = this.identity
     this.backup =
       api && backup
         ? new BackupManager({
@@ -138,6 +154,7 @@ export class E2eeEngine {
             enabled: backupEnabled,
             run: (task) => this.run(task),
             log: this.log,
+            onKeyAdopted: identity ? () => identity.sync() : undefined,
           })
         : null
     this.transfer =
@@ -148,6 +165,9 @@ export class E2eeEngine {
             blob: backup.blob,
             run: (task) => this.run(task),
             log: this.log,
+            identity: identity
+              ? { export: () => identity.exportForTransfer(), adopt: (t) => identity.adoptFromTransfer(t) }
+              : undefined,
           })
         : null
   }
@@ -167,6 +187,7 @@ export class E2eeEngine {
       deps,
       data.backup === true,
       data.transfer === true,
+      data.identity === true,
     )
     engine.franking = data.franking === true
     try {
@@ -178,6 +199,8 @@ export class E2eeEngine {
       if (e instanceof DeviceBrokenError) deps.onWarn('', 'device-broken')
       throw e
     }
+    // E7 §4.4: geçiş ve imza. Kilit DIŞINDA (ağ çağrıları); hata fırlatmaz, açılışı bekletmez.
+    engine.identitySynced = engine.identity?.sync() ?? Promise.resolve()
     return engine
   }
 

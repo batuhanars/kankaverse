@@ -1,6 +1,7 @@
 import { webProvider } from '@kankaverse/e2ee-core'
 import { backupSuite } from './backupSuite'
 import { transferSuite } from './transferSuite'
+import { identitySuite } from './identitySuite'
 import { flowSuite } from './flowSuite'
 import { callSuite } from './callSuite'
 import { groupSuite } from './groupSuite'
@@ -16,3 +17,4 @@ transferSuite('web')
 groupSuite('web') // beforeEach ve sunucu flowSuite'ten gelir
 rebindSuite('web')
 callSuite('web') // E8; beforeEach ve sunucu flowSuite'ten gelir
+identitySuite('web') // E7; beforeEach ve sunucu flowSuite'ten gelir

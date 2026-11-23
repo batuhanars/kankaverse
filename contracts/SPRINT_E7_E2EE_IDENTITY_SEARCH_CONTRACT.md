@@ -142,6 +142,14 @@ E2 §3.3'teki tetikleme koşulu aynen (başka kullanıcının, zaten üyeyken ek
 ### §4.8 Kendi cihazlarım
 Hesap güvenliği → Cihazlar (Oturumlarım) listesinde her cihazın yanında "doğrulanmış" / "doğrulanmamış". Doğrulanmamış bu cihazsa §4.5-3 satırı.
 
+### §4.9 Rev.2 (2026-11-23, adım 3 PM): uygulama kararları
+- **Aktarım yükü `v: 1` kalır**, `identity` isteğe bağlı alan (§4.5-2'deki `v: 2` yerine). Neden: `parseSnapshot` `v !== 1`'i reddediyor; sürüm artarsa eski istemci yeni cihazdan aktarım ALAMAZDI. İsteğe bağlı alanı eski istemci yok sayar.
+- **Sabitlemeler (`pins`) ve kimlik Vault'un `device` bölümünde** (§4.1'deki yeni bölüm yerine): adaptörler değişmez. `resetDeviceState` BMK gibi ikisini de korur. Kanal başı görülen kimlikler `groups` bölümünde (`{channelId}:ids`).
+- **Sürüm düşürme koruması:** sunucu bir kişinin kimliğini sonradan `null` bildirirse sabitleme düşmez; o kişinin yeni cihazları yine sabitlenmiş kimlikle sınanır ("yeni cihaz"a kaçmaz). Bedeli: bayrak kapatılırsa (geri alma) önceden sabitlenmiş kişilerin yeni cihazları "doğrulanmamış" görünür. Kabul: geri alma acil durumdur ve satır doğrudur (doğrulayamıyoruz).
+- **Kimlik değişimi yalnız durum tazelenince görülür** (sıfırlama commit üretmez): `syncGroup` sonunda gözlem. Değişim satırı kanal başına bir kez.
+- **Açılışta eşitleme** kilit dışında, tek seferde bir (`inflight`); `engine.identitySynced` sözü.
+- **Bayrak açılışta okunur:** `E2EE_IDENTITY` açılınca istemcide etkisi uygulama yeniden açılınca başlar.
+
 ## §5 Parça B: yerel arama (R7 DEĞİL)
 
 ### §5.1 Kapsam

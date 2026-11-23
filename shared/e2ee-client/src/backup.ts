@@ -73,6 +73,11 @@ export interface BackupDeps {
   /** Motorun kilit yolu (`withLock`): depoya dokunan her adım bundan geçer. */
   run: <T>(task: (ctx: E2eeContext) => Promise<T>) => Promise<T>
   log: (message: string, error?: unknown) => void
+  /**
+   * E7 §4.5-1: BMK bu cihaza yazıldıktan sonra (kurulum, açma, sıfırlama). Kimlik yöneticisi yedekteki kimliği
+   * açıp cihazı imzalar ya da kendi kimliğini yedeğe sarar. Hata fırlatmaz (fail-quiet).
+   */
+  onKeyAdopted?: () => Promise<void>
 }
 
 const toHex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
@@ -319,11 +324,12 @@ export class BackupManager {
   }
 
   /** Yeni anahtar bu cihaza yazılır; bu anahtarla bu cihazdan henüz yedek yok: ilk fırsatta alınsın. */
-  private adopt(bmk: Uint8Array, keyVersion: number): Promise<void> {
-    return this.d.run(async (ctx) => {
+  private async adopt(bmk: Uint8Array, keyVersion: number): Promise<void> {
+    await this.d.run(async (ctx) => {
       await ctx.store.saveBackupKey({ bmk, keyVersion })
       await ctx.store.patchFlags({ backupDirty: true, backupInFlight: false, lastBackupAt: undefined })
     })
+    await this.d.onKeyAdopted?.()
   }
 }
 

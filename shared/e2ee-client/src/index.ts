@@ -24,6 +24,12 @@ export {
   e2eeErrorCode,
 } from './errors'
 export { TransferManager } from './transfer'
+export {
+  IdentityManager,
+  type OwnDeviceView,
+  type SafetyCodeView,
+  type TransferIdentity,
+} from './identity'
 export { isBeforeDevice, reachedDeviceBoundary, visibleMessages, type VisibilityMessage } from './historyVisibility'
 export {
   BACKUP_MIN_INTERVAL_MS,

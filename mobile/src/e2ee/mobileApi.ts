@@ -9,6 +9,8 @@ import type {
   TransferPending,
   TransferStatus,
   TransferView,
+  E2eeIdentityInfo,
+  E2eeUserDevice,
 } from '@kankaverse/e2ee-client'
 import http from '@/api/http'
 
@@ -16,7 +18,10 @@ type TransferStep = { id: string; status: TransferStatus }
 type TransferBlobRef = { size: number; sha256: string }
 
 export const mobileE2eeApi: E2eeApi = {
-  status: () => http.get<{ enabled: boolean; franking?: boolean; backup?: boolean; transfer?: boolean }>('/e2ee/status'),
+  status: () =>
+    http.get<{ enabled: boolean; franking?: boolean; backup?: boolean; transfer?: boolean; identity?: boolean }>(
+      '/e2ee/status',
+    ),
   registerDevice: (signatureKey) =>
     http.post<{ deviceId: string }>('/e2ee/devices', { platform: 'android', signatureKey }),
   available: () => http.get<{ available: number }>('/e2ee/devices/me'),
@@ -68,6 +73,13 @@ export const mobileE2eeApi: E2eeApi = {
   transferBlob: (id) => http.get<{ url: string; size: number; sha256: string }>(`/e2ee/transfer/${id}/blob`),
   transferDone: (id) => http.post<TransferStep>(`/e2ee/transfer/${id}/done`),
   transferCancel: (id) => http.post<TransferStep>(`/e2ee/transfer/${id}/cancel`),
+  // E7 §3.2: kimlik ve cihaz imzası.
+  userDevices: (userId) =>
+    http.get<{ identity: E2eeIdentityInfo | null; devices: E2eeUserDevice[] }>(`/e2ee/users/${userId}/devices`),
+  identityCreate: (body) => http.put<{ version: number }>('/e2ee/identity', body),
+  identityReset: (body) => http.post<{ version: number }>('/e2ee/identity/reset', body),
+  signDevice: (deviceId, body) => http.post<null>(`/e2ee/devices/${deviceId}/signature`, body),
+  backupPutIdentity: (body) => http.put<null>('/e2ee/backup/identity', body),
 }
 
 /** C69 Oturumlarım: çıkış yapılmış (park) cihazlar. Motor portunun parçası değil (yalnız ayarlar ekranı kullanır). */

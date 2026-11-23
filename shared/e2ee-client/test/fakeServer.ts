@@ -4,6 +4,7 @@ import { createPublicKey, randomBytes, verify } from 'node:crypto'
 import { rebindMessage } from '@kankaverse/e2ee-core'
 import type { E2eeApi, E2eeChannelState } from '../src/ports'
 import { FakeBackupStore } from './fakeBackup'
+import { FakeIdentityStore } from './fakeIdentity'
 import { FakeTransferStore } from './fakeTransfer'
 
 interface Dev {
@@ -62,6 +63,8 @@ export class FakeServer {
   backup = new FakeBackupStore()
   /** E5b aktarım: yük nesneleri yedekle aynı sahte depoda. */
   transfer = new FakeTransferStore(this.backup)
+  /** E7 kimlik uçları ve sahte kimlik enjeksiyonu. */
+  identity = new FakeIdentityStore(this)
   /** E5a Rev.2 §4.7 varlık kontrolü: varsayılan her mesaj var; silinmiş/olmayan kimlikler buraya. */
   goneMessages = new Set<string>()
   /** Çağıranın erişemediği kanallar (403). */
@@ -133,7 +136,13 @@ export class FakeServer {
     const ok = <T>(data: T) => Promise.resolve({ data })
     const api = {
       status: () =>
-        ok({ enabled: true, franking: this.franking, backup: this.backup.enabled, transfer: this.transfer.enabled }),
+        ok({
+          enabled: true,
+          franking: this.franking,
+          backup: this.backup.enabled,
+          transfer: this.transfer.enabled,
+          identity: this.identity.enabled,
+        }),
       registerDevice: (key: string) => {
         const existing = this.deviceOfFamily(family)
         if (existing) {
@@ -280,6 +289,7 @@ export class FakeServer {
       },
       ...this.backup.api(userId, () => active().id),
       ...this.transfer.api(userId, () => active().id),
+      ...this.identity.api(userId),
     }
     return api as unknown as E2eeApi
   }
@@ -308,6 +318,7 @@ export class FakeServer {
         deviceId: d.id,
         signatureKey: d.key,
         revokedAt: d.revokedAt?.toISOString() ?? null,
+        ...this.identity.sigView(d.id),
       }))
   }
 
@@ -323,6 +334,7 @@ export class FakeServer {
       members: (this.members.get(channelId) ?? []).map((userId) => ({
         userId,
         joinedAt: joined?.get(userId) ?? null,
+        identity: this.identity.visibleIdentity(userId),
         devices: this.devicesOfUser(userId, hide),
       })),
       formerMembers: [...(this.former.get(channelId) ?? [])].map(([userId, leftAt]) => ({

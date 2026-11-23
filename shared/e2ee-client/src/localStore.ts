@@ -8,6 +8,7 @@ import {
   type CryptoProvider,
   type Device,
   type Group,
+  type IdentityKeyPair,
   utf8,
 } from '@kankaverse/e2ee-core'
 import { fromB64, toB64 } from './b64'
@@ -35,13 +36,30 @@ export interface StoredMessage {
 /** Grupta görülen üye → görüldüğü andaki katılım zamanı (ISO; 1-1'de ''). Yeniden eklenen üye farklı değer taşır. */
 export type SeenMembers = Record<string, string>
 
-/** Sohbette gri bilgi satırı: `userId` kullanıcısı bu grupta yeni bir cihaz ekledi (E2 §3.3). `at` = ms. */
+/**
+ * Sohbette gri bilgi satırı (E2 §3.3, E7 §4.2-4.3). `at` = ms.
+ * - `new` (ya da alan yok, E7 öncesi kayıt): kimliği olmayan kişinin yeni cihazı.
+ * - `unverified`: kimliği olan kişinin, o kimlikle imzalanmamış cihazı.
+ * - `identity`: kişinin güvenlik kodu değişti (count anlamsız, 1).
+ */
 export interface DeviceNotice {
   userId: string
   at: number
   /** Aynı commit'te eklenen cihaz sayısı. */
   count: number
+  kind?: 'new' | 'unverified' | 'identity'
 }
+
+/** E7 §4.2: kişinin sabitlenmiş kimliği (TOFU) ve bu cihazdaki doğrulama işareti. Anahtar base64. */
+export interface IdentityPin {
+  publicKey: string
+  version: number
+  verified: boolean
+  verifiedAt?: number
+}
+
+/** Kanalda en son görülen kimlikler: kullanıcı → `publicKey|version` (değişim satırı kanal başına bir kez). */
+export type SeenIdentities = Record<string, string>
 
 export interface Flags {
   lastResortUploaded: boolean
@@ -69,6 +87,9 @@ export interface BackupKeyRecord {
 }
 
 const BACKUP_KEY = 'backupKey'
+/** E7: kimlik ve kişi sabitlemeleri `device` bölümünde; yeni vault bölümü gerekmez (adaptörler değişmez). */
+const IDENTITY_KEY = 'identity'
+const PINS_KEY = 'pins'
 const BACKUP_FLAGS = ['lastBackupAt', 'backupDirty', 'backupInFlight'] as const
 
 /** Ciphertext'in kısa özeti (SHA-256 ilk 16 bayt). Gizli değil; yalnız sürüm ayırt etmek için. */
@@ -118,6 +139,43 @@ export class LocalStore {
 
   deleteBackupKey(): Promise<void> {
     return this.vault.delete('device', BACKUP_KEY)
+  }
+
+  /** E7: bu cihazın taşıdığı kimlik (özel anahtar dahil; Vault zaten şifreli). */
+  async loadIdentity(): Promise<IdentityKeyPair | null> {
+    const bytes = await this.vault.get('device', IDENTITY_KEY)
+    if (!bytes) return null
+    const rec = JSON.parse(fromUtf8(bytes)) as { priv: string; pub: string; version: number }
+    return { privateKey: fromB64(rec.priv), publicKey: fromB64(rec.pub), version: rec.version }
+  }
+
+  saveIdentity(id: IdentityKeyPair): Promise<void> {
+    const json = JSON.stringify({ priv: toB64(id.privateKey), pub: toB64(id.publicKey), version: id.version })
+    return this.vault.put('device', IDENTITY_KEY, utf8(json))
+  }
+
+  deleteIdentity(): Promise<void> {
+    return this.vault.delete('device', IDENTITY_KEY)
+  }
+
+  /** E7 §4.2: kişi sabitlemeleri (kullanıcı → kimlik + doğrulama işareti). */
+  async loadPins(): Promise<Record<string, IdentityPin>> {
+    const bytes = await this.vault.get('device', PINS_KEY)
+    return bytes ? (JSON.parse(fromUtf8(bytes)) as Record<string, IdentityPin>) : {}
+  }
+
+  savePins(pins: Record<string, IdentityPin>): Promise<void> {
+    return this.vault.put('device', PINS_KEY, utf8(JSON.stringify(pins)))
+  }
+
+  /** E7: bu kanalda en son görülen kimlikler. */
+  async loadSeenIdentities(channelId: string): Promise<SeenIdentities> {
+    const bytes = await this.vault.get('groups', `${channelId}:ids`)
+    return bytes ? (JSON.parse(fromUtf8(bytes)) as SeenIdentities) : {}
+  }
+
+  saveSeenIdentities(channelId: string, ids: SeenIdentities): Promise<void> {
+    return this.vault.put('groups', `${channelId}:ids`, utf8(JSON.stringify(ids)))
   }
 
   /** Bayrakların bir kısmını günceller (oku-değiştir-yaz; çağıran motor kilidindedir). */
@@ -203,6 +261,7 @@ export class LocalStore {
     await this.vault.delete('groups', channelId)
     await this.vault.delete('groups', `${channelId}:joinedAt`)
     await this.vault.delete('groups', `${channelId}:seen`) // bayat grubun üye geçmişi yeni gruba taşınmaz
+    await this.vault.delete('groups', `${channelId}:ids`)
   }
 
   async loadMessage(id: string): Promise<StoredMessage | null> {
@@ -236,15 +295,20 @@ export class LocalStore {
   }
 
   /**
-   * Oturum zinciri değişince cihaz + grup durumu gider, ama BMK ve yedek bayrakları KORUNUR: BMK kullanıcı
+   * Oturum zinciri değişince cihaz + grup durumu gider, ama BMK, yedek bayrakları, kimlik ve sabitlemeler KORUNUR: BMK kullanıcı
    * başınadır (şifre + hesap), cihaz zincirinden bağımsız geçerliliğini sürdürür. Vault yalnız `device`
    * bölümünü topluca siler; koruma burada, tek yerde.
    */
   async resetDeviceState(): Promise<void> {
     const key = await this.loadBackupKey()
     const flags = await this.loadFlags()
+    // E7: kimlik ve sabitlemeler de kullanıcı başınadır (BMK gibi); cihaz zinciri değişince geçerliliğini korur.
+    const identity = await this.loadIdentity()
+    const pins = await this.loadPins()
     await this.vault.resetDeviceState()
     if (key) await this.saveBackupKey(key)
+    if (identity) await this.saveIdentity(identity)
+    if (Object.keys(pins).length > 0) await this.savePins(pins)
     const kept = Object.fromEntries(BACKUP_FLAGS.flatMap((k) => (flags[k] === undefined ? [] : [[k, flags[k]]])))
     if (Object.keys(kept).length > 0) await this.saveFlags({ lastResortUploaded: false, ...kept })
   }

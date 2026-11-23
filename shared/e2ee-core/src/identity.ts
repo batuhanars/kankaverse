@@ -41,6 +41,16 @@ export function createIdentity(version = 1): IdentityKeyPair {
 }
 
 /**
+ * Özel anahtardan kimlik (aktarımda gelen anahtar). Açık anahtar HER ZAMAN yeniden türetilir: dışarıdan gelen
+ * açık anahtara güvenilmez, çağıran bunu sunucunun bildirdiğiyle karşılaştırır.
+ */
+export function identityFromPrivate(privateKey: Uint8Array, version: number): IdentityKeyPair {
+  assertVersion(version)
+  assertLength(privateKey, KEY_LENGTH, 'Kimlik özel anahtarı')
+  return { privateKey, publicKey: ed25519.getPublicKey(privateKey), version }
+}
+
+/**
  * İmzalanan bayt: etiket + kullanıcı + kimlik sürümü + cihaz + cihazın MLS imza anahtarı.
  * Sürüm içeride olduğu için sıfırlamadan önce atılmış imza yeni kimlikle "geçerli" sayılamaz;
  * kullanıcı içeride olduğu için bir kullanıcının imzası başkasının cihazına taşınamaz.

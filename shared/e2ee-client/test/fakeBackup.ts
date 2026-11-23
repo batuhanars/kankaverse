@@ -12,6 +12,9 @@ const fail = (status: number, error: string) =>
 
 interface KeyRow extends BackupKeyMaterial {
   keyVersion: number
+  /** E7 §2.3: BMK ile sarılı kimlik; yedek sıfırlanınca düşer, şifre değişiminde KALIR. */
+  wrappedIdentity?: string | null
+  identityVersion?: number | null
 }
 interface SnapRow {
   deviceId: string
@@ -91,7 +94,8 @@ export class FakeBackupStore {
         const cur = keyOf()
         if (!cur && keyVersion !== 1) throw fail(409, 'E2EE_BACKUP_KEY_VERSION')
         if (cur && cur.keyVersion !== keyVersion) throw fail(409, 'E2EE_BACKUP_KEY_VERSION')
-        this.keys.set(userId, { ...material, keyVersion })
+        // Şifre değişimi BMK'yı değiştirmez: sarılı kimlik geçerli kalır (gerçek sunucu yalnız 3 alanı günceller).
+        this.keys.set(userId, { ...cur, ...material, keyVersion })
         return ok({ keyVersion })
       },
       backupReset: (body) => {
@@ -99,7 +103,7 @@ export class FakeBackupStore {
         const cur = keyOf()
         if (!cur) throw fail(404, 'E2EE_BACKUP_NOT_CONFIGURED')
         const { currentPassword: _p, totpCode: _t, ...material } = body
-        this.keys.set(userId, { ...material, keyVersion: cur.keyVersion + 1 })
+        this.keys.set(userId, { ...material, keyVersion: cur.keyVersion + 1, wrappedIdentity: null, identityVersion: null })
         this.dropAll(userId)
         return ok({ keyVersion: cur.keyVersion + 1 })
       },

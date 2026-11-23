@@ -2,6 +2,7 @@
 import type { Group } from '@kankaverse/e2ee-core'
 import { catchUp, guardUntrusted, type ChannelView } from './commitSync'
 import { GroupNotReadyError, type E2eeContext } from './context'
+import { observeIdentities } from './deviceNotices'
 import { createChannelGroup } from './groupCreate'
 import { plan, reconcile } from './reconcile'
 import { devicesOf } from './registry'
@@ -27,6 +28,11 @@ export async function syncGroup(
     await catchUp(ctx, channelId, group, view)
     await reconcile(ctx, channelId, group, view)
   })
+  // E7 §4.2: kimlik sıfırlaması commit üretmez (yapraklar aynı kalır); değişim yalnız durum tazelenince görülür.
+  // Pasif grupta (bu cihaz çıkarıldı) kendi yaprağımız yok: gözlem de yok.
+  if (group.isActive) {
+    await observeIdentities(ctx, channelId, view.devices, view.devices.owners.get(group.ownDeviceId))
+  }
 }
 
 /**

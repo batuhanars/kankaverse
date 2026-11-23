@@ -4,7 +4,10 @@ import type {
   E2eeApi,
   E2eeChannelState,
   E2eeCommitRow,
+  E2eeIdentityInfo,
+  E2eeUserDevice,
   E2eeWelcomeItem,
+  IdentityMaterial,
   E2eeWelcomeRow,
   Reauth,
   SnapshotRef,
@@ -29,9 +32,13 @@ type TransferBlobRef = { size: number; sha256: string }
 
 export const e2eeApi = {
   status: () =>
-    http.get<{ enabled: boolean; franking?: boolean; backup?: boolean; transfer?: boolean }>(
-      '/e2ee/status',
-    ),
+    http.get<{
+      enabled: boolean
+      franking?: boolean
+      backup?: boolean
+      transfer?: boolean
+      identity?: boolean
+    }>('/e2ee/status'),
   registerDevice: (signatureKey: string) =>
     http.post<{ deviceId: string }>('/e2ee/devices', { platform: 'web', signatureKey }),
   available: () => http.get<{ available: number }>('/e2ee/devices/me'),
@@ -104,6 +111,15 @@ export const e2eeApi = {
     http.get<{ url: string; size: number; sha256: string }>(`/e2ee/transfer/${id}/blob`),
   transferDone: (id: string) => http.post<TransferStep>(`/e2ee/transfer/${id}/done`),
   transferCancel: (id: string) => http.post<TransferStep>(`/e2ee/transfer/${id}/cancel`),
+  // E7 §3.2: kimlik ve cihaz imzası.
+  userDevices: (userId: string) =>
+    http.get<{ identity: E2eeIdentityInfo | null; devices: E2eeUserDevice[] }>(`/e2ee/users/${userId}/devices`),
+  identityCreate: (body: IdentityMaterial) => http.put<{ version: number }>('/e2ee/identity', body),
+  identityReset: (body: IdentityMaterial & Reauth) => http.post<{ version: number }>('/e2ee/identity/reset', body),
+  signDevice: (deviceId: string, body: { identityVersion: number; sig: string }) =>
+    http.post<null>(`/e2ee/devices/${deviceId}/signature`, body),
+  backupPutIdentity: (body: { wrappedIdentity: string; identityVersion: number; keyVersion: number }) =>
+    http.put<null>('/e2ee/backup/identity', body),
 } satisfies E2eeApi
 
 /** C69 Oturumlarım: motor portunun parçası değil (yalnız ayarlar ekranı kullanır). */

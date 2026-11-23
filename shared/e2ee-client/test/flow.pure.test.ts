@@ -1,6 +1,7 @@
 import { pureProvider } from '@kankaverse/e2ee-core'
 import { backupSuite } from './backupSuite'
 import { transferSuite } from './transferSuite'
+import { identitySuite } from './identitySuite'
 import { flowSuite } from './flowSuite'
 import { callSuite } from './callSuite'
 import { groupSuite } from './groupSuite'
@@ -17,3 +18,4 @@ transferSuite('pure')
 groupSuite('pure') // beforeEach ve sunucu flowSuite'ten gelir
 rebindSuite('pure')
 callSuite('pure') // E8; beforeEach ve sunucu flowSuite'ten gelir
+identitySuite('pure') // E7; beforeEach ve sunucu flowSuite'ten gelir

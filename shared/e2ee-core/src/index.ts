@@ -67,6 +67,7 @@ export {
   createIdentity,
   deviceSigMessage,
   fingerprint,
+  identityFromPrivate,
   safetyCode,
   signDevice,
   unwrapIdentity,

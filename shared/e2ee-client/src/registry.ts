@@ -1,5 +1,5 @@
 // Sunucunun kanal durumundan çekirdeğin beklediği cihaz listelerini türetir (E1 §3.3, E2 §3.2).
-import type { ExpectedDevice } from '@kankaverse/e2ee-core'
+import type { ExpectedDevice, PublicIdentity } from '@kankaverse/e2ee-core'
 import type { E2eeDeviceInfo, E2eeViewSnapshot } from './ports'
 import { fromB64 } from './b64'
 
@@ -23,6 +23,10 @@ export interface ChannelDevices {
   joinedAt: Map<string, number>
   /** Grubun kurulma zamanı (ms), yoksa null. */
   groupCreatedAt: number | null
+  /** E7: sunucunun bildirdiği üye kimlikleri (yalnız ŞU ANKİ üyeler; kimliği olmayan üye burada yok). */
+  identities: Map<string, PublicIdentity>
+  /** E7: cihaz kimliği → imza bilgisi (imzasız cihaz burada yok). İmza anahtarı `registered`'dadır. */
+  sigs: Map<string, { sig: Uint8Array; version: number }>
 }
 
 export function devicesOf(state: E2eeViewSnapshot): ChannelDevices {
@@ -34,9 +38,17 @@ export function devicesOf(state: E2eeViewSnapshot): ChannelDevices {
     owners: new Map(),
     joinedAt: new Map(),
     groupCreatedAt: state.createdAt ? Date.parse(state.createdAt) : null,
+    identities: new Map(),
+    sigs: new Map(),
   }
   for (const member of state.members) {
     if (member.joinedAt) out.joinedAt.set(member.userId, Date.parse(member.joinedAt))
+    if (member.identity) {
+      out.identities.set(member.userId, {
+        publicKey: fromB64(member.identity.publicKey),
+        version: member.identity.version,
+      })
+    }
     for (const d of member.devices) addDevice(out, member.userId, d, true)
   }
   const current = new Set(state.members.map((m) => m.userId))
@@ -54,6 +66,9 @@ function addDevice(out: ChannelDevices, userId: string, d: E2eeDeviceInfo, curre
   const device = { deviceId: d.deviceId, signatureKey: fromB64(d.signatureKey) }
   out.registered.push(device)
   out.owners.set(d.deviceId, userId)
+  if (d.identitySig && d.identityVersion) {
+    out.sigs.set(d.deviceId, { sig: fromB64(d.identitySig), version: d.identityVersion })
+  }
   if (d.revokedAt) out.revokedAt.set(d.deviceId, Date.parse(d.revokedAt))
   else if (current) out.active.push(device)
 }

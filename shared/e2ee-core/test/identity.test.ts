@@ -8,6 +8,7 @@ import {
   createIdentity,
   deviceSigMessage,
   fingerprint,
+  identityFromPrivate,
   safetyCode,
   signDevice,
   unwrapIdentity,
@@ -45,6 +46,20 @@ describe('createIdentity', () => {
   it('geçersiz sürümü reddeder', () => {
     expect(() => createIdentity(0)).toThrow(IdentityKeyError)
     expect(() => createIdentity(1.5)).toThrow(IdentityKeyError)
+  })
+})
+
+describe('identityFromPrivate', () => {
+  it('açık anahtarı özel anahtardan yeniden türetir', () => {
+    const id = createIdentity(4)
+    const again = identityFromPrivate(id.privateKey, 4)
+    expect(again.publicKey).toEqual(id.publicKey)
+    expect(again.version).toBe(4)
+  })
+
+  it('yanlış uzunluk ya da sürüm reddedilir', () => {
+    expect(() => identityFromPrivate(seq(0, 31), 1)).toThrow(IdentityKeyError)
+    expect(() => identityFromPrivate(seq(0), 0)).toThrow(IdentityKeyError)
   })
 })
 

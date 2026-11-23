@@ -16,6 +16,7 @@ import {
   verifyTransferCommit,
   wipe,
   type TransferKeyPair,
+  fromUtf8,
 } from '@kankaverse/e2ee-core'
 import { fromB64, toB64 } from './b64'
 import { missingIds } from './backupExists'
@@ -23,6 +24,7 @@ import { buildSnapshot, parseSnapshot } from './backupSnapshot'
 import type { E2eeContext } from './context'
 import { TransferPayloadError, TransferSessionError, TransferTooLargeError } from './errors'
 import { collectBodies, dropDeleted, mergeCandidates } from './historyRecords'
+import type { TransferIdentity } from './identity'
 import type { BlobTransport, E2eeApi, TransferPending } from './ports'
 
 export interface TransferDeps {
@@ -32,6 +34,14 @@ export interface TransferDeps {
   /** Motorun kilit yolu: depoya dokunan her adım bundan geçer. */
   run: <T>(task: (ctx: E2eeContext) => Promise<T>) => Promise<T>
   log: (message: string, error?: unknown) => void
+  /**
+   * E7 §4.5-2: kimlik yükle taşınır (kodla doğrulanmış kanal). Yük biçimi `v: 1` kalır, `identity` İSTEĞE BAĞLI
+   * alan: eski istemci alanı yok sayar, yeni istemci eski yükü kimliksiz alır (sözleşme Rev.2).
+   */
+  identity?: {
+    export(): Promise<TransferIdentity | null>
+    adopt(t: TransferIdentity): Promise<boolean>
+  }
 }
 
 interface Session {
@@ -97,15 +107,21 @@ export class TransferManager {
    * Yük hazır: indirir, açar, birleştirir (E5a §4.5 kuralı), `done` der. Erişilemeyen kanalın ve sunucuda
    * silinmiş/temizlenmiş mesajın kaydı yazılmaz. Dönen sayı yeni yazılan kayıt.
    */
-  async receive(id: string, accessibleEncryptedChannelIds: string[]): Promise<{ received: number }> {
+  async receive(
+    id: string,
+    accessibleEncryptedChannelIds: string[],
+  ): Promise<{ received: number; identityAdopted: boolean }> {
     const s = this.session(id, 'new')
     if (!s.key || !s.peerDeviceId) throw new TransferSessionError()
     const { data } = await this.d.api.transferBlob(id)
     const bytes = await this.d.blob.get(data.url)
     let messages
+    let identity: TransferIdentity | null
     try {
       if (toHex(sha256(bytes)) !== data.sha256) throw new TransferPayloadError()
-      messages = parseSnapshot(openTransfer(s.key, bytes, this.d.userId, id), s.peerDeviceId).messages
+      const plain = openTransfer(s.key, bytes, this.d.userId, id)
+      messages = parseSnapshot(plain, s.peerDeviceId).messages
+      identity = transferIdentityOf(plain)
     } catch {
       throw new TransferPayloadError()
     }
@@ -115,9 +131,17 @@ export class TransferManager {
     const gone = await missingIds(this.d.api, candidates, false)
     const fresh = candidates.filter((m) => !gone.has(m.id))
     const received = await this.d.run((ctx) => mergeCandidates(ctx, fresh, allowed))
+    // Kimlik alınamazsa (sunucudakiyle tutmuyor, ağ) aktarım yine tamamdır; cihaz imzasız kalır.
+    let identityAdopted = false
+    if (identity && this.d.identity) {
+      identityAdopted = await this.d.identity.adopt(identity).catch((e) => {
+        this.d.log('[e2ee] aktarımdaki kimlik alınamadı', e)
+        return false
+      })
+    }
     await this.d.api.transferDone(id)
     this.forget(id)
-    return { received }
+    return { received, identityAdopted }
   }
 
   // ── Eski cihaz (O) ─────────────────────────────────────────────────────────
@@ -167,12 +191,20 @@ export class TransferManager {
    * Kullanıcı kodların aynı olduğunu onayladı: gövdeli yerel kayıtlar (silinmiş/temizlenmiş olanlar ayıklanır)
    * E5a görüntü biçiminde şifrelenip yüklenir. 25 MB'ı aşarsa istek iptal edilir ve `TransferTooLargeError`.
    */
-  async send(id: string): Promise<{ sent: number }> {
+  async send(id: string, opts: { identityOnly?: boolean } = {}): Promise<{ sent: number }> {
     const s = this.session(id, 'old')
     if (!s.key) throw new TransferSessionError()
     const own = await this.ownDeviceId()
-    const records = await dropDeleted(this.d.api, this.d.run, await this.d.run((ctx) => collectBodies(ctx)))
-    const content = { ...buildSnapshot(own, Date.now(), records), kind: 'transfer' }
+    // E7 §4.5-3 "Bu cihazı doğrula": aynı el sıkışma, mesaj listesi boş, yalnız kimlik gider.
+    const records = opts.identityOnly
+      ? []
+      : await dropDeleted(this.d.api, this.d.run, await this.d.run((ctx) => collectBodies(ctx)))
+    const identity = (await this.d.identity?.export()) ?? null
+    const content = {
+      ...buildSnapshot(own, Date.now(), records),
+      kind: 'transfer',
+      ...(identity && { identity }),
+    }
     const sealed = sealTransfer(s.key, utf8(JSON.stringify(content)), this.d.userId, id)
     if (sealed.length > TRANSFER_MAX_BYTES) {
       await this.cancel(id).catch(() => undefined)
@@ -216,4 +248,12 @@ export class TransferManager {
     if (!deviceId) throw new TransferSessionError()
     return deviceId
   }
+}
+
+/** Yükteki isteğe bağlı kimlik alanı; biçimi bozuksa yok sayılır (mesajlar yine alınır). */
+function transferIdentityOf(plain: Uint8Array): TransferIdentity | null {
+  const raw = JSON.parse(fromUtf8(plain)) as { identity?: { priv?: unknown; version?: unknown } }
+  const t = raw.identity
+  if (!t || typeof t.priv !== 'string' || typeof t.version !== 'number') return null
+  return { priv: t.priv, version: t.version }
 }
