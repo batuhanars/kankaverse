@@ -187,3 +187,9 @@ Her adım: `tsc`, ilgili testler, web için `vue-tsc -b` (6 bilinen hata dışı
 - Bulgu (E8 dışı): MIUI'de yeni kurulumda Otomatik başlatma kapalı; kapalı uygulamaya arama push'u 30 sn
   ömrünü aşacak kadar gecikip düşüyor. İzin açılınca çalıştı.
 - Kalan: AAB 83 Play'de yayılsın → `E2EE_CALLS_USER_IDS` boşaltılır (herkese açılış).
+
+### Herkese açılış (2026-11-23)
+
+- Sahip canlı turu: web ↔ güncel Play sürümü, 1-1 ve grup aramada ses + görüntü, üye ekleme/çıkarmada kesinti yok.
+- `E2EE_CALLS_USER_IDS` boşaltıldı (imaj `8ce0c4da`). Eski Android sürümü aramaya giremez, güncelleme mesajı görür.
+- Gözlem: web/masaüstünde sayfa yenilenince aramadan düşülür; beklenen davranış (bağlantı ve arama anahtarı bellekte).
