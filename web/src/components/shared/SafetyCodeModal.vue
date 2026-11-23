@@ -99,14 +99,13 @@ const rows = computed(() => {
         </template>
       </template>
 
-      <div class="flex flex-wrap gap-3 justify-end">
+      <div v-if="(selected && members.length > 1) || code" class="flex flex-wrap gap-3 justify-end">
         <KvButton v-if="selected && members.length > 1" variant="ghost" @click="selectedId = null">
           {{ t('e2ee.identity.back') }}
         </KvButton>
         <KvButton v-if="code" variant="ghost" :loading="saving" @click="toggleVerified">
           {{ code.verified ? t('e2ee.identity.unmarkVerified') : t('e2ee.identity.markVerified') }}
         </KvButton>
-        <KvButton @click="emit('close')">{{ t('common.close') }}</KvButton>
       </div>
     </div>
   </KvModal>

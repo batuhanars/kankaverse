@@ -2,6 +2,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/stores/auth';
+import { useE2eeStore } from '@/stores/e2ee';
 import { useE2eeBackupStore } from '@/stores/e2eeBackup';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -20,6 +21,7 @@ export default function AccountSecurityScreen() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const backupEnabled = useE2eeBackupStore((s) => s.state?.enabled === true);
+  const identityEnabled = useE2eeStore((s) => s.engine?.identity?.enabled === true);
 
   if (!user) return null;
 
@@ -57,7 +59,7 @@ export default function AccountSecurityScreen() {
             icon="phone-portrait-outline"
             label={t('security.sessions.title')}
             onPress={() => router.push('/security-sessions')}
-            last={!backupEnabled}
+            last={!backupEnabled && !identityEnabled}
           />
           {/* E5a: yedek bayrağı kapalıysa satır hiç çıkmaz (boş yüzey yok). */}
           {backupEnabled ? (
@@ -65,6 +67,15 @@ export default function AccountSecurityScreen() {
               icon="cloud-upload-outline"
               label={t('e2ee.backup.title')}
               onPress={() => router.push('/backup-settings')}
+              last={!identityEnabled}
+            />
+          ) : null}
+          {/* E7: kimlik bayrağı kapalıysa satır hiç çıkmaz. */}
+          {identityEnabled ? (
+            <Row
+              icon="finger-print-outline"
+              label={t('e2ee.identity.sectionTitle')}
+              onPress={() => router.push('/identity-settings')}
               last
             />
           ) : null}

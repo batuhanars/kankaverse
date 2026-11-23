@@ -30,6 +30,7 @@ import { GroupEventNotice } from './message/GroupEventNotice';
 import { useGroupEventSlots } from './message/useGroupEventSlots';
 import { E2eeWarningBanner } from './message/E2eeWarningBanner';
 import { useE2eeChannelView } from './message/useE2eeChannelView';
+import { SafetyCodeSheet } from './e2ee/SafetyCodeSheet';
 import { useBackupInChannel } from './backup/useBackupInChannel';
 import { useTypingEmitter } from './message/useTypingEmitter';
 import { useMessageComposer } from './message/useMessageComposer';
@@ -42,6 +43,7 @@ import { ScrollToBottomButton } from './message/ScrollToBottomButton';
 import { useMessageActions } from './message/useMessageActions';
 import { useQuickReactions } from '@/utils/quickReactions';
 import { useMessagesStore } from '@/stores/messages';
+import { useE2eeStore } from '@/stores/e2ee';
 import { useVoicePlaybackStore } from '@/stores/voicePlayback';
 import { ScanStatus } from '@/api/messages';
 import { useAuthStore } from '@/stores/auth';
@@ -366,12 +368,19 @@ export function MessageScreen({
   // E5b Parça C: cihaz öncesi mesajlar gizlendiyse (daha eskisi yokken) listenin başında tek satır bilgi.
   const hiddenBefore = useMessagesStore((s) => s.byChannel[channelId]?.hiddenBefore ?? false);
   const e2eeView = useE2eeChannelView(channelId, plainMessages, hasMoreOlder);
+  const safetyEnabled = useE2eeStore((s) => s.engine?.identity?.enabled === true);
+  const [safetyOpen, setSafetyOpen] = useState(false);
+  // Kod iki kişi arasındadır: 1-1'de karşı taraf, grupta üyeler (bahsetme listesi zaten "ben hariç").
+  const safetyMembers = useMemo(
+    () => (mentionCandidates ?? []).filter((c) => !c.isEveryone && !c.isRole).map((c) => ({ id: c.id, username: c.username })),
+    [mentionCandidates],
+  );
   /** E2 §3.3: `slot` = eskiden-yeniye dizideki yer (bu mesajdan ÖNCE; `items.length` = son mesajdan sonra). */
   const groupEventSlots = useGroupEventSlots(channelId, plainMessages, hasMoreOlder);
   const renderNotices = (slot: number) => (
     <>
       {e2eeView.deviceNotices.get(slot)?.map((n) => (
-        <E2eeDeviceNotice key={`${n.userId}-${n.at}`} name={e2eeView.noticeName(n.userId)} />
+        <E2eeDeviceNotice key={`${n.userId}-${n.at}`} name={e2eeView.noticeName(n.userId)} kind={n.kind} />
       ))}
       {/* C64: uyelik olaylari (mesaj degil); zamanina gore akisa karisir. */}
       {groupEventSlots.get(slot)?.map((e) => (
@@ -472,12 +481,16 @@ export function MessageScreen({
           headerRight: () => (
             <View style={styles.headerActionsRow}>
               {e2eeView.encrypted && (
-                <Ionicons
-                  name="lock-closed"
-                  size={16}
-                  color={theme.colors.textMuted}
-                  accessibilityLabel={t('e2ee.lockTitle')}
-                />
+                // E7 §4.7: kilit güvenlik kodunu açar (kimlik bayrağı kapalıysa yalnız simge).
+                <Pressable
+                  onPress={safetyEnabled ? () => setSafetyOpen(true) : undefined}
+                  disabled={!safetyEnabled}
+                  hitSlop={12}
+                  accessibilityRole={safetyEnabled ? 'button' : 'image'}
+                  accessibilityLabel={safetyEnabled ? t('e2ee.identity.openCode') : t('e2ee.lockTitle')}
+                >
+                  <Ionicons name="lock-closed" size={16} color={theme.colors.textMuted} />
+                </Pressable>
               )}
               {headerActions}
               {/* Sprint M1h — Sabitlenenler. Yalnız ekran bir yüzey verdiyse çizilir; düğme
@@ -690,6 +703,8 @@ export function MessageScreen({
           }}
         />
       )}
+
+      {safetyOpen && <SafetyCodeSheet members={safetyMembers} onClose={() => setSafetyOpen(false)} />}
     </GestureHandlerRootView>
   );
 }

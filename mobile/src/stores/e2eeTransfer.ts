@@ -27,7 +27,17 @@ export type NewPhase =
 export type OldPhase = 'idle' | 'request' | 'waiting' | 'code' | 'sending' | 'sent' | 'rejected' | 'error';
 
 interface TransferState {
-  n: { open: boolean; phase: NewPhase; id: string | null; sas: string; expiresAt: string; received: number };
+  n: {
+    open: boolean;
+    phase: NewPhase;
+    id: string | null;
+    sas: string;
+    expiresAt: string;
+    received: number;
+    /** E7 §4.5-3 "Bu cihazı doğrula": aynı el sıkışma, mesaj yazılmaz, yalnız kimlik alınır. */
+    identityOnly: boolean;
+    identityAdopted: boolean;
+  };
   o: { phase: OldPhase; request: TransferPending | null; sas: string };
 }
 
@@ -39,7 +49,16 @@ const POLL_MS = 4000;
  * 🔴 Yük yalnız kullanıcı "Kodlar aynı, aktar" deyince gider (`confirmOld`). MIUI: aktarım ön planda yürür.
  */
 export const useE2eeTransferStore = create<TransferState>(() => ({
-  n: { open: false, phase: 'idle', id: null, sas: '', expiresAt: '', received: 0 },
+  n: {
+    open: false,
+    phase: 'idle',
+    id: null,
+    sas: '',
+    expiresAt: '',
+    received: 0,
+    identityOnly: false,
+    identityAdopted: false,
+  },
   o: { phase: 'idle', request: null, sas: '' },
 }));
 
@@ -71,10 +90,18 @@ function newFailure(e: unknown): NewPhase {
 
 // ── Yeni cihaz ─────────────────────────────────────────────────────────────
 
-export async function startNewTransfer(): Promise<void> {
+export async function startNewTransfer(opts: { identityOnly?: boolean } = {}): Promise<void> {
   const t = tr();
   if (!t) return;
-  setN({ open: true, phase: 'starting', id: null, sas: '', received: 0 });
+  setN({
+    open: true,
+    phase: 'starting',
+    id: null,
+    sas: '',
+    received: 0,
+    identityOnly: opts.identityOnly === true,
+    identityAdopted: false,
+  });
   try {
     const r = await t.start();
     setN({ id: r.id, expiresAt: r.expiresAt, phase: 'waiting' });
@@ -102,8 +129,10 @@ export async function onTransferReady(id: string): Promise<void> {
   if (!t || n.id !== id || n.phase !== 'code' || !n.sas) return;
   setN({ phase: 'receiving' });
   try {
-    const r = await t.receive(id, dmIds());
-    setN({ received: r.received, phase: 'done' });
+    // Yalnız kimlik: erişilebilir kanal listesi boş verilir, motor hiçbir mesaj kaydı yazmaz.
+    const r = await t.receive(id, get().n.identityOnly ? [] : dmIds());
+    setN({ received: r.received, identityAdopted: r.identityAdopted, phase: 'done' });
+    if (get().n.identityOnly) return;
     // Açık sohbet ve liste önizlemeleri yeni kayıtlarla yeniden okunsun.
     useE2eeBackupStore.setState((s) => ({ restoreTick: s.restoreTick + 1 }));
     markDecrypted();

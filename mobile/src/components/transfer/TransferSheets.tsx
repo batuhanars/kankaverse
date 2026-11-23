@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { formatSas } from '@kankaverse/e2ee-core';
 import {
   acceptOldTransfer,
@@ -22,12 +23,31 @@ import { theme } from '@/theme';
  * 🔴 Eski cihazda gönderimin tek kapısı "Kodlar aynı, aktar" (`confirmOldTransfer`).
  */
 
-function Card({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+/** Ortak kart pencere (E7 güvenlik kodu da kullanır). */
+export function Card({
+  title,
+  onClose,
+  closeIcon,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  /** Başlığın sağında X (web `KvModal` gibi); altta ayrı "Kapat" düğmesi gerekmez. */
+  closeIcon?: boolean;
+  children: ReactNode;
+}) {
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          <Text style={styles.title}>{title}</Text>
+          <View style={styles.header}>
+            <Text style={[styles.title, styles.titleText]}>{title}</Text>
+            {closeIcon ? (
+              <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('common.close')}>
+                <Ionicons name="close" size={22} color={theme.colors.textMuted} />
+              </Pressable>
+            ) : null}
+          </View>
           {children}
         </View>
       </View>
@@ -35,7 +55,7 @@ function Card({ title, onClose, children }: { title: string; onClose: () => void
   );
 }
 
-function Button({ label, onPress, kind = 'primary', disabled }: {
+export function Button({ label, onPress, kind = 'primary', disabled }: {
   label: string;
   onPress: () => void;
   kind?: 'primary' | 'ghost' | 'danger';
@@ -84,7 +104,9 @@ export function TransferNewSheet() {
   const finished = ['done', 'expired', 'cancelled', 'tooLarge', 'error'].includes(n.phase);
   const result =
     n.phase === 'done'
-      ? t('e2ee.backup.transfer.done', { n: n.received })
+      ? n.identityOnly
+        ? t(n.identityAdopted ? 'e2ee.identity.verifyDone' : 'e2ee.identity.verifyFailed')
+        : t('e2ee.backup.transfer.done', { n: n.received })
       : n.phase === 'expired'
         ? t('e2ee.backup.transfer.expired')
         : n.phase === 'cancelled'
@@ -95,7 +117,10 @@ export function TransferNewSheet() {
   const canRestart = ['expired', 'cancelled', 'error'].includes(n.phase);
 
   return (
-    <Card title={t('e2ee.backup.transfer.title')} onClose={closeNewTransfer}>
+    <Card
+      title={n.identityOnly ? t('e2ee.identity.verifyTitle') : t('e2ee.backup.transfer.title')}
+      onClose={closeNewTransfer}
+    >
       {n.phase === 'starting' || n.phase === 'waiting' ? (
         <>
           <Text style={styles.body}>{t('e2ee.backup.transfer.waiting')}</Text>
@@ -117,7 +142,7 @@ export function TransferNewSheet() {
         </Text>
       )}
       <View style={styles.actions}>
-        {canRestart ? <Button kind="ghost" label={t('e2ee.backup.transfer.restart')} onPress={() => void startNewTransfer()} /> : null}
+        {canRestart ? <Button kind="ghost" label={t('e2ee.backup.transfer.restart')} onPress={() => void startNewTransfer({ identityOnly: n.identityOnly })} /> : null}
         <Button
           kind={finished ? 'primary' : 'ghost'}
           label={finished ? t('e2ee.backup.transfer.close') : t('common.cancel')}
@@ -210,7 +235,9 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 14,
   },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   title: { color: theme.colors.textPrimary, fontSize: theme.fontSize.xl, fontWeight: '700' },
+  titleText: { flex: 1 },
   body: { flexShrink: 1, color: theme.colors.textPrimary, fontSize: theme.fontSize.base, lineHeight: 21 },
   muted: { color: theme.colors.textMuted, fontSize: theme.fontSize.sm },
   danger: { color: theme.colors.danger },
