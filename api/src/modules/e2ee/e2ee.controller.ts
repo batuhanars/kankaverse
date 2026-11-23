@@ -202,10 +202,10 @@ export class E2eeController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
-      'Kanalda hâlâ var olan (silinmemiş) mesaj kimlikleri (≤500; yedek hijyeni, içerik yok)',
+      'Kanalda hâlâ var olan (silinmemiş) mesaj kimlikleri (≤500; yedek hijyeni, içerik yok; meta: yazan + zaman)',
   })
   messagesExist(@CurrentUser() user: RequestUser, @Body() dto: MessagesExistDto) {
-    return this.exists.existing(user.id, dto.channelId, dto.ids);
+    return this.exists.existing(user.id, dto.channelId, dto.ids, dto.meta === true);
   }
 
   @Get('welcomes')

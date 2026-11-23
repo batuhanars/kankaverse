@@ -5,6 +5,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBase64,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -80,6 +81,13 @@ export class MessagesExistDto {
   @IsString({ each: true })
   @Matches(E2EE_ID_RE, { each: true, message: 'Geçersiz mesaj kimliği.' })
   ids: string[];
+
+  @ApiPropertyOptional({
+    description: 'E7 §5.4: var olanlar için yazan + zaman da dönsün (yerel arama sonucu)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  meta?: boolean;
 }
 
 export class WelcomeItemDto {

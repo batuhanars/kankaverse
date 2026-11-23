@@ -31,6 +31,8 @@ export class FakeServer {
   joined = new Map<string, Map<string, string>>()
   former = new Map<string, Map<string, string>>()
   groups = new Map<string, { epoch: number; groupId: string; createdAt: string }>()
+  /** E7 §5.4: `messagesExist(…, true)` için mesaj üst verisi (testler kaydeder; kayıtsız kimlik meta'da yok). */
+  messageMeta = new Map<string, { channelId: string; createdAt: string; authorId: string }>()
   handshakes: {
     channelId: string
     epoch: number
@@ -281,11 +283,19 @@ export class FakeServer {
         this.welcomes.find((w) => w.id === id)!.done = true
         return ok(null)
       },
-      messagesExist: (channelId: string, ids: string[]) => {
+      messagesExist: (channelId: string, ids: string[], meta?: boolean) => {
         this.existsCalls.push({ channelId, count: ids.length })
         if (this.existsError) throw this.existsError
         if (this.noAccessChannels.has(channelId)) throw fail(403, 'NOT_CHANNEL_MEMBER')
-        return ok({ existing: ids.filter((id) => !this.goneMessages.has(id)) })
+        const existing = ids.filter((id) => !this.goneMessages.has(id))
+        if (!meta) return ok({ existing })
+        // E7 §5.4: yazan + zaman sunucudaki mesajdan (bilinmeyen kimlik: kanalda yok sayılır).
+        const rows = existing.flatMap((id) => {
+          const m = this.messageMeta.get(id)
+          if (!m || m.channelId !== channelId) return []
+          return [{ id, createdAt: m.createdAt, author: { id: m.authorId, username: m.authorId, avatarUrl: null } }]
+        })
+        return ok({ existing: rows.map((r) => r.id), meta: rows })
       },
       ...this.backup.api(userId, () => active().id),
       ...this.transfer.api(userId, () => active().id),

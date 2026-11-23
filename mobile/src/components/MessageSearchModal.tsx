@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { mergeResults, normalizeQuery, type LocalSearchHit } from '@kankaverse/e2ee-client';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { extractErrorMessage } from '@/api/errors';
+import { useDmStore } from '@/stores/dm';
+import { useE2eeStore } from '@/stores/e2ee';
 import { formatMentionsPlain } from '@/utils/mentions';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -10,6 +13,69 @@ interface Props {
   channelId: string;
   onClose: () => void;
   onJump: (messageId: string) => void;
+}
+
+/** Sonuç satırı: sunucu mesajı ya da yerel (şifreli) eşleşme; ikisi de aynı alanlarla çizilir. */
+type SearchRow = Pick<MessageDto, 'id' | 'createdAt' | 'author' | 'content'>;
+
+const localRow = (h: LocalSearchHit): SearchRow => ({
+  id: h.id,
+  createdAt: h.createdAt,
+  author: h.author,
+  content: h.body,
+});
+
+/**
+ * E7 §5: şifreli grup DM'de sunucu şifreli mesajı aramaz; bu cihazda çözülmüş kayıtlar yerelde aranır.
+ * Yerel arama düşerse (ağ, kilit) yalnız sunucu sonucu gösterilir: arama tamamen bozulmasın.
+ */
+async function searchLocal(channelId: string, q: string, plain: (body: string) => string): Promise<LocalSearchHit[]> {
+  const { engine, channels } = useE2eeStore.getState();
+  if (!engine || channels[channelId]?.encrypted !== true) return [];
+  try {
+    return await engine.searchLocal(channelId, q, plain);
+  } catch (e) {
+    console.error('[E2EE] yerel arama', e instanceof Error ? e.name : typeof e);
+    return [];
+  }
+}
+
+/** Eşleşme bundan sonra başlıyorsa satır eşleşmeden biraz önce "…" ile başlar (2 satırda görünsün). */
+const SNIPPET_AFTER = 60;
+const SNIPPET_LEAD = 24;
+
+/**
+ * Sonuç metni, eşleşmeler vurgulu (web `SearchPopover.highlight` karşılığı). Eşleme aramayla aynı Türkçe kural
+ * (İ↔i, I↔ı): küçük harfli metinde bulunur, vurgu özgün metne aynı konumdan uygulanır. Küçültme uzunluğu
+ * değiştirirse (Türkçe dışı nadir harf) vurgusuz düz metin.
+ */
+function Highlighted({ text, term }: { text: string; term: string }) {
+  const lower = normalizeQuery(text);
+  const needle = normalizeQuery(term.trim());
+  const first = needle ? lower.indexOf(needle) : -1;
+  if (first === -1 || lower.length !== text.length) return <>{text}</>;
+  const start = first > SNIPPET_AFTER ? first - SNIPPET_LEAD : 0;
+  const parts: { s: string; hit: boolean }[] = start > 0 ? [{ s: '…', hit: false }] : [];
+  let from = start;
+  for (let i = first; i !== -1; i = lower.indexOf(needle, i + needle.length)) {
+    if (i > from) parts.push({ s: text.slice(from, i), hit: false });
+    parts.push({ s: text.slice(i, i + needle.length), hit: true });
+    from = i + needle.length;
+  }
+  parts.push({ s: text.slice(from), hit: false });
+  return (
+    <>
+      {parts.map((p, k) =>
+        p.hit ? (
+          <Text key={k} style={styles.hit}>
+            {p.s}
+          </Text>
+        ) : (
+          p.s
+        ),
+      )}
+    </>
+  );
 }
 
 function formatTime(iso: string): string {
@@ -28,7 +94,14 @@ function formatTime(iso: string): string {
 // atmaz + `messageSearch.minChars` ipucu web ile aynı).
 export function MessageSearchModal({ channelId, onClose, onJump }: Props) {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<MessageDto[]>([]);
+  const [results, setResults] = useState<SearchRow[]>([]);
+  // Grup DM'de bahsetme adı üyelerden çözülür (yerel eşleme de bu düz metinde arar, E7 §5.2).
+  const members = useDmStore((s) => {
+    const c = s.channels.find((x) => x.id === channelId);
+    return c?.type === 'GROUP_DM' ? c.members : undefined;
+  });
+  const plain = (content: string) =>
+    formatMentionsPlain(content, (id) => members?.find((m) => m.id === id)?.username, t('mention.unknown'));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,18 +115,28 @@ export function MessageSearchModal({ channelId, onClose, onJump }: Props) {
       setError('');
       return;
     }
+    // Yazarken yeni sorgu başlarsa eski cevap ekrana yazılmaz (yerel tarama sunucudan yavaş dönebilir).
+    let stale = false;
     debounceRef.current = setTimeout(() => {
       setLoading(true);
       setError('');
-      messagesApi
-        .search(channelId, { q: trimmed })
-        .then((list) => setResults(list))
-        .catch((e) => setError(extractErrorMessage(e)))
-        .finally(() => setLoading(false));
+      Promise.all([messagesApi.search(channelId, { q: trimmed }), searchLocal(channelId, trimmed, plain)])
+        .then(([list, local]) => {
+          if (!stale) setResults(mergeResults<SearchRow>(list, local, localRow));
+        })
+        .catch((e) => {
+          if (!stale) setError(extractErrorMessage(e));
+        })
+        .finally(() => {
+          if (!stale) setLoading(false);
+        });
     }, 300);
     return () => {
+      stale = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
+    // `plain` üyelerden türer; üye listesi değişince arama yeniden koşmasın (sonuç satırı zaten çizimde çözer).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, channelId]);
 
   const trimmedLen = query.trim().length;
@@ -114,7 +197,7 @@ export function MessageSearchModal({ channelId, onClose, onJump }: Props) {
                         <Text style={styles.resultTime}>{formatTime(item.createdAt)}</Text>
                       </View>
                       <Text style={styles.resultContent} numberOfLines={2}>
-                        {formatMentionsPlain(item.content, () => undefined, t('mention.unknown'))}
+                        <Highlighted text={plain(item.content)} term={query} />
                       </Text>
                     </View>
                   </Pressable>
@@ -236,6 +319,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.xs,
   },
+  hit: { color: theme.colors.textPrimary, backgroundColor: theme.colors.accentSubtle, fontWeight: '700' },
   resultContent: {
     color: theme.colors.textBody,
     fontSize: theme.fontSize.sm,

@@ -166,6 +166,12 @@ Hesap güvenliği → Cihazlar (Oturumlarım) listesinde her cihazın yanında "
 - Aynı oturumda kanalın çözülmüş kayıtları bellekte tutulabilir (sohbet kapanınca bırakılır); kalıcı düz indeks YAZILMAZ.
 - **Ölçüm (DoD):** 10 000 kayıtlı depoda Redmi 14C release'te ilk arama süresi. Hedef < 1,5 sn. Aşılırsa dev DURUR ve bildirir; indeks kararı PM'de (şifreli kanal-başı id listesi gibi).
 
+### §5.4 Rev.3 (2026-11-23, adım 6, sahip kararı): sonuç satırının yazanı ve zamanı
+- **Boşluk:** yerel kayıt (`StoredMessage`) yalnız `id`, `channelId`, `status`, `body` taşır; yazan ve `createdAt` yok (yedekten/aktarımdan gelen kayıtlarda da). Sonuç satırı (ad, avatar, tarih) ve zamana göre sıralama bunlarsız kurulamaz.
+- **Karar:** mevcut `POST /e2ee/messages/exists` ucuna isteğe bağlı `meta: true`. Yanıt `{ existing, meta?: [{ id, createdAt, author: { id, username, avatarUrl, avatarAnimatedUrl } }] }`. Aynı kapılar (üyelik, `deletedAt`, `clearedAt`); içerik yok. Çağıranın geçmiş ucundan zaten görebildiğinden fazlası dönmez. `meta` yoksa yanıt bugünkü gibi (eski istemci etkilenmez).
+- **Akış:** yerel eşleşmeler 500'lük `exists` çağrılarıyla zenginleşir (en çok 4 çağrı = 2000 eşleşme; kayıtta zaman olmadığı için sınır aşılırsa hangi 2000'in seçildiği belirsizdir, kabul: bu kadar genel bir sorguda kullanıcı aramayı daraltır); sunucuda olmayan (silinmiş/temizlenmiş) eşleşme sonuçtan düşer. Birleşim `createdAt` azalan, ilk 50.
+- R7 değil (mevcut kapılar aynen, yanıt yalnız üst veri). api testi: `meta` yalnız istendiğinde, silinmiş/temizlenmiş kimlik meta'da yok.
+
 ## §6 Kullanıcıya görünen metinler (taslak, sahip onayı)
 - Satırlar: "{ad} doğrulanmamış bir cihaz ekledi" · "{ad} güvenlik kodunu değiştirdi" · (değişmeyen) "{ad} yeni bir cihaz ekledi".
 - Kod ekranı açıklaması: "Bu kodu {ad} ile yüz yüze ya da sesli aramada karşılaştır. Aynıysa mesajlarınız ve aramalarınız araya kimse girmeden şifreleniyor."

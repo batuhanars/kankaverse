@@ -131,6 +131,13 @@ export interface SnapshotRef {
  * Sunucu uçları (E1 §2). Baytlar base64 metin. Hata, `response.data.error` makine kodunu taşıyan bir
  * nesne olarak fırlatılır (axios hatası zaten böyle; mobil adaptör aynı şekli üretir).
  */
+/** E7 §5.4: `messagesExist(…, true)` yanıtındaki üst veri (içerik yok). `createdAt` ISO. */
+export interface ExistingMeta {
+  id: string
+  createdAt: string
+  author: { id: string; username: string; avatarUrl: string | null; avatarAnimatedUrl?: string | null }
+}
+
 export interface E2eeApi {
   /** `franking`: E4 §2.2, true iken istemci v2 yük (parmak izi) gönderir; eski sunucuda yok = false. */
   status(): Promise<
@@ -167,8 +174,15 @@ export interface E2eeApi {
   commits(channelId: string, since: number): Promise<Reply<E2eeCommitRow[]>>
   welcomes(): Promise<Reply<E2eeWelcomeRow[]>>
   ackWelcome(id: string): Promise<Reply<null>>
-  /** E5a Rev.2 §4.7: kanalda hâlâ var olan (silinmemiş) mesaj kimlikleri; `ids` 1..500. İçerik yok. */
-  messagesExist(channelId: string, ids: string[]): Promise<Reply<{ existing: string[] }>>
+  /**
+   * E5a Rev.2 §4.7: kanalda hâlâ var olan (silinmemiş) mesaj kimlikleri; `ids` 1..500. İçerik yok.
+   * E7 §5.4: `meta` true ise var olanların yazanı ve zamanı da döner (yerel arama sonucu).
+   */
+  messagesExist(
+    channelId: string,
+    ids: string[],
+    meta?: boolean,
+  ): Promise<Reply<{ existing: string[]; meta?: ExistingMeta[] }>>
   /** E5a yedek uçları (§3.2). Hata kodları: E2EE_BACKUP_KEY_VERSION (409), E2EE_BACKUP_NOT_CONFIGURED (404) vb. */
   backupGet(): Promise<Reply<BackupInfo>>
   /** Kurulum (keyVersion 1) ya da şifre değişimi (aynı keyVersion, yeniden sarma). */

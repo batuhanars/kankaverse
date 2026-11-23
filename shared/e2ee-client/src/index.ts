@@ -25,6 +25,14 @@ export {
 } from './errors'
 export { TransferManager } from './transfer'
 export {
+  mergeResults,
+  normalizeQuery,
+  searchable,
+  SEARCH_LIMIT,
+  SEARCH_MIN_CHARS,
+  type LocalSearchHit,
+} from './localSearch'
+export {
   IdentityManager,
   type OwnDeviceView,
   type SafetyCodeView,

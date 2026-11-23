@@ -30,6 +30,7 @@ import { Hydrator, type OwnEntry, type OwnPlain, type Resolution, type WireMessa
 import { type DeviceNotice, digestOf, LocalStore, type StoredStatus } from './localStore'
 import type { E2eeApi, EngineDeps, Vault, WarningHandler, WithLock } from './ports'
 import { OFFLINE_API, withViewCache } from './viewCache'
+import { enrichHits, scanLocal, searchable, type LocalSearchHit } from './localSearch'
 import { processWelcomes } from './welcomes'
 
 export type { WarningHandler }
@@ -509,6 +510,16 @@ export class E2eeEngine {
   async quoteText(messageId: string): Promise<string | null> {
     const rec = await this.run((ctx) => ctx.store.loadMessage(messageId))
     return rec?.status === 'ok' ? rec.body : null
+  }
+
+  /**
+   * E7 §5: şifreli grup DM'de yerel arama. Tarama kilit içinde (yalnız depo), zenginleştirme kilit dışında (ağ).
+   * `plain`: gövdeyi aramadan önce düz metne çevirir (bahsetmeler). Ağsız motorda boş döner.
+   */
+  async searchLocal(channelId: string, query: string, plain?: (body: string) => string): Promise<LocalSearchHit[]> {
+    if (!searchable(query) || this.api === OFFLINE_API) return []
+    const hits = await this.run((ctx) => scanLocal(ctx, channelId, query, plain))
+    return hits.length ? enrichHits(this.api, channelId, hits) : []
   }
 
   /** E2 §3.3: sohbetteki "yeni cihaz eklendi" satırları (yerel depo; mesaj değil, yedeğe girmez). */

@@ -1571,7 +1571,6 @@
     "unverified": "Bu mesaj doğrulanamadı",
     "preview": "🔒 Şifreli mesaj",
     "encryptedQuote": "Şifreli mesaj",
-    "searchNote": "Şifreli mesajlar bu cihazda henüz aranamıyor",
     "warning": {
       "unknown-device": "Bu sohbette tanınmayan bir cihaz var. Güvenliğin için mesajlaşma durduruldu.",
       "removed": "Bu cihaz bu sohbetten çıkarıldı. Yeni mesaj gönderemez ve alamazsın.",

@@ -7,6 +7,7 @@ import type {
   E2eeIdentityInfo,
   E2eeUserDevice,
   E2eeWelcomeItem,
+  ExistingMeta,
   IdentityMaterial,
   E2eeWelcomeRow,
   Reauth,
@@ -74,8 +75,12 @@ export const e2eeApi = {
   welcomes: () => http.get<E2eeWelcomeRow[]>('/e2ee/welcomes'),
   ackWelcome: (id: string) => http.post<null>(`/e2ee/welcomes/${id}/ack`),
   // E5a Rev.2 §4.7: yerel mesajlar sunucuda hâlâ var mı (silinmiş geçmişte dönmez).
-  messagesExist: (channelId: string, ids: string[]) =>
-    http.post<{ existing: string[] }>('/e2ee/messages/exists', { channelId, ids }),
+  messagesExist: (channelId: string, ids: string[], meta?: boolean) =>
+    http.post<{ existing: string[]; meta?: ExistingMeta[] }>('/e2ee/messages/exists', {
+      channelId,
+      ids,
+      ...(meta && { meta: true }),
+    }),
   // E5a yedek uçları (§3.2). Silme/sıfırlama reauth gövdesi taşır (axios DELETE gövdesi `data`).
   backupGet: () => http.get<BackupInfo>('/e2ee/backup'),
   backupPutKey: (body: Parameters<E2eeApi['backupPutKey']>[0]) =>

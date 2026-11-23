@@ -75,6 +75,41 @@ describe('E2eeExistsService (E5a Rev.2 §4.7)', () => {
     await svc.existing('u1', 'ch', ['m1', 'm1', 'm2']);
     expect(prisma.message.findMany.mock.calls[0][0].where.id.in).toEqual(['m1', 'm2']);
   });
+
+  it('E7 §5.4: meta istenmezse yanıtta meta alanı yok (eski istemci aynı yanıtı alır)', async () => {
+    const { prisma, svc } = setup();
+    prisma.message.findMany.mockResolvedValue([{ id: 'm1' }]);
+    const r = await svc.existing('u1', 'ch', ['m1']);
+    expect(r).toEqual({ existing: ['m1'] });
+    expect(prisma.message.findMany.mock.calls[0][0].select).toEqual({ id: true });
+  });
+
+  it('E7 §5.4: meta istenirse yazan + zaman döner, içerik seçilmez, kapılar aynı', async () => {
+    const { prisma, svc } = setup();
+    const clearedAt = new Date('2026-11-12T10:00:00Z');
+    prisma.channelMember.findFirst.mockResolvedValue({ clearedAt });
+    const row = {
+      id: 'm1',
+      createdAt: new Date('2026-11-20T10:00:00Z'),
+      author: { id: 'u2', username: 'ayse', avatarUrl: null, avatarAnimatedUrl: null },
+    };
+    prisma.message.findMany.mockResolvedValue([row]);
+    await expect(svc.existing('u1', 'ch', ['m1', 'silinmis'], true)).resolves.toEqual({
+      existing: ['m1'],
+      meta: [row],
+    });
+    const call = prisma.message.findMany.mock.calls[0][0];
+    expect(call.where).toMatchObject({
+      channelId: 'ch',
+      deletedAt: null,
+      createdAt: { gt: clearedAt },
+    });
+    expect(Object.keys(call.select as Record<string, unknown>).sort()).toEqual([
+      'author',
+      'createdAt',
+      'id',
+    ]);
+  });
 });
 
 describe('MessagesExistDto', () => {
@@ -94,5 +129,10 @@ describe('MessagesExistDto', () => {
     expect((await validate(body({ ids: ['ok', 'kotu kimlik!'] }))).length).toBeGreaterThan(0);
     expect((await validate(body({ ids: [1] }))).length).toBeGreaterThan(0);
     expect((await validate(body({ channelId: '' }))).length).toBeGreaterThan(0);
+  });
+
+  it('meta isteğe bağlı ve yalnız boolean', async () => {
+    expect(await validate(body({ meta: true }))).toHaveLength(0);
+    expect((await validate(body({ meta: 'evet' }))).length).toBeGreaterThan(0);
   });
 });

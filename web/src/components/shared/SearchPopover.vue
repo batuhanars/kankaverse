@@ -16,7 +16,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useDmStore } from '@/stores/dm'
 import { useE2eeStore } from '@/stores/e2ee'
 import { formatMentionsPlain } from '@/utils/mentions'
+import { mergeResults, normalizeQuery, type LocalSearchHit } from '@kankaverse/e2ee-client'
 import type { MessageDto } from '@/types'
+
+/** Sonuç satırı: sunucu mesajı ya da yerel (şifreli) eşleşme; ikisi de aynı alanlarla çizilir. */
+type SearchRow = Pick<MessageDto, 'id' | 'createdAt' | 'author' | 'content' | 'attachments'>
 
 defineOptions({ name: 'SearchPopover' })
 
@@ -52,7 +56,7 @@ async function onMemberClick(userId: string) {
   try {
     const ch = await dmStore.openChannel(userId)
     emit('close')
-    router.push({ name: 'dm', params: { channelId: ch.id } })
+    void router.push({ name: 'dm', params: { channelId: ch.id } })
   } catch {
     error.value = t('messageSearch.userOpenFailed')
   }
@@ -65,7 +69,7 @@ function onJump(messageId: string) {
 }
 
 const query = ref('')
-const results = ref<MessageDto[]>([])
+const results = ref<SearchRow[]>([])
 const loading = ref(false)
 const error = ref('')
 const inputEl = ref<HTMLInputElement | null>(null)
@@ -80,8 +84,36 @@ function formatTime(iso: string): string {
     d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }).replace(':', '.')
 }
 
+// Grup DM'de bahsetme adı üyelerden çözülür (yerel eşleme de bu düz metinde arar, E7 §5.2).
+function memberName(id: string): string | undefined {
+  const ch = dmStore.channels.find((c) => c.id === props.channelId)
+  return ch?.type === 'GROUP_DM' ? ch.members.find((m) => m.id === id)?.username : undefined
+}
+
 function contentPlain(content: string): string {
-  return formatMentionsPlain(content, () => undefined, t('mention.unknown'))
+  return formatMentionsPlain(content, memberName, t('mention.unknown'))
+}
+
+const localRow = (h: LocalSearchHit): SearchRow => ({
+  id: h.id,
+  createdAt: h.createdAt,
+  author: h.author,
+  content: h.body,
+})
+
+/**
+ * E7 §5: şifreli grup DM'de sunucu şifreli mesajı aramaz; bu cihazda çözülmüş kayıtlar yerelde aranır.
+ * Yerel arama düşerse (ağ, kilit) yalnız sunucu sonucu gösterilir: arama tamamen bozulmasın.
+ */
+async function searchLocal(q: string): Promise<LocalSearchHit[]> {
+  const engine = e2eeStore.engine
+  if (!engine || !e2eeStore.channels[props.channelId]?.encrypted) return []
+  try {
+    return await engine.searchLocal(props.channelId, q, contentPlain)
+  } catch (e) {
+    console.error('[e2ee] yerel arama', e instanceof Error ? e.name : typeof e)
+    return []
+  }
 }
 
 // REV-3: eşleşen kelimeyi vurgula. XSS-güvenli: önce HTML kaçışı, sonra kaçışlı
@@ -95,24 +127,46 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 function highlight(content: string): string {
-  const safe = escapeHtml(contentPlain(content))
+  const plain = contentPlain(content)
   const term = query.value.trim()
-  if (!term) return safe
-  const re = new RegExp(`(${escapeRegex(escapeHtml(term))})`, 'gi')
-  return safe.replace(re, '<mark class="kv-hl">$1</mark>')
+  if (!term) return escapeHtml(plain)
+  // E7 §5.2: arama ile aynı Türkçe kural (İ↔i, I↔ı); `/gi` bu eşleri tanımaz. Eşleşme küçük harfli metinde
+  // aranır, vurgu özgün metne aynı konumdan uygulanır. Küçültme uzunluğu değiştirirse (Türkçe dışı nadir harf)
+  // eski kurala düşülür. Kaçış her parçada ayrı yapılır: yalnız <mark> enjekte edilir.
+  const lower = normalizeQuery(plain)
+  const needle = normalizeQuery(term)
+  if (lower.length !== plain.length) {
+    const re = new RegExp(`(${escapeRegex(escapeHtml(term))})`, 'gi')
+    return escapeHtml(plain).replace(re, '<mark class="kv-hl">$1</mark>')
+  }
+  let out = ''
+  let from = 0
+  for (let i = lower.indexOf(needle); i !== -1; i = lower.indexOf(needle, i + needle.length)) {
+    out += escapeHtml(plain.slice(from, i)) + `<mark class="kv-hl">${escapeHtml(plain.slice(i, i + needle.length))}</mark>`
+    from = i + needle.length
+  }
+  return out + escapeHtml(plain.slice(from))
 }
+
+// Yazarken yeni sorgu başlarsa eski cevap ekrana yazılmaz (yerel tarama sunucudan yavaş dönebilir).
+let searchSeq = 0
 
 async function doSearch(q: string) {
   if (!props.channelId || q.trim().length < 2) return
+  const seq = ++searchSeq
   loading.value = true
   error.value = ''
   try {
-    const res = await messagesApi.searchMessages(props.channelId, q.trim())
-    results.value = res.data
+    const [res, local] = await Promise.all([
+      messagesApi.searchMessages(props.channelId, q.trim()),
+      searchLocal(q.trim()),
+    ])
+    if (seq !== searchSeq) return
+    results.value = mergeResults<SearchRow>(res.data, local, localRow)
   } catch {
-    error.value = t('messageSearch.error')
+    if (seq === searchSeq) error.value = t('messageSearch.error')
   } finally {
-    loading.value = false
+    if (seq === searchSeq) loading.value = false
   }
 }
 
@@ -126,7 +180,7 @@ function onInput() {
     return
   }
   debounceTimer = setTimeout(() => {
-    doSearch(query.value)
+    void doSearch(query.value)
   }, 300)
 }
 
@@ -139,7 +193,7 @@ watch(
       results.value = []
       loading.value = false
       error.value = ''
-      nextTick(() => inputEl.value?.focus())
+      void nextTick(() => inputEl.value?.focus())
       document.addEventListener('click', onDocClick)
       document.addEventListener('keydown', onDocKeydown)
     } else {
@@ -189,15 +243,6 @@ function onDocKeydown(e: KeyboardEvent) {
         ✕
       </button>
     </div>
-
-    <!-- E1: şifreli DM'de sunucu araması şifreli mesajları görmez; kullanıcıya açıkça söylenir -->
-    <p
-      v-if="e2eeStore.channels[channelId]?.encrypted"
-      class="px-4 py-2 text-[12px] shrink-0 border-b"
-      style="color: var(--kv-text-muted); border-color: var(--kv-border-subtle);"
-    >
-      {{ t('e2ee.searchNote') }}
-    </p>
 
     <!-- Arama input'u -->
     <div class="px-4 py-2 shrink-0 border-b" style="border-color: var(--kv-border-subtle);">
