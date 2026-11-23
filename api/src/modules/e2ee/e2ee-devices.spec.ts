@@ -6,8 +6,9 @@ const KEY = new Uint8Array(32).fill(7);
 const KEY_B64 = toB64(KEY);
 const USER = { id: 'u1', username: 'a', sessionId: 's1', tokenFamily: 'fam-1' } as never;
 
-function setup() {
+function setup(flag = { identity: false }) {
   const prisma = {
+    e2eeIdentity: { findUnique: jest.fn().mockResolvedValue(null) },
     e2eeDevice: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
@@ -25,7 +26,11 @@ function setup() {
     $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
   };
   const notify = { devicesChanged: jest.fn().mockResolvedValue(undefined) };
-  return { prisma, notify, svc: new E2eeDevicesService(prisma as never, notify as never) };
+  return {
+    prisma,
+    notify,
+    svc: new E2eeDevicesService(prisma as never, notify as never, flag as never),
+  };
 }
 
 describe('E2eeDevicesService.register (§2.3)', () => {
@@ -145,7 +150,11 @@ describe('E2eeDevicesService.uploadKeyPackages', () => {
   });
 
   // §6.5: count çağrıları: (1) bekleyen sayısı, (2) claim edilebilir paket var mı
-  function withCounts(prisma: ReturnType<typeof setup>['prisma'], pending: number, claimable: number) {
+  function withCounts(
+    prisma: ReturnType<typeof setup>['prisma'],
+    pending: number,
+    claimable: number,
+  ) {
     prisma.e2eeDevice.findUnique.mockResolvedValue(activeDevice);
     prisma.e2eeKeyPackage.count.mockImplementation(({ where }: { where: { OR?: unknown } }) =>
       Promise.resolve(where.OR ? claimable : pending),
@@ -209,6 +218,42 @@ describe('E2eeDevicesService.listUserDevices', () => {
       userId: 'u1',
       revokedAt: null,
     });
-    expect(res[0]).toMatchObject({ deviceId: 'd1', signatureKey: KEY_B64 });
+    // E7 Rev.1: yanıt nesne; bayrak kapalıyken kimlik okunmaz, imza alanları null.
+    expect(res.identity).toBeNull();
+    expect(prisma.e2eeIdentity.findUnique).not.toHaveBeenCalled();
+    expect(res.devices[0]).toMatchObject({
+      deviceId: 'd1',
+      signatureKey: KEY_B64,
+      identitySig: null,
+      identityVersion: null,
+    });
+  });
+
+  it('E7: bayrak açıkken kimlik ve cihaz imzası döner; imzasız cihazda alanlar null', async () => {
+    const { prisma, svc } = setup({ identity: true });
+    const SIG = new Uint8Array(64).fill(3);
+    prisma.e2eeIdentity.findUnique.mockResolvedValue({ publicKey: KEY, version: 2 });
+    prisma.e2eeDevice.findMany.mockResolvedValue([
+      {
+        id: 'd1',
+        platform: 'web',
+        signatureKey: KEY,
+        createdAt: new Date(),
+        identitySig: SIG,
+        identityVersion: 2,
+      },
+      {
+        id: 'd2',
+        platform: 'android',
+        signatureKey: KEY,
+        createdAt: new Date(),
+        identitySig: null,
+        identityVersion: null,
+      },
+    ]);
+    const res = await svc.listUserDevices('u1', 'u1');
+    expect(res.identity).toEqual({ publicKey: KEY_B64, version: 2 });
+    expect(res.devices[0]).toMatchObject({ identitySig: toB64(SIG), identityVersion: 2 });
+    expect(res.devices[1]).toMatchObject({ identitySig: null, identityVersion: null });
   });
 });

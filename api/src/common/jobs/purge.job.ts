@@ -127,6 +127,8 @@ export class PurgeJob {
       backupKeys = snaps.map((x) => x.objectKey);
       await tx.e2eeBackupSnapshot.deleteMany({ where: { userId } });
       await tx.e2eeBackup.deleteMany({ where: { userId } });
+      // E7: kimlik açık anahtarı. Kullanıcı satırı silinmediği için Cascade devreye girmez, açıkça silinir.
+      await tx.e2eeIdentity.deleteMany({ where: { userId } });
       // E5b: açık/bitmiş aktarımlar ve (varsa) şifreli yük nesneleri. User ilişkisi yok, açıkça silinir.
       const transfers = await tx.e2eeTransfer.findMany({
         where: { userId, objectKey: { not: null } },

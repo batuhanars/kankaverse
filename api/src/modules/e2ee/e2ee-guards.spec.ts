@@ -75,6 +75,7 @@ describe('GET /e2ee/status', () => {
       franking: false,
       backup: false,
       transfer: false,
+      identity: false,
     });
   });
 
@@ -91,12 +92,14 @@ describe('GET /e2ee/status', () => {
       franking: false,
       backup: false,
       transfer: false,
+      identity: false,
     });
     expect(make({ e2eeFranking: true }).status({ id: 'u1' } as never)).toEqual({
       enabled: true,
       franking: true,
       backup: false,
       transfer: false,
+      identity: false,
     });
   });
 
@@ -123,6 +126,30 @@ describe('GET /e2ee/status', () => {
     expect(make({}).status({ id: 'u1' } as never).transfer).toBe(false);
     expect(make({ e2eeTransfer: true }).status({ id: 'u1' } as never).transfer).toBe(true);
     expect(make({ e2eeTransfer: true }).status({ id: 'u2' } as never).transfer).toBe(false);
+  });
+
+  it('E7: identity bayrağı E2EE_IDENTITY ile açılır, E1 uygunluğu ve kendi izin listesini ister', () => {
+    const make = (cfg: Record<string, unknown>) =>
+      new E2eeController(
+        new E2eeFlagService(config({ e2eeEnabled: true, e2eeUserIds: ['u1', 'u2'], ...cfg })),
+        null as never,
+        null as never,
+        null as never,
+      );
+    expect(make({}).status({ id: 'u1' } as never).identity).toBe(false);
+    expect(make({ e2eeIdentity: true }).status({ id: 'u1' } as never).identity).toBe(true);
+    // E1 listesinde olmayan kimlik kuramaz.
+    expect(make({ e2eeIdentity: true }).status({ id: 'u3' } as never).identity).toBe(false);
+    // İlk aşama listesi doluyken yalnız listedekiler.
+    const restricted = make({ e2eeIdentity: true, e2eeIdentityUserIds: ['u1'] });
+    expect(restricted.status({ id: 'u1' } as never).identity).toBe(true);
+    expect(restricted.status({ id: 'u2' } as never).identity).toBe(false);
+  });
+
+  it('E7: E2EE kapalıyken identity bayrağı tek başına kimlik alanlarını açmaz', () => {
+    expect(new E2eeFlagService(config({ e2eeEnabled: false, e2eeIdentity: true })).identity).toBe(
+      false,
+    );
   });
 });
 

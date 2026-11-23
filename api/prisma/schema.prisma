@@ -141,6 +141,7 @@ model User {
   sessions               Session[]
   e2eeDevices            E2eeDevice[]
   e2eeBackup             E2eeBackup?
+  e2eeIdentity           E2eeIdentity?
   memberships            GuildMember[]
   ownedGuilds            Guild[]               @relation("GuildOwner")
   messages               Message[]
@@ -646,7 +647,7 @@ enum GroupDmEventKind {
 // C64: grup DM üyelik olay satırı ("X gruptan ayrıldı"). Message DEĞİL: okunmadı/bildirim/push/lastMessage/şifreleme
 // hattına girmez. Üyelik değişikliğiyle AYNI transaction ve AYNI an yazılır (createdAt açıkça verilir).
 model GroupDmEvent {
-  id        String            @id @default(cuid())
+  id        String           @id @default(cuid())
   channelId String
   kind      GroupDmEventKind
   actorId   String? // ekleyen/çıkaran; MEMBER_LEFT'te null
@@ -1017,17 +1018,20 @@ model AiVideoGeneration {
 // Sözleşme: contracts/SPRINT_E1_DM_E2EE_CONTRACT.md §2.1 (Rev.2: cihaz oturum ZİNCİRİNE bağlı)
 
 model E2eeDevice {
-  id           String           @id @default(cuid())
-  userId       String
-  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenFamily  String?          @unique // refresh rotasyonunda sabit; zincir bitince cihaz iptal (§2.6). C69: çıkışta null (park)
-  platform     String // 'web' | 'android'
-  signatureKey Bytes // MLS leaf imza açık anahtarı (Ed25519, 32 bayt)
-  createdAt    DateTime         @default(now())
-  lastSeenAt   DateTime         @default(now())
-  revokedAt    DateTime?
-  parkedAt     DateTime? // C69: çıkışla park edildi (iptal DEĞİL); yeniden bağlanınca null, 30 gün sonra işle iptal
-  keyPackages  E2eeKeyPackage[]
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenFamily     String?          @unique // refresh rotasyonunda sabit; zincir bitince cihaz iptal (§2.6). C69: çıkışta null (park)
+  platform        String // 'web' | 'android'
+  signatureKey    Bytes // MLS leaf imza açık anahtarı (Ed25519, 32 bayt)
+  createdAt       DateTime         @default(now())
+  lastSeenAt      DateTime         @default(now())
+  revokedAt       DateTime?
+  parkedAt        DateTime? // C69: çıkışla park edildi (iptal DEĞİL); yeniden bağlanınca null, 30 gün sonra işle iptal
+  // E7 §3.1: kullanıcı kimlik anahtarının bu cihaza attığı imza; null = imzasız (engellenmez, istemcide görünür)
+  identitySig     Bytes?
+  identityVersion Int? // imzanın atıldığı kimlik sürümü; kimlik sıfırlanınca imza silinir
+  keyPackages     E2eeKeyPackage[]
 
   @@index([userId])
   @@index([parkedAt])
@@ -1101,14 +1105,28 @@ model E2eeWelcome {
 
 /// E5a: şifreli DM yedeği anahtar kaydı. Sunucu yalnız tuz, parametre ve SARILMIŞ anahtarı tutar; yedek şifresi cihazdan çıkmaz.
 model E2eeBackup {
-  userId     String   @id
-  salt       Bytes // 16
-  params     Json // { m, t, p } Argon2id
-  wrappedKey Bytes // nonce(12) + AES-GCM çıktısı (60 bayt)
-  keyVersion Int // sıfırlamada artar
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String   @id
+  salt            Bytes // 16
+  params          Json // { m, t, p } Argon2id
+  wrappedKey      Bytes // nonce(12) + AES-GCM çıktısı (60 bayt)
+  keyVersion      Int // sıfırlamada artar
+  // E7 §2.3: BMK ile sarılı kimlik özel anahtarı; yedek sıfırlanınca (yeni BMK) ya da kimlik sıfırlanınca null
+  wrappedIdentity Bytes?
+  identityVersion Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// E7 §3.1: kullanıcı kimlik anahtarı (yalnız AÇIK anahtar). Cihazları imzalar; güvenlik kodu buna bağlıdır.
+/// Özel anahtar sunucuya düz gelmez (yalnız E2eeBackup.wrappedIdentity içinde, BMK ile sarılı).
+model E2eeIdentity {
+  userId    String   @id
+  publicKey Bytes // Ed25519, 32 bayt
+  version   Int // sıfırlamada artar
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 /// E5a: cihaz başına şifreli yerel mesaj görüntüsü (nesne özel bucket'ta). deviceId iptal edilse de KALIR (kayıp telefonun geçmişi).

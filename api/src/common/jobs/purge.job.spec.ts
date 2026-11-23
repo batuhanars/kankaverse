@@ -19,6 +19,7 @@ const prismaMock = {
   e2eeDevice: { updateMany: jest.fn() },
   e2eeKeyPackage: { deleteMany: jest.fn() },
   e2eeBackup: { deleteMany: jest.fn() },
+  e2eeIdentity: { deleteMany: jest.fn() },
   e2eeBackupSnapshot: { findMany: jest.fn(), deleteMany: jest.fn() },
   e2eeTransfer: { findMany: jest.fn(), deleteMany: jest.fn() },
   $transaction: jest.fn(),
@@ -52,6 +53,7 @@ function resetMocks() {
   prismaMock.e2eeDevice.updateMany.mockResolvedValue({ count: 0 });
   prismaMock.e2eeKeyPackage.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.e2eeBackup.deleteMany.mockResolvedValue({ count: 0 });
+  prismaMock.e2eeIdentity.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.e2eeBackupSnapshot.findMany.mockResolvedValue([]);
   prismaMock.e2eeBackupSnapshot.deleteMany.mockResolvedValue({ count: 0 });
   prismaMock.e2eeTransfer.findMany.mockResolvedValue([]);
@@ -172,7 +174,13 @@ describe('PurgeJob.run — Sprint R6a §2 asgari kimlik imhası', () => {
     expect(prismaMock.e2eeBackupSnapshot.deleteMany).toHaveBeenCalledWith({
       where: { userId: 'user-123' },
     });
-    expect(prismaMock.e2eeBackup.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-123' } });
+    expect(prismaMock.e2eeBackup.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-123' },
+    });
+    // E7: kimlik açık anahtarı da gider (KVKK; kullanıcı satırı anonimleşir, Cascade çalışmaz).
+    expect(prismaMock.e2eeIdentity.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-123' },
+    });
     expect(storageMock.delete).toHaveBeenCalledTimes(2);
     expect(storageMock.delete).toHaveBeenCalledWith('e2ee-backup/user-123/d2/bb');
   });
@@ -180,11 +188,15 @@ describe('PurgeJob.run — Sprint R6a §2 asgari kimlik imhası', () => {
   it('E5b: hesap imhasi aktarim satirlarini ve yuk nesnelerini siler', async () => {
     prismaMock.user.findMany.mockResolvedValue([{ id: 'user-123' }]);
     configMock.get.mockReturnValue(true);
-    prismaMock.e2eeTransfer.findMany.mockResolvedValue([{ objectKey: 'e2ee-transfer/user-123/t1' }]);
+    prismaMock.e2eeTransfer.findMany.mockResolvedValue([
+      { objectKey: 'e2ee-transfer/user-123/t1' },
+    ]);
 
     await job.run();
 
-    expect(prismaMock.e2eeTransfer.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-123' } });
+    expect(prismaMock.e2eeTransfer.deleteMany).toHaveBeenCalledWith({
+      where: { userId: 'user-123' },
+    });
     expect(storageMock.delete).toHaveBeenCalledWith('e2ee-transfer/user-123/t1');
   });
 

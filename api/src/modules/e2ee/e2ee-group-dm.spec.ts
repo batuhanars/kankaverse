@@ -64,7 +64,7 @@ describe('E2eeChannelService (GROUP_DM kapısı, §2.2)', () => {
   });
 });
 
-function setupGroups(members = ['u1', 'u2', 'u3']) {
+function setupGroups(members = ['u1', 'u2', 'u3'], flag = { identity: false }) {
   const tx = {
     e2eeGroup: { create: jest.fn() },
     e2eeHandshake: { create: jest.fn() },
@@ -89,6 +89,7 @@ function setupGroups(members = ['u1', 'u2', 'u3']) {
     channels as never,
     devices as never,
     notify as never,
+    flag as never,
   );
   return { prisma, tx, channels, devices, notify, svc };
 }

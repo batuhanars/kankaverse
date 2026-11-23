@@ -6,7 +6,7 @@ const USER = { id: 'u1', username: 'a', sessionId: 's', tokenFamily: 'fam-1' } a
 const GID = toB64(new Uint8Array(32).fill(1));
 const BLOB = toB64(new Uint8Array([9, 9]));
 
-function setup() {
+function setup(flag = { identity: false }) {
   const tx = {
     e2eeGroup: { create: jest.fn(), updateMany: jest.fn() },
     e2eeHandshake: { create: jest.fn() },
@@ -15,6 +15,7 @@ function setup() {
   const prisma = {
     e2eeGroup: { findUnique: jest.fn(), count: jest.fn().mockResolvedValue(0) },
     e2eeDevice: { findMany: jest.fn() },
+    e2eeIdentity: { findMany: jest.fn().mockResolvedValue([]) },
     e2eeHandshake: { findMany: jest.fn() },
     e2eeWelcome: { findMany: jest.fn(), updateMany: jest.fn() },
     $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
@@ -31,6 +32,7 @@ function setup() {
     channels as never,
     devices as never,
     notify as never,
+    flag as never,
   );
   return { prisma, tx, channels, devices, notify, svc };
 }
@@ -208,6 +210,53 @@ describe('E2eeGroupsService okuma uçları', () => {
       encrypted: true,
       epoch: 4,
       groupId: toB64(new Uint8Array([1, 2])),
+    });
+  });
+
+  it('E7: bayrak kapalıyken kimlik okunmaz, üye kimliği ve imza alanları null', async () => {
+    const { prisma, svc } = setup();
+    prisma.e2eeGroup.findUnique.mockResolvedValue(null);
+    prisma.e2eeDevice.findMany.mockResolvedValue([
+      {
+        id: 'd1',
+        userId: 'u1',
+        signatureKey: new Uint8Array([1]),
+        revokedAt: null,
+        identitySig: new Uint8Array(64),
+        identityVersion: 1,
+      },
+    ]);
+    const state = await svc.getState('u1', 'ch');
+    expect(prisma.e2eeIdentity.findMany).not.toHaveBeenCalled();
+    expect(state.members[0].identity).toBeNull();
+    expect(state.members[0].devices[0]).toMatchObject({ identitySig: null, identityVersion: null });
+  });
+
+  it('E7: bayrak açıkken üyelerin kimliği ve cihaz imzaları döner; kimliksiz üye null', async () => {
+    const { prisma, svc } = setup({ identity: true });
+    const PUB = new Uint8Array(32).fill(5);
+    const SIG = new Uint8Array(64).fill(6);
+    prisma.e2eeGroup.findUnique.mockResolvedValue(null);
+    prisma.e2eeIdentity.findMany.mockResolvedValue([{ userId: 'u2', publicKey: PUB, version: 3 }]);
+    prisma.e2eeDevice.findMany.mockResolvedValue([
+      {
+        id: 'd2',
+        userId: 'u2',
+        signatureKey: new Uint8Array([2]),
+        revokedAt: null,
+        identitySig: SIG,
+        identityVersion: 3,
+      },
+    ]);
+    const state = await svc.getState('u1', 'ch');
+    expect(prisma.e2eeIdentity.findMany.mock.calls[0][0].where).toEqual({
+      userId: { in: ['u1', 'u2'] },
+    });
+    expect(state.members[0].identity).toBeNull();
+    expect(state.members[1].identity).toEqual({ publicKey: toB64(PUB), version: 3 });
+    expect(state.members[1].devices[0]).toMatchObject({
+      identitySig: toB64(SIG),
+      identityVersion: 3,
     });
   });
 

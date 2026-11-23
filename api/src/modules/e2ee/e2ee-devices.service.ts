@@ -2,6 +2,8 @@ import { ConflictException, ForbiddenException, HttpStatus, Injectable } from '@
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RequestUser } from '../../common/types/request-user';
+import { E2eeFlagService } from './e2ee-flag.service';
+import { identitySigView, identityView } from './e2ee-identity.util';
 import { E2eeNotifyService } from './e2ee-notify.service';
 import { RegisterDeviceDto, UploadKeyPackagesDto } from './dto/e2ee.dto';
 import {
@@ -17,6 +19,7 @@ export class E2eeDevicesService {
   constructor(
     private prisma: PrismaService,
     private notify: E2eeNotifyService,
+    private flag: E2eeFlagService,
   ) {}
 
   /** Çağıranın oturum zincirindeki ETKİN cihaz; yoksa/iptalse 403 E2EE_DEVICE_REQUIRED. */
@@ -165,15 +168,29 @@ export class E2eeDevicesService {
         });
       }
     }
-    const devices = await this.prisma.e2eeDevice.findMany({
-      where: { userId, revokedAt: null },
-      orderBy: { createdAt: 'asc' },
-    });
-    return devices.map((d) => ({
-      deviceId: d.id,
-      platform: d.platform,
-      signatureKey: toB64(d.signatureKey),
-      createdAt: d.createdAt.toISOString(),
-    }));
+    const [devices, identity] = await Promise.all([
+      this.prisma.e2eeDevice.findMany({
+        where: { userId, revokedAt: null },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.identityOf(userId),
+    ]);
+    // E7 Rev.1: dizi yerine nesne. Bu ucu bugün hiçbir istemci çağırmıyor (grep, 2026-11-23); geçiş düzeni gerekmez.
+    return {
+      identity,
+      devices: devices.map((d) => ({
+        deviceId: d.id,
+        platform: d.platform,
+        signatureKey: toB64(d.signatureKey),
+        createdAt: d.createdAt.toISOString(),
+        ...identitySigView(d, this.flag.identity),
+      })),
+    };
+  }
+
+  /** E7: kullanıcının kimliği (bayrak kapalıyken null). */
+  private async identityOf(userId: string) {
+    if (!this.flag.identity) return null;
+    return identityView(await this.prisma.e2eeIdentity.findUnique({ where: { userId } }));
   }
 }

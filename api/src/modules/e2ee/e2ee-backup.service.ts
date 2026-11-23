@@ -23,7 +23,7 @@ import { E2EE_ERRORS, e2eeError, fromB64, toB64 } from './e2ee.util';
 
 const OCTET = 'application/octet-stream';
 
-const BACKUP_ERRORS = {
+export const BACKUP_ERRORS = {
   notConfigured: () =>
     e2eeError(
       HttpStatus.NOT_FOUND,
@@ -95,6 +95,9 @@ export class E2eeBackupService {
       params: backup.params,
       wrappedKey: toB64(backup.wrappedKey),
       keyVersion: backup.keyVersion,
+      // E7 §3.2: BMK ile sarılı kimlik (varsa). Sunucu açamaz; BMK yalnız kullanıcının cihazında.
+      wrappedIdentity: backup.wrappedIdentity ? toB64(backup.wrappedIdentity) : null,
+      identityVersion: backup.identityVersion,
       snapshots: snaps,
     };
   }
@@ -160,6 +163,9 @@ export class E2eeBackupService {
           salt: fromB64(dto.salt),
           params,
           wrappedKey: fromB64(dto.wrappedKey),
+          // E7 §2.3: sarılı kimlik eski BMK'ya bağlıydı, artık açılamaz. Kimliği taşıyan cihaz yeniden sarar (§4.6).
+          wrappedIdentity: null,
+          identityVersion: null,
         },
       });
       if (res.count === 0) throw BACKUP_ERRORS.keyVersion();

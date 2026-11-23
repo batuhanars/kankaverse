@@ -50,6 +50,21 @@ export class E2eeFlagService {
     return allow.length === 0 || memberIds.every((id) => allow.includes(id));
   }
 
+  /**
+   * E7: kimlik alanları yanıtlarda görünür mü. Kapalı = istemci kimlik görmez, bugünkü "yeni cihaz eklendi"
+   * davranışına döner (geri alma budur; imzalar DB'de kalır, yeniden açınca aynen geçerli).
+   */
+  get identity(): boolean {
+    return this.enabled && this.config.get<boolean>('e2eeIdentity') === true;
+  }
+
+  /** E7: bu kullanıcı kimlik kurabilir / imza atabilir mi (ilk aşama izin listesi; boş = herkes uygun). */
+  isIdentityEligible(userId: string): boolean {
+    if (!this.identity || !this.isEligible(userId)) return false;
+    const allow = this.config.get<string[]>('e2eeIdentityUserIds') ?? [];
+    return allow.length === 0 || allow.includes(userId);
+  }
+
   isEligible(userId: string): boolean {
     if (!this.enabled) return false;
     const allow = this.config.get<string[]>('e2eeUserIds') ?? [];

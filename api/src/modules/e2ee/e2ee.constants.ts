@@ -91,3 +91,9 @@ export const E2EE_REBIND_NONCE_TTL_MS = 2 * 60 * 1000;
 export const E2EE_REBIND_NONCE_BYTES = 32;
 /** Ed25519 imzası 64 bayt. */
 export const E2EE_SIGNATURE_BYTES = 64;
+
+/** E7 §3: kimlik açık anahtarı 32 bayt (43 + '='), cihaz imzası 64 bayt (86 + '=='). Sarılı kimlik 60 bayt (backup ile aynı biçim). */
+export const E2EE_IDENTITY_KEY_B64_RE = /^[A-Za-z0-9+/]{43}=$/;
+export const E2EE_IDENTITY_SIG_B64_RE = /^[A-Za-z0-9+/]{86}==$/;
+/** İlk kurulum/sıfırlamada tek istekte imzalanabilecek cihaz sayısı (aktif cihaz sınırıyla aynı). */
+export const E2EE_IDENTITY_MAX_SIGNATURES = 10;

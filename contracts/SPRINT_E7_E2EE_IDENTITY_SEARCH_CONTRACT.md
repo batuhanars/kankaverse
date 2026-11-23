@@ -93,6 +93,12 @@ model E2eeIdentity {
 ### §3.4 Geriye uyum
 `GET /e2ee/users/:userId/devices` şekli değişiyor. Dev, iki istemcide bu ucun tüm çağrılarını grep ile bulur. Eski mobil sürüm (Play'de yayılım süresince) dizi bekler: uç `?v=2` parametresi olmadan bugünkü diziyi döner, `v=2` ile yeni nesneyi. Eski sürüm yayılımdan düşünce (E8'deki gibi yayılım sorgusu) `v` parametresiz yol PLAN borcuna yazılır.
 
+### §3.5 Rev.1 (2026-11-23, adım 2 PM): iki sadeleştirme
+- **§3.4 geçiş düzeni gereksiz:** `GET /e2ee/users/:userId/devices` ucunu bugün hiçbir istemci çağırmıyor (web, mobil, e2ee-client grep). Şekil doğrudan nesneye döndü, `?v=2` yok, PLAN borcu yok.
+- **Yeni soket olayı yok:** `e2ee:identity` yerine mevcut `e2ee:devices-changed` (`E2eeNotifyService.devicesChanged`) kullanılır; istemci bu olayda zaten kanal durumunu tazeliyor. İmza ve kimlik değişimi "cihaz değişimi" sayılır.
+- **Bayrak:** `E2EE_IDENTITY` + ilk aşama listesi `E2EE_IDENTITY_USER_IDS`. Okuma (yanıttaki kimlik/imza alanları) bayrağa bağlı, yazma ayrıca listeye. Bayrağı kapatmak geri almadır: alanlar null döner, istemci bugünkü davranışa düşer, imzalar DB'de kalır.
+- `GET /e2ee/status` → `identity` = bu kullanıcı kimlik kurup imza atabilir mi.
+
 ## §4 İstemci (`shared/e2ee-client` + web + mobil)
 
 ### §4.1 Depo

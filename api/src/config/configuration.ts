@@ -8,6 +8,13 @@ const S3_REQUIRED_PROD_ENVS = [
   'S3_SECRET_KEY',
 ] as const;
 
+/** Virgülle ayrılmış kullanıcı kimliği listesi (E2EE izin listeleri). Boş/eksik env = boş liste. */
+const idList = (value: string | undefined): string[] =>
+  (value ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+
 export default () => {
   for (const key of REQUIRED_ENVS) {
     if (!process.env[key]) {
@@ -181,14 +188,12 @@ export default () => {
     e2eeCalls: process.env.E2EE_CALLS === 'true',
     // E8 ilk aşama: dolu = arama yalnız kanalın TÜM üyeleri listedeyse şifreli; boş = şifreli grubu olan her DM.
     // E2EE_USER_IDS'ten ayrı: mesaj şifrelemesi herkese açıkken aramayı önce dar bir grupta sınamak için.
-    e2eeCallUserIds: (process.env.E2EE_CALLS_USER_IDS ?? '')
-      .split(',')
-      .map((id) => id.trim())
-      .filter((id) => id.length > 0),
-    e2eeUserIds: (process.env.E2EE_USER_IDS ?? '')
-      .split(',')
-      .map((id) => id.trim())
-      .filter((id) => id.length > 0),
+    e2eeCallUserIds: idList(process.env.E2EE_CALLS_USER_IDS),
+    // E7 — kimlik anahtarı + cihaz imzası. Varsayılan KAPALI; kapalıyken yanıtlarda kimlik yok, istemci bugünkü
+    // "yeni cihaz eklendi" davranışına döner. Dolu liste = yalnız bu kullanıcılar kimlik kurar/imza atar (ilk aşama).
+    e2eeIdentity: process.env.E2EE_IDENTITY === 'true',
+    e2eeIdentityUserIds: idList(process.env.E2EE_IDENTITY_USER_IDS),
+    e2eeUserIds: idList(process.env.E2EE_USER_IDS),
     // E3 — şifreli DM push'una şifreli yük (telefonda çözülüp bildirimde gösterilir). Varsayılan KAPALI.
     // Kapalıyken push bugünkü genel metinle gider; sorun olursa tek env ile geri dönülür.
     e2eePushCiphertext: process.env.E2EE_PUSH_CIPHERTEXT === 'true',

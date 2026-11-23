@@ -60,6 +60,8 @@ export class E2eeController {
       // E5a: yedek bayrağı ayrıca uygunluk ister; kapalıyken istemci yedek arayüzünü göstermez.
       backup: this.flag.isEligible(user.id) && this.flag.backup,
       transfer: this.flag.isEligible(user.id) && this.flag.transfer,
+      // E7: bu kullanıcı kimlik kurup imza atabilir mi (ilk aşama izin listesi dahil).
+      identity: this.flag.isIdentityEligible(user.id),
     };
   }
 

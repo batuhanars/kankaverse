@@ -4,6 +4,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RequestUser } from '../../common/types/request-user';
 import { E2eeChannelService } from './e2ee-channel.service';
 import { E2eeDevicesService } from './e2ee-devices.service';
+import { E2eeFlagService } from './e2ee-flag.service';
+import { identitySigView, identityView } from './e2ee-identity.util';
 import { E2eeNotifyService } from './e2ee-notify.service';
 import { CreateGroupDto, PostCommitDto, WelcomeItemDto } from './dto/e2ee.dto';
 import { E2EE_COMMITS_PAGE, E2EE_GROUP_ID_BYTES } from './e2ee.constants';
@@ -17,6 +19,7 @@ export class E2eeGroupsService {
     private channels: E2eeChannelService,
     private devices: E2eeDevicesService,
     private notify: E2eeNotifyService,
+    private flag: E2eeFlagService,
   ) {}
 
   /**
@@ -40,6 +43,11 @@ export class E2eeGroupsService {
           orderBy: { createdAt: 'asc' },
         })
       : [];
+    // E7 §3.2: üyelerin kimliği; bayrak kapalıyken hiç okunmaz, alanlar null döner.
+    const showIdentity = encryptable && this.flag.identity;
+    const identities = showIdentity
+      ? await this.prisma.e2eeIdentity.findMany({ where: { userId: { in: memberIds } } })
+      : [];
     return {
       encrypted: group !== null,
       epoch: group?.epoch ?? null,
@@ -49,13 +57,14 @@ export class E2eeGroupsService {
         ? memberIds.map((id) => ({
             userId: id,
             joinedAt: joinedAt?.get(id)?.toISOString() ?? null,
-            devices: this.deviceViews(devices, id),
+            identity: identityView(identities.find((i) => i.userId === id)),
+            devices: this.deviceViews(devices, id, showIdentity),
           }))
         : [],
       formerMembers: former.map((f) => ({
         userId: f.userId,
         leftAt: f.leftAt.toISOString(),
-        devices: this.deviceViews(devices, f.userId),
+        devices: this.deviceViews(devices, f.userId, showIdentity),
       })),
     };
   }
@@ -68,8 +77,16 @@ export class E2eeGroupsService {
   }
 
   private deviceViews(
-    devices: { id: string; userId: string; signatureKey: Uint8Array; revokedAt: Date | null }[],
+    devices: {
+      id: string;
+      userId: string;
+      signatureKey: Uint8Array;
+      revokedAt: Date | null;
+      identitySig: Uint8Array | null;
+      identityVersion: number | null;
+    }[],
     userId: string,
+    showIdentity: boolean,
   ) {
     return devices
       .filter((d) => d.userId === userId)
@@ -77,6 +94,7 @@ export class E2eeGroupsService {
         deviceId: d.id,
         signatureKey: toB64(d.signatureKey),
         revokedAt: d.revokedAt ? d.revokedAt.toISOString() : null,
+        ...identitySigView(d, showIdentity),
       }));
   }
 
