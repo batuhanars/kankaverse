@@ -166,6 +166,13 @@ Hesap güvenliği → Cihazlar (Oturumlarım) listesinde her cihazın yanında "
 - Aynı oturumda kanalın çözülmüş kayıtları bellekte tutulabilir (sohbet kapanınca bırakılır); kalıcı düz indeks YAZILMAZ.
 - **Ölçüm (DoD):** 10 000 kayıtlı depoda Redmi 14C release'te ilk arama süresi. Hedef < 1,5 sn. Aşılırsa dev DURUR ve bildirir; indeks kararı PM'de (şifreli kanal-başı id listesi gibi).
 
+### §5.3.1 Ölçüm sonucu ve Rev.4 (2026-11-23, sahip kararı: seçenek A, B tetikli borç)
+- **Cihaz:** Redmi Note 10S (sahip; 14C yok), dev build, 10 000 sahte `ok` kayıt tek kanalda (en kötü durum).
+- **İlk sürüm (tek tek okuma):** ilk arama 149 sn. Profil: tek tek SQL okuma ~68 sn (köprü çağrısı başına ~7 ms), AES-GCM (JS, noble) 17 sn, JSON 2,6 sn, `toLocaleLowerCase('tr')` 21 sn (Hermes'te kayıt başına ~2 ms). Hedef aşıldı, dev DURDU.
+- **Rev.4 (A, JS, şema/uç değişmez):** `Vault.entries?` isteğe bağlı toplu okuma (mobil tek SQL sorgusu; web yedek yol keys + get), Türkçe küçültme elle (`İ→i`, `I→ı`, sonra `toLowerCase`; `toLocaleLowerCase('tr')` ile aynı sonuç, testli), son aranan kanalın çözülmüş kayıtları bellekte (depo yazım sayacıyla bayatlar, arama kutusu kapanınca bırakılır; diske düz metin yok), arayüz sunucu sonucunu hemen gösterir, şifreli sonuç hazır olunca katılır ("Şifreli mesajlar aranıyor…").
+- **Rev.4 ölçümü (aynı cihaz, dev build):** ilk arama 23 sn, aynı oturumda sonraki arama 0,3 sn, 10 bin eşleşmeli en kötü sorgu 0,9 sn. Kalan süre JS AES-GCM (~17 sn dev). Release tahmini: 10 bin kayıtta 6-10 sn, bin kayıtta ~1 sn.
+- **Hedef revizyonu:** <1,5 sn hedefi **gerçekçi depo boyutunda** (bugün cihaz başı şifreli kayıt binler değil yüzler mertebesinde; E2EE 2026-11-10'dan beri) geçerli; 10 bin kayıt en kötü durum olarak ilerlemeli gösterimle kabul. **Borç (B):** yerel (Kotlin, `javax.crypto`) toplu AES-GCM çözme modülü. Tetik: herhangi bir ölçümde ilk arama >1,5 sn ya da cihaz deposu >3000 kayıt (PLAN D116).
+
 ### §5.4 Rev.3 (2026-11-23, adım 6, sahip kararı): sonuç satırının yazanı ve zamanı
 - **Boşluk:** yerel kayıt (`StoredMessage`) yalnız `id`, `channelId`, `status`, `body` taşır; yazan ve `createdAt` yok (yedekten/aktarımdan gelen kayıtlarda da). Sonuç satırı (ad, avatar, tarih) ve zamana göre sıralama bunlarsız kurulamaz.
 - **Karar:** mevcut `POST /e2ee/messages/exists` ucuna isteğe bağlı `meta: true`. Yanıt `{ existing, meta?: [{ id, createdAt, author: { id, username, avatarUrl, avatarAnimatedUrl } }] }`. Aynı kapılar (üyelik, `deletedAt`, `clearedAt`); içerik yok. Çağıranın geçmiş ucundan zaten görebildiğinden fazlası dönmez. `meta` yoksa yanıt bugünkü gibi (eski istemci etkilenmez).

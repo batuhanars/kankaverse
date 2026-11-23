@@ -71,6 +71,8 @@ function onJump(messageId: string) {
 const query = ref('')
 const results = ref<SearchRow[]>([])
 const loading = ref(false)
+/** Şifreli sonuçlar hâlâ aranıyor (sunucu sonucu ekranda olabilir). */
+const localPending = ref(false)
 const error = ref('')
 const inputEl = ref<HTMLInputElement | null>(null)
 const popoverEl = ref<HTMLElement | null>(null)
@@ -151,22 +153,33 @@ function highlight(content: string): string {
 // Yazarken yeni sorgu başlarsa eski cevap ekrana yazılmaz (yerel tarama sunucudan yavaş dönebilir).
 let searchSeq = 0
 
+/**
+ * Sunucu sonucu gelir gelmez gösterilir; şifreli (yerel) sonuçlar hazır olunca listeye katılır (E7 §5.3: ilk
+ * yerel arama büyük depoda saniyeler sürebilir, kullanıcı boş ekranda beklemez).
+ */
 async function doSearch(q: string) {
   if (!props.channelId || q.trim().length < 2) return
+  const term = q.trim()
   const seq = ++searchSeq
   loading.value = true
   error.value = ''
+  localPending.value = !!e2eeStore.channels[props.channelId]?.encrypted
+  const localTask = searchLocal(term)
+  let serverRows: SearchRow[] = []
   try {
-    const [res, local] = await Promise.all([
-      messagesApi.searchMessages(props.channelId, q.trim()),
-      searchLocal(q.trim()),
-    ])
-    if (seq !== searchSeq) return
-    results.value = mergeResults<SearchRow>(res.data, local, localRow)
+    serverRows = (await messagesApi.searchMessages(props.channelId, term)).data
+    if (seq === searchSeq) results.value = serverRows
   } catch {
     if (seq === searchSeq) error.value = t('messageSearch.error')
   } finally {
     if (seq === searchSeq) loading.value = false
+  }
+  const local = await localTask
+  if (seq !== searchSeq) return
+  localPending.value = false
+  if (local.length) {
+    error.value = ''
+    results.value = mergeResults<SearchRow>(serverRows, local, localRow)
   }
 }
 
@@ -198,6 +211,9 @@ watch(
       document.addEventListener('keydown', onDocKeydown)
     } else {
       if (debounceTimer) clearTimeout(debounceTimer)
+      searchSeq++ // uçuştaki arama sonucu kapalı pencereye yazılmaz
+      localPending.value = false
+      e2eeStore.engine?.dropSearchCache() // bellekteki çözülmüş kayıtlar bırakılır (E7 §5.3)
       document.removeEventListener('click', onDocClick)
       document.removeEventListener('keydown', onDocKeydown)
     }
@@ -308,7 +324,7 @@ function onDocKeydown(e: KeyboardEvent) {
 
       <!-- Boş durum (arama yapıldı, sonuç yok) -->
       <p
-        v-else-if="query.trim().length >= 2 && !loading && results.length === 0"
+        v-else-if="query.trim().length >= 2 && !loading && !localPending && results.length === 0"
         class="px-4 py-3 text-[13px]"
         style="color: var(--kv-text-muted);"
       >
@@ -317,6 +333,15 @@ function onDocKeydown(e: KeyboardEvent) {
 
       <!-- Sonuçlar -->
       <template v-else>
+        <!-- E7: şifreli sonuçlar sunucudan sonra gelir -->
+        <p
+          v-if="localPending && query.trim().length >= 2"
+          class="px-4 py-2 text-[12px]"
+          style="color: var(--kv-text-muted);"
+          role="status"
+        >
+          {{ t('messageSearch.localSearching') }}
+        </p>
         <div
           v-for="msg in results"
           :key="msg.id"

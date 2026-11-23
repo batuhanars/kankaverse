@@ -27,10 +27,10 @@ import { previewInMemory, type PushCommit } from './commitPreview'
 import { mentionIdsOf } from './mentionIds'
 import { DeviceBrokenError, ensureDevice } from './deviceSetup'
 import { Hydrator, type OwnEntry, type OwnPlain, type Resolution, type WireMessage } from './hydrate'
-import { type DeviceNotice, digestOf, LocalStore, type StoredStatus } from './localStore'
+import { type DeviceNotice, digestOf, LocalStore, type StoredMessage, type StoredStatus } from './localStore'
 import type { E2eeApi, EngineDeps, Vault, WarningHandler, WithLock } from './ports'
 import { OFFLINE_API, withViewCache } from './viewCache'
-import { enrichHits, scanLocal, searchable, type LocalSearchHit } from './localSearch'
+import { channelRecords, enrichHits, matchRecords, searchable, type LocalSearchHit } from './localSearch'
 import { processWelcomes } from './welcomes'
 
 export type { WarningHandler }
@@ -103,6 +103,8 @@ export class E2eeEngine {
   private yieldToUi: EngineDeps['yieldToUi']
   private metric: EngineDeps['metric']
   private own: OwnPlain = new Map()
+  /** E7 §5.3: son aranan kanalın çözülmüş `ok` kayıtları (yalnız bellek; depo sürümüyle bayatlar). */
+  private searchCache: { channelId: string; version: number; records: StoredMessage[] } | null = null
   /** `/e2ee/status` bayrağı (E4 §2.2): true iken v2 yük + frankingTag gönderilir. */
   private franking = false
   /** E5a yedek motoru: yalnız `start` ile kurulan (ağlı) motorda var; `openLocal` motorunda yok. */
@@ -513,13 +515,27 @@ export class E2eeEngine {
   }
 
   /**
-   * E7 §5: şifreli grup DM'de yerel arama. Tarama kilit içinde (yalnız depo), zenginleştirme kilit dışında (ağ).
+   * E7 §5: şifreli grup DM'de yerel arama. Kayıtlar kilit içinde (yalnız depo) okunur, zenginleştirme kilit
+   * dışında (ağ). Aynı kanalın çözülmüş kayıtları bellekte tutulur (§5.3): yazarken her harf yeni sorgu, depo
+   * baştan okunmaz. Depo değişince (yeni/silinen kayıt) önbellek bayatlar. Diske düz metin YAZILMAZ.
    * `plain`: gövdeyi aramadan önce düz metne çevirir (bahsetmeler). Ağsız motorda boş döner.
    */
   async searchLocal(channelId: string, query: string, plain?: (body: string) => string): Promise<LocalSearchHit[]> {
     if (!searchable(query) || this.api === OFFLINE_API) return []
-    const hits = await this.run((ctx) => scanLocal(ctx, channelId, query, plain))
+    const records = await this.run(async (ctx) => {
+      const c = this.searchCache
+      if (c?.channelId === channelId && c.version === ctx.store.messagesVersion) return c.records
+      const loaded = await channelRecords(ctx, channelId)
+      this.searchCache = { channelId, version: ctx.store.messagesVersion, records: loaded }
+      return loaded
+    })
+    const hits = matchRecords(records, query, plain)
     return hits.length ? enrichHits(this.api, channelId, hits) : []
+  }
+
+  /** Arama kutusu kapanınca: bellekteki çözülmüş kayıtlar bırakılır. */
+  dropSearchCache(): void {
+    this.searchCache = null
   }
 
   /** E2 §3.3: sohbetteki "yeni cihaz eklendi" satırları (yerel depo; mesaj değil, yedeğe girmez). */
@@ -583,6 +599,7 @@ export class E2eeEngine {
   /** Çıkış: bu kullanıcının tüm yerel şifreli deposunu siler. */
   async destroy(): Promise<void> {
     this.own.clear()
+    this.searchCache = null
     await this.vault.destroy()
   }
 }

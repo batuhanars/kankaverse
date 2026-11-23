@@ -23,6 +23,8 @@ export interface RowStore {
   delete(userId: string, store: string, key: string): Promise<void>
   /** Bölümdeki tüm anahtarlar (yedek görüntüsü `messages` bölümünü bununla gezer). */
   keys(userId: string, store: string): Promise<string[]>
+  /** Bölümün tüm satırları tek sorguda (E7 arama: tek tek okuma köprü çağrısı başına ~7 ms). */
+  entries(userId: string, store: string): Promise<(SealedRow & { key: string })[]>
   deleteStores(userId: string, stores: string[]): Promise<void>
   deleteUser(userId: string): Promise<void>
   /** Depoda satırı olan tüm kullanıcılar (çıkışta anahtarlarını da silebilmek için). */
@@ -90,6 +92,24 @@ export class SealedVault implements Vault {
 
   keys(store: VaultStore): Promise<string[]> {
     return this.rows.keys(this.userId, store)
+  }
+
+  /**
+   * Toplu okuma: tek SQL sorgusu, satırlar burada çözülür. Açılamayan satır atlanır (tek tek okumada o kayıt
+   * zaten "bozuk" sayılıp geçiliyordu). Çözme JS'te ve uzun: her 200 satırda arayüze nefes verilir.
+   */
+  async entries(store: VaultStore): Promise<[string, Uint8Array][]> {
+    const rows = await this.rows.entries(this.userId, store)
+    const out: [string, Uint8Array][] = []
+    for (const [i, r] of rows.entries()) {
+      try {
+        out.push([r.key, gcm(this.key, r.iv, aadFor(this.userId, store, r.key)).decrypt(r.ct)])
+      } catch {
+        // bozuk satır: aramayı durdurmaz
+      }
+      if (i % 200 === 199) await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    return out
   }
 
   /** Cihaz + grup durumunu siler, çözülmüş mesajlar kalır (oturum zinciri değişti, anahtarlar geçersiz). */

@@ -273,6 +273,11 @@ export interface Vault {
   delete(store: VaultStore, key: string): Promise<void>
   /** Bölümdeki tüm anahtarlar (yedek görüntüsü `messages` bölümünü bununla gezer). */
   keys(store: VaultStore): Promise<string[]>
+  /**
+   * İsteğe bağlı toplu okuma (E7 §5.3 ölçümü): bölümün tüm satırları tek seferde. Mobilde tek tek okuma köprü
+   * çağrısı başına ~7 ms; 10 bin kayıtta toplu okuma 35 kat hızlı. Açılamayan satır atlanır. Yoksa keys + get.
+   */
+  entries?(store: VaultStore): Promise<[string, Uint8Array][]>
   /** Cihaz + grup durumunu siler, çözülmüş mesajlar kalır (oturum zinciri değişti, anahtarlar geçersiz). */
   resetDeviceState(): Promise<void>
   /** Bu kullanıcının tüm deposunu (anahtar dahil) siler. */

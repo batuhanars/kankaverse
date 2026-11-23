@@ -264,6 +264,38 @@ export class LocalStore {
     await this.vault.delete('groups', `${channelId}:ids`)
   }
 
+  /** Mesaj yazımı/silmesi sayacı (yalnız bellekte): arama önbelleği bununla bayatlığını anlar. */
+  messagesVersion = 0
+
+  /**
+   * Bölümdeki tüm mesaj kayıtları (E7 arama). Depo toplu okuma veriyorsa tek seferde, yoksa tek tek.
+   * Bozuk tek kayıt atlanır (aramayı durdurmaz).
+   */
+  async allMessages(yieldToUi?: () => Promise<void>): Promise<StoredMessage[]> {
+    const parse = (bytes: Uint8Array): StoredMessage | null => {
+      try {
+        return JSON.parse(fromUtf8(bytes)) as StoredMessage
+      } catch {
+        return null
+      }
+    }
+    const out: StoredMessage[] = []
+    if (this.vault.entries) {
+      for (const [i, [, bytes]] of (await this.vault.entries('messages')).entries()) {
+        const rec = parse(bytes)
+        if (rec) out.push(rec)
+        if (i % 500 === 499) await yieldToUi?.()
+      }
+      return out
+    }
+    for (const [i, id] of (await this.messageIds()).entries()) {
+      const rec = await this.loadMessage(id).catch(() => null)
+      if (rec) out.push(rec)
+      if (i % 100 === 99) await yieldToUi?.()
+    }
+    return out
+  }
+
   async loadMessage(id: string): Promise<StoredMessage | null> {
     const bytes = await this.vault.get('messages', id)
     return bytes ? (JSON.parse(fromUtf8(bytes)) as StoredMessage) : null
@@ -272,6 +304,7 @@ export class LocalStore {
   /** Mesaj yazımı yedeği kirletir (E5a §4.3). Toplu geri yüklemede `markDirty=false`, sonunda tek işaret konur. */
   async saveMessage(msg: StoredMessage, markDirty = true): Promise<void> {
     await this.vault.put('messages', msg.id, utf8(JSON.stringify(msg)))
+    this.messagesVersion++
     if (markDirty) await this.markBackupDirty()
   }
 
@@ -287,6 +320,7 @@ export class LocalStore {
       // bozuk kayıt: yine de sil, yedek yenilensin
     }
     await this.vault.delete('messages', id)
+    this.messagesVersion++
     if (existed && markDirty) await this.markBackupDirty()
   }
 

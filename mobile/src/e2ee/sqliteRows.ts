@@ -56,6 +56,12 @@ const sqliteRows: RowStore = {
     )
     return rows.map((r) => r.key)
   },
+  async entries(userId, store) {
+    return (await db()).getAllAsync<SealedRow & { key: string }>(
+      'SELECT key, iv, ct FROM sealed_v1 WHERE user_id = ? AND store = ?',
+      [userId, store],
+    )
+  },
   async deleteStores(userId, stores) {
     const d = await db()
     for (const s of stores) {

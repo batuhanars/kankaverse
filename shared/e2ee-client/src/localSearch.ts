@@ -12,7 +12,6 @@ export const SEARCH_LIMIT = 50
 /** Zenginleştirme: `exists` çağrısı başına 500 kimlik, en çok 4 çağrı (§5.4). */
 const META_BATCH = 500
 const META_MAX_BATCHES = 4
-const YIELD_EVERY = 100
 
 export interface LocalSearchHit {
   id: string
@@ -22,33 +21,33 @@ export interface LocalSearchHit {
   author: ExistingMeta['author']
 }
 
-/** Türkçe büyük/küçük harf eşlemesi (İ→i, I→ı): sunucunun "büyük/küçük harf duyarsız" eşlemesinin yerel karşılığı. */
-export const normalizeQuery = (s: string): string => s.toLocaleLowerCase('tr')
+/**
+ * Türkçe büyük/küçük harf eşlemesi (İ→i, I→ı): sunucunun "büyük/küçük harf duyarsız" eşlemesinin yerel karşılığı.
+ * `toLocaleLowerCase('tr')` ile aynı sonuç, ama Hermes'te o çağrı kayıt başına ~2 ms (10 bin kayıtta 21 sn,
+ * Note 10S ölçümü 2026-11-23); önce iki Türkçe harf elle çevrilir, kalanı yerel ayarsız `toLowerCase`.
+ */
+export const normalizeQuery = (s: string): string => s.replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase()
 
 /** Sorgu aranabilir mi (kırpılmış, en az 2 karakter). */
 export const searchable = (q: string): boolean => q.trim().length >= SEARCH_MIN_CHARS
 
 /**
- * Kanalın eşleşen `ok` kayıtları. Diğer durumlar (`unverified`, `failed`, `undecryptable`, `unsupported`) aranmaz.
- * `plain`: gövdeyi aramadan önce ekrandaki düz metne çevirir (bahsetme belirteci → @ad). Kilit içinde çağrılır.
+ * Kanalın aranabilir kayıtları: yalnız `ok`. Diğer durumlar (`unverified`, `failed`, `undecryptable`,
+ * `unsupported`) aranmaz. Kilit içinde çağrılır; depo toplu okuma veriyorsa tek sorgu (§5.3 ölçümü).
  */
-export async function scanLocal(
-  ctx: E2eeContext,
-  channelId: string,
+export async function channelRecords(ctx: E2eeContext, channelId: string): Promise<StoredMessage[]> {
+  const all = await ctx.store.allMessages(ctx.yieldToUi)
+  return all.filter((r) => r.channelId === channelId && r.status === 'ok')
+}
+
+/** Eşleşen kayıtlar. `plain`: gövdeyi aramadan önce ekrandaki düz metne çevirir (bahsetme belirteci → @ad). */
+export function matchRecords(
+  records: StoredMessage[],
   query: string,
   plain: (body: string) => string = (b) => b,
-): Promise<StoredMessage[]> {
+): StoredMessage[] {
   const needle = normalizeQuery(query.trim().slice(0, SEARCH_MAX_CHARS))
-  const hits: StoredMessage[] = []
-  const ids = await ctx.store.messageIds()
-  for (const [i, id] of ids.entries()) {
-    const rec = await ctx.store.loadMessage(id).catch(() => null) // bozuk tek kayıt aramayı durdurmaz
-    if (rec && rec.channelId === channelId && rec.status === 'ok' && normalizeQuery(plain(rec.body)).includes(needle)) {
-      hits.push(rec)
-    }
-    if (i % YIELD_EVERY === YIELD_EVERY - 1) await ctx.yieldToUi?.()
-  }
-  return hits
+  return records.filter((r) => normalizeQuery(plain(r.body)).includes(needle))
 }
 
 /**

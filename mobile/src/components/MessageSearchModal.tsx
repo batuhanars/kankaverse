@@ -103,6 +103,10 @@ export function MessageSearchModal({ channelId, onClose, onJump }: Props) {
   const plain = (content: string) =>
     formatMentionsPlain(content, (id) => members?.find((m) => m.id === id)?.username, t('mention.unknown'));
   const [loading, setLoading] = useState(false);
+  /** Şifreli sonuçlar hâlâ aranıyor (sunucu sonucu ekranda olabilir). */
+  const [localPending, setLocalPending] = useState(false);
+  // Pencere kapanınca bellekteki çözülmüş kayıtlar bırakılır (E7 §5.3).
+  useEffect(() => () => useE2eeStore.getState().engine?.dropSearchCache(), []);
   const [error, setError] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -112,24 +116,36 @@ export function MessageSearchModal({ channelId, onClose, onJump }: Props) {
     if (trimmed.length < 2) {
       setResults([]);
       setLoading(false);
+      setLocalPending(false);
       setError('');
       return;
     }
-    // Yazarken yeni sorgu başlarsa eski cevap ekrana yazılmaz (yerel tarama sunucudan yavaş dönebilir).
+    // Yazarken yeni sorgu başlarsa eski cevap ekrana yazılmaz. Sunucu sonucu gelir gelmez gösterilir; şifreli
+    // (yerel) sonuçlar hazır olunca listeye katılır (E7 §5.3: büyük depoda ilk yerel arama saniyeler sürebilir).
     let stale = false;
     debounceRef.current = setTimeout(() => {
       setLoading(true);
       setError('');
-      Promise.all([messagesApi.search(channelId, { q: trimmed }), searchLocal(channelId, trimmed, plain)])
-        .then(([list, local]) => {
-          if (!stale) setResults(mergeResults<SearchRow>(list, local, localRow));
-        })
-        .catch((e) => {
+      setLocalPending(useE2eeStore.getState().channels[channelId]?.encrypted === true);
+      const localTask = searchLocal(channelId, trimmed, plain);
+      void (async () => {
+        let serverRows: SearchRow[] = [];
+        try {
+          serverRows = await messagesApi.search(channelId, { q: trimmed });
+          if (!stale) setResults(serverRows);
+        } catch (e) {
           if (!stale) setError(extractErrorMessage(e));
-        })
-        .finally(() => {
+        } finally {
           if (!stale) setLoading(false);
-        });
+        }
+        const local = await localTask;
+        if (stale) return;
+        setLocalPending(false);
+        if (local.length) {
+          setError('');
+          setResults(mergeResults<SearchRow>(serverRows, local, localRow));
+        }
+      })();
     }, 300);
     return () => {
       stale = true;
@@ -172,9 +188,15 @@ export function MessageSearchModal({ channelId, onClose, onJump }: Props) {
 
             {!loading && error ? <Text style={styles.error}>{error}</Text> : null}
 
-            {!loading && !error && trimmedLen >= 2 && results.length === 0 && (
+            {!loading && !error && !localPending && trimmedLen >= 2 && results.length === 0 && (
               <Text style={styles.hint}>{t('messageSearch.empty')}</Text>
             )}
+
+            {!loading && localPending && trimmedLen >= 2 ? (
+              <Text style={styles.hint} accessibilityLiveRegion="polite">
+                {t('messageSearch.localSearching')}
+              </Text>
+            ) : null}
 
             {!loading && results.length > 0 && (
               <FlatList

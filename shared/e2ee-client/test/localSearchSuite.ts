@@ -88,6 +88,20 @@ export function localSearchSuite(label: string) {
       expect(await search(B1, 'u-ayse', plain)).toEqual([])
     })
 
+    it('önbellek: ikinci aramada depo baştan okunmaz; yeni kayıt gelince önbellek bayatlar', async () => {
+      const { A1, B1 } = await pair()
+      await deliver(A1, B1, 'm1', 'önbellek bir', 1)
+      expect((await search(B1, 'önbellek')).map((h) => h.id)).toEqual(['m1'])
+      await deliver(A1, B1, 'm2', 'önbellek iki', 2)
+      expect((await search(B1, 'önbellek')).map((h) => h.id)).toEqual(['m2', 'm1'])
+    })
+
+    it('Türkçe küçültme toLocaleLowerCase("tr") ile aynı sonucu verir', () => {
+      for (const w of ['İSTANBUL', 'ILIK', 'Iğdır', 'ÇĞÖŞÜ', 'İıIi', 'Straße', 'ÀÉ 🔒 Мир']) {
+        expect(normalizeQuery(w)).toBe(w.toLocaleLowerCase('tr'))
+      }
+    })
+
     it('birleşim: sunucu sonucu ∪ yerel, kimlikle tekilleşir, zamana göre, en çok 50', () => {
       const server = [
         { id: 's1', createdAt: at(1) },
