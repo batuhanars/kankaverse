@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * PinsPopover — "Sabitlenen Mesajlar" popover/panel (§7 contract).
- * TopBar veya DM başlığındaki 📌 butonuna tıklanınca açılır.
+ * TopBar veya DM başlığındaki sabitleme butonuna tıklanınca açılır.
  * GET /channels/:id/pins ile liste çeker; WS güncellemesi parent tarafından triggerlanır.
  * Gölge yok, --kv-bg-elevated + ince kenarlık + --kv-radius-md.
  * Dışına tıkla / Esc kapat.
@@ -14,6 +14,7 @@ import { useMessagesStore } from '@/stores/messages'
 import { useMessageJump } from '@/composables/useMessageJump'
 import { formatMentionsPlain } from '@/utils/mentions'
 import type { MessageDto } from '@/types'
+import PinIcon from '@/components/shared/PinIcon.vue'
 
 defineOptions({ name: 'PinsPopover' })
 
@@ -140,7 +141,7 @@ defineExpose({ refresh })
       style="border-color: var(--kv-border-subtle);"
     >
       <span class="text-[14px] font-semibold" style="color: var(--kv-text-primary);">
-        📌 {{ t('message.pinnedMessages') }}
+        <PinIcon :size="14" class="inline align-[-2px] mr-1" />{{ t('message.pinnedMessages') }}
       </span>
       <button
         class="w-6 h-6 flex items-center justify-center rounded text-[14px] cursor-pointer transition-colors"

@@ -30,6 +30,7 @@ import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import { useActiveMenu } from '@/composables/useActiveMenu'
 import { useMessageJump } from '@/composables/useMessageJump'
 import type { MessageDto } from '@/types'
+import PinIcon from '@/components/shared/PinIcon.vue'
 
 // MessageActionsMenu instance ref — menuOpen'ı okumak için
 const actionsMenuRef = ref<InstanceType<typeof MessageActionsMenu> | null>(null)
@@ -396,7 +397,7 @@ const renderedContent = computed<string>(() => {
           style="color: var(--kv-text-muted);"
           :title="t('message.pinnedMessages')"
         >
-          📌
+          <PinIcon :size="12" class="inline align-[-1px]" />
         </span>
       </div>
 
@@ -461,7 +462,7 @@ const renderedContent = computed<string>(() => {
               class="text-[11px] ml-1 select-none"
               style="color: var(--kv-text-muted);"
               :title="t('message.pinnedMessages')"
-            >📌</span></template><ReceiptTick v-if="showReceipt && receipt" :receipt="receipt" />
+            ><PinIcon :size="12" class="inline align-[-1px]" /></span></template><ReceiptTick v-if="showReceipt && receipt" :receipt="receipt" />
           </div>
           <!-- C62: ayrıldıktan sonra düzenlenen mesaj (eski üye penceresi) — e2ee etiketinden ÖNCE -->
           <p

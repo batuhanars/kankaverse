@@ -4,6 +4,7 @@
  * Tüm MessageActionsMenu örnekleri bu ref'i paylaşır → aynı anda yalnız BİR picker açık olur.
  */
 import { ref as moduleRef } from 'vue'
+import PinIcon from '@/components/shared/PinIcon.vue'
 const openPickerMessageId = moduleRef<string | null>(null)
 </script>
 
@@ -355,7 +356,7 @@ onUnmounted(() => {
           @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
           @click="onPin"
         >
-          <span class="text-[15px] shrink-0">📌</span>
+          <PinIcon class="shrink-0" />
           <span>{{ t('message.pin') }}</span>
         </button>
         <button
@@ -366,7 +367,7 @@ onUnmounted(() => {
           @mouseleave="($event.currentTarget as HTMLElement).style.backgroundColor = ''"
           @click="onUnpin"
         >
-          <span class="text-[15px] shrink-0">📌</span>
+          <PinIcon class="shrink-0" />
           <span>{{ t('message.unpin') }}</span>
         </button>
 

@@ -56,6 +56,7 @@ import { useAppShellNav } from '@/composables/useAppShellNav'
 import { isNewDay, dayDividerLabel } from '@/utils/dateSeparator'
 import type { DmChannelDto, MessageDto, SeenReader } from '@/types'
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence'
+import PinIcon from '@/components/shared/PinIcon.vue'
 
 // Web `UserCard.vue` presenceColor ile aynı palet; `offline: null` = satır hiç çizilmez.
 // (Mobil `dm/[id].tsx` PRESENCE_COLOR ile birebir aynı kural — iki istemci aynı şeyi söylesin.)
@@ -1014,7 +1015,7 @@ const dayLabels = computed<(string | null)[]>(() =>
               @mouseleave="!showDmPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
               @click="toggleDmPins"
             >
-              📌
+              <PinIcon />
             </button>
             <PinsPopover
               :channel-id="channel.id"
@@ -1114,7 +1115,7 @@ const dayLabels = computed<(string | null)[]>(() =>
               @mouseleave="!showDmPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
               @click="toggleDmPins"
             >
-              📌
+              <PinIcon />
             </button>
             <PinsPopover
               :channel-id="channel.id"

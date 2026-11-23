@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChannelsStore } from '@/stores/channels'
 import PinsPopover from '@/components/shared/PinsPopover.vue'
+import PinIcon from '@/components/shared/PinIcon.vue'
 
 defineProps<{ showMemberPanel: boolean }>()
 const emit = defineEmits<{ toggleMembers: [] }>()
@@ -40,7 +41,7 @@ function togglePins(e: MouseEvent) {
           @mouseleave="!showPins && (($event.currentTarget as HTMLElement).style.color = 'var(--kv-text-muted)')"
           @click="togglePins"
         >
-          📌
+          <PinIcon />
         </button>
         <PinsPopover
           v-if="channelsStore.activeChannel()"
