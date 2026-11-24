@@ -500,6 +500,26 @@ function toRoomMember(p: Participant, localIdentity: string | undefined): RoomMe
   return { userId: p.identity, username: p.name || p.identity, avatarUrl, isLocal: p.identity === localIdentity };
 }
 
+/** Bu oturumun çıkış önceliği (`startOrJoin`te kurulur). */
+let activePreferredOutputs: AudioOutputId[] = ['bluetooth', 'headset', 'speaker', 'earpiece'];
+
+/**
+ * LiveKit'in öncelik listesiyle seçeceği çıkışı `outputId`ye yazar: listede ilk bulunan. Cihaz listesi
+ * henüz boşsa (oturum başı) listedeki ilk telefon içi çıkış varsayılır (ahize ya da hoparlör).
+ */
+async function syncOutputId(set: (partial: Partial<VoiceState>) => void): Promise<void> {
+  try {
+    const outputs = (await AudioSession.getAudioOutputs()) as AudioOutputId[];
+    const chosen =
+      activePreferredOutputs.find((o) => outputs.includes(o)) ??
+      activePreferredOutputs.find((o) => o === 'earpiece' || o === 'speaker') ??
+      'speaker';
+    set({ outputId: chosen });
+  } catch {
+    // yoksay — seçici açılınca kendi listesini okur
+  }
+}
+
 export const useVoiceStore = create<VoiceState>((set, get) => ({
   connectedChannelId: null,
   incomingCall: null,
@@ -651,29 +671,25 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       // E8 §5.2 — DM/grup aramasında "şifreleyebilirim" (native çerçeve şifreleyici her sürümde var).
       const data = await voiceApi.getToken(channelId, isGuild ? undefined : { callE2ee: true });
 
+      // §5 — varsayılan çıkış. Sahip kararı (2026-11-24): 1-1 sesli aramada AHİZE (telefon araması gibi
+      // kulağa), hoparlör kullanıcı seçimi. Ortam ses kanalı, grup DM ve görüntülü başlayan arama HOPARLÖR.
+      // Kulaklık/Bluetooth her durumda önce gelir; ahizesi olmayan cihaz listede bir sonrakine düşer.
+      // 🔴 Seçim ELLE YAPILMAZ, sıralama olarak verilir: `getAudioOutputs()` oturum başında boş dönüyor
+      // (cihazda ölçüldü: `[]`), Android cihazları henüz saymamış. Elle `selectAudioOutput` hem boş listeye
+      // bakıp yanlış karar veriyordu hem de LiveKit'in kendi önceliğini (takılı kulaklık dahil) eziyordu.
+      const preferredOutputs: AudioOutputId[] =
+        !isGuild && !isGroup && !options?.startWithCamera
+          ? ['bluetooth', 'headset', 'earpiece', 'speaker']
+          : ['bluetooth', 'headset', 'speaker', 'earpiece'];
       await AudioSession.configureAudio({
-        android: { audioTypeOptions: AndroidAudioTypePresets.communication },
+        android: {
+          preferredOutputList: preferredOutputs,
+          audioTypeOptions: AndroidAudioTypePresets.communication,
+        },
       });
       await AudioSession.startAudioSession();
-      // §5 — varsayılan çıkış, yalnız kablolu/Bluetooth kulaklık YOKSA: biri bağlıysa
-      // `preferredOutputList` (bluetooth > headset > speaker > earpiece) zaten onu seçer, üstüne
-      // yazmak takılı kulaklığı görmezden gelirdi.
-      // Sahip kararı (2026-11-24): 1-1 sesli aramada AHİZE (telefon araması gibi kulağa), hoparlör
-      // kullanıcı seçimi. Ortam ses kanalı, grup DM ve görüntülü başlayan arama HOPARLÖR (önceki
-      // varsayılan). Cihazda ahize yoksa (tablet) hoparlöre düşer.
-      const wantEarpiece = !isGuild && !isGroup && !options?.startWithCamera;
-      try {
-        const outputs = await AudioSession.getAudioOutputs();
-        if (outputs.includes('bluetooth') || outputs.includes('headset')) {
-          set({ outputId: outputs.includes('bluetooth') ? 'bluetooth' : 'headset' });
-        } else {
-          const target: AudioOutputId = wantEarpiece && outputs.includes('earpiece') ? 'earpiece' : 'speaker';
-          await AudioSession.selectAudioOutput(target);
-          set({ outputId: target });
-        }
-      } catch {
-        // yoksay — platform varsayılanı geçerli kalır, seçici açılınca kendi listesini okur
-      }
+      activePreferredOutputs = preferredOutputs;
+      await syncOutputId(set);
 
       // 🔴 E8 §4.3 (R7) — şifreli arama: anahtar türetilip yuvaya yazılır, Room şifreleme yöneticisiyle kurulur,
       // şifreleme connect'ten ÖNCE açılır. Herhangi biri tutmazsa fırlar → catch → bağlanılmaz (geri düşme yok).
@@ -693,6 +709,8 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
         set({ callEncrypted: true });
       }
       await room.connect(data.url, data.token);
+      // Cihazlar artık sayılmış olur: göstergedeki çıkışı gerçek seçimle eşitle (yakınlık kilidi buna bakar).
+      await syncOutputId(set);
 
       // 🔴 PM incelemesi (2026-08-06) — bu iki satır eksikti: `wireRoom`in `ParticipantConnected`
       // dinleyicisi yalnız BİZDEN SONRA girenlere `attachSpeaking` çağırıyordu. Kendi katılımcımız
