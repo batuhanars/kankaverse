@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <i>Durum: kapalı beta (davetli) — aktif geliştirme · <a href="https://kankaverse.com">kankaverse.com</a></i>
+  <i>Durum: yayında. Web, masaüstü ve Android (Google Play) · aktif geliştirme · <a href="https://kankaverse.com">kankaverse.com</a></i>
 </p>
 
 ---
@@ -35,6 +35,8 @@ Sesli/görüntülü sohbet, metin kanalları ve topluluk ("Ortam") yönetimi sun
 | Backend (`api/`) | NestJS 11 · Prisma · PostgreSQL · Socket.IO (Redis adapter) |
 | Web (`web/`) | Vue 3 · Vite · TypeScript · Pinia · Tailwind |
 | Masaüstü (`desktop/`) | Electron |
+| Mobil (`mobile/`) | React Native · Expo · Expo Router · EAS Build |
+| Uçtan uca şifreleme (`shared/`) | E2EE çekirdeği ve istemci katmanı (TypeScript) |
 | Gerçek zamanlı ses/video | LiveKit |
 | Altyapı | Docker Compose · Caddy (otomatik TLS) |
 
@@ -44,6 +46,9 @@ Sesli/görüntülü sohbet, metin kanalları ve topluluk ("Ortam") yönetimi sun
 api/        NestJS backend (REST + WebSocket)
 web/        Vue 3 SPA — birincil istemci
 desktop/    Electron masaüstü sarmalayıcı
+mobile/     React Native + Expo Android uygulaması
+shared/     Ortak paketler (E2EE çekirdeği ve istemcisi)
+landing/    Tanıtım sitesi
 contracts/  Sprint sözleşmeleri (PM ↔ geliştirme)
 PLAN.md     yol haritası + mimari kararlar
 CLAUDE.md   çalışma kuralları (tier'lara cascade yüklenir)
@@ -75,3 +80,7 @@ cd web && npm install && npm run dev           # http://localhost:5173
 ---
 
 > Kankaverse aktif geliştirme aşamasındadır; özellikler ve arayüz değişebilir.
+
+---
+
+© 2026 Batuhan Arslan. Tüm hakları saklıdır.
