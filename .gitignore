@@ -54,3 +54,6 @@ design-refs/
 
 # Yerel arşivler (dosya gönderme testinde üretilenler dahil) — kaynak değil, depoya girmez
 *.zip
+
+# Automod kelime listesi yalnız sunucuda (bkz. docker-compose.prod.yml api)
+/config/automod-words.json

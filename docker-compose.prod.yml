@@ -41,6 +41,12 @@ services:
       context: ./api
     restart: unless-stopped
     env_file: .env.production
+    # Automod kelime listesi repoda değil, sunucuda `config/automod-words.json` (git dışı). Değiştirmek için
+    # dosyayı düzenleyip api'yi yeniden başlat. Dosya yoksa api başlamaz (bkz. api automod-lists.ts).
+    environment:
+      AUTOMOD_WORDS_FILE: /app/config/automod-words.json
+    volumes:
+      - ./config/automod-words.json:/app/config/automod-words.json:ro
     depends_on:
       postgres:
         condition: service_healthy

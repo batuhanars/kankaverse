@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { AUTOMOD_SAFE_PREFIXES, AUTOMOD_WORDS } from '../../config/automod-words';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { AUTOMOD_LISTS, loadAutomodLists, type AutomodLists } from './automod-lists';
 
 export interface AutomodResult {
   blocked: boolean;
@@ -34,11 +34,14 @@ export class AutomodService {
   private readonly bannedPhrases: string[]; // çok kelime — substring eşleşmesi
   private readonly safePrefixes: string[]; // masum kök — tek kelime eşleşmesini atlatır
 
-  constructor() {
-    const normalized = AUTOMOD_WORDS.map((w) => this.normalize(w));
+  // Liste repoda değil, sunucudaki dosyadan gelir (bkz. `automod-lists.ts`). Testler kendi kurgusal
+  // listesini verir; uygulamada sağlayıcı yoksa dosyadan okunur.
+  constructor(@Optional() @Inject(AUTOMOD_LISTS) lists?: AutomodLists) {
+    const { words, safePrefixes } = lists ?? loadAutomodLists();
+    const normalized = words.map((w) => this.normalize(w));
     this.bannedWords = normalized.filter((w) => w.length > 0 && !w.includes(' '));
     this.bannedPhrases = normalized.filter((w) => w.includes(' '));
-    this.safePrefixes = AUTOMOD_SAFE_PREFIXES.map((w) => this.normalize(w));
+    this.safePrefixes = safePrefixes.map((w) => this.normalize(w));
   }
 
   check(content: string): AutomodResult {
@@ -53,7 +56,10 @@ export class AutomodService {
     // sınıfına dahil; gerisi a-z0-9.
     // Masum kök istisnası (`şikayet` → `sikayet`): kök SİLİNİR, kalan kısım yine denetlenir.
     // Tümden serbest bırakmak kaçış yolu olurdu (kökün ardına küfür yapıştırmak).
-    const tokens = normalized.split(/[^a-z0-9ı]+/).filter(Boolean).map((t) => this.stripSafePrefix(t));
+    const tokens = normalized
+      .split(/[^a-z0-9ı]+/)
+      .filter(Boolean)
+      .map((t) => this.stripSafePrefix(t));
     const blocked = tokens.some((token) => this.bannedWords.some((word) => token.startsWith(word)));
     return { blocked };
   }
