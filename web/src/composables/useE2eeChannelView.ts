@@ -13,13 +13,24 @@ export function useE2eeChannelView(
   channelId: () => string,
   messages: Ref<MessageDto[]>,
   hasMore: Ref<boolean>,
+  hiddenBefore?: Ref<boolean>,
 ) {
   const store = useE2eeStore()
   const encrypted = computed(() => store.channels[channelId()]?.encrypted === true)
   // Kanala özel uyarı, yoksa cihaz geneli ('' anahtarı: örn. cihaz anahtarı bozuk).
   const warning = computed(() => store.warnings[channelId()] ?? store.warnings[''] ?? null)
 
+  // Sohbet başı bilgi kutusu (sahip 2026-11-24): şifreli sohbetin EN BAŞINDAYIZ (eski sayfa yok, yedekten
+  // gizlenen geçmiş yok) ve ya hiç mesaj yok ya da ilk mesaj zaten şifreli. Kutu varken ayraç çizilmez:
+  // "bu noktadan sonra" denecek bir öncesi yok.
+  const showIntro = computed(() => {
+    if (!encrypted.value || hasMore.value || hiddenBefore?.value) return false
+    const first = messages.value[0]
+    return !first || first.encrypted === true
+  })
+
   const dividerIndex = computed(() => {
+    if (showIntro.value) return -1
     const list = messages.value
     const i = list.findIndex((m) => m.encrypted)
     if (i === -1) return encrypted.value && list.length > 0 ? list.length : -1 // henüz şifreli mesaj yok
@@ -32,5 +43,5 @@ export function useE2eeChannelView(
     noticeSlots(notices.byChannel[channelId()] ?? [], messages.value, hasMore.value),
   )
 
-  return { encrypted, warning, dividerIndex, deviceNotices }
+  return { encrypted, warning, showIntro, dividerIndex, deviceNotices }
 }

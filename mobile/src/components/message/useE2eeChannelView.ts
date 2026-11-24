@@ -12,7 +12,7 @@ import type { MessageDto } from '@/api/messages';
  * yeri gösterirdi, bu yüzden o durumda çizilmez. Henüz şifreli mesaj yoksa ayraç listenin sonunda.
  * `dividerBeforeId`: ayracın üstüne gireceği mesaj; `dividerAtEnd`: ayraç tüm mesajlardan sonra.
  */
-export function useE2eeChannelView(channelId: string, messages: MessageDto[], hasMore: boolean) {
+export function useE2eeChannelView(channelId: string, messages: MessageDto[], hasMore: boolean, hiddenBefore = false) {
   const encrypted = useE2eeStore((s) => s.channels[channelId]?.encrypted === true);
   // Kanala özel uyarı, yoksa cihaz geneli ('' anahtarı: örn. cihaz anahtarı bozuk).
   const rawWarning = useE2eeStore((s) => s.warnings[channelId] ?? s.warnings[''] ?? null);
@@ -23,12 +23,18 @@ export function useE2eeChannelView(channelId: string, messages: MessageDto[], ha
   });
   const warning = departed ? null : rawWarning;
 
+  // Sohbet başı bilgi kutusu (sahip 2026-11-24): şifreli sohbetin EN BAŞINDAYIZ (eski sayfa yok, yedekten
+  // gizlenen geçmiş yok) ve ya hiç mesaj yok ya da ilk mesaj zaten şifreli. Kutu varken ayraç çizilmez:
+  // "bu noktadan sonra" denecek bir öncesi yok. Web `useE2eeChannelView.showIntro` ile aynı kural.
+  const showIntro = encrypted && !hasMore && !hiddenBefore && (messages.length === 0 || messages[0].encrypted === true);
+
   const { dividerBeforeId, dividerAtEnd } = useMemo(() => {
+    if (showIntro) return { dividerBeforeId: null, dividerAtEnd: false };
     const first = messages.findIndex((m) => m.encrypted);
     if (first === -1) return { dividerBeforeId: null, dividerAtEnd: encrypted && messages.length > 0 };
     if (first === 0 && hasMore) return { dividerBeforeId: null, dividerAtEnd: false };
     return { dividerBeforeId: messages[first].id, dividerAtEnd: false };
-  }, [messages, hasMore, encrypted]);
+  }, [messages, hasMore, encrypted, showIntro]);
 
   // E2 §3.3: "yeni cihaz eklendi" satırları. `messages` eskiden yeniye; yuva i = i. mesajdan ÖNCE, length = son mesajdan sonra.
   const notices = useE2eeNoticesStore((s) => s.byChannel[channelId]);
@@ -42,5 +48,5 @@ export function useE2eeChannelView(channelId: string, messages: MessageDto[], ha
     return known?.[userId] ?? null;
   };
 
-  return { encrypted, warning, dividerBeforeId, dividerAtEnd, deviceNotices, noticeName };
+  return { encrypted, warning, showIntro, dividerBeforeId, dividerAtEnd, deviceNotices, noticeName };
 }

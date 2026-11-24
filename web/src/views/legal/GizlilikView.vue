@@ -86,6 +86,10 @@ const { t } = useI18n()
             <span style="color: var(--kv-accent-500);">•</span>
             <span>{{ t('legal.privacy.s3Item5') }}</span>
           </li>
+          <li class="flex gap-2">
+            <span style="color: var(--kv-accent-500);">•</span>
+            <span>{{ t('legal.privacy.s3Item6') }}</span>
+          </li>
         </ul>
       </section>
 

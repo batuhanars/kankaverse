@@ -1527,6 +1527,12 @@
   "e2ee": {
     "lockTitle": "Uçtan uca şifreli",
     "divider": "Bu noktadan sonra mesajlar uçtan uca şifreli",
+    "intro": {
+      "title": "Mesajlar ve aramalar uçtan uca şifreli",
+      "body": "Yazdıklarını ve aramalarını yalnız bu sohbetteki kişilerin cihazları açabilir. Paylaşılan görsel ve dosyalar şimdilik bu kapsamda değil.",
+      "actionClick": "Güvenlik kodunu görmek için tıkla.",
+      "actionTap": "Güvenlik kodunu görmek için dokun."
+    },
     "deviceAdded": "{name} yeni bir cihaz ekledi",
     "deviceAddedUnknown": "Bir üye yeni bir cihaz ekledi",
     "deviceUnverified": "{name} doğrulanmamış bir cihaz ekledi",
@@ -2335,9 +2341,11 @@
       "s3Title": "3. İçeriğe erişim",
       "s3Item1": "Ortam kanallarındaki içerik, moderasyon ve güvenlik (özellikle çocuk güvenliği) amacıyla sunucu tarafında erişilebilir.",
       "s3Item2": "İçeriğe erişim yetkili moderasyon süreçleriyle sınırlıdır.",
-      "s3Item3": "Ortam dışı tüm DM'lerdeki mesaj metinleri uçtan uca şifrelidir: yalnız sen ve konuştuğun kişilerin cihazları okuyabilir, Kankaverse okuyamaz. Şifreleme, sohbette \"Bu noktadan sonra mesajlar uçtan uca şifreli\" ayracından sonraki mesajlar için geçerlidir. DM'de paylaşılan görsel, dosya, ses ve videolar ile sesli ve görüntülü aramalar şu an bu şifrelemenin kapsamında değildir.",
+      "s3Item3": "Ortam dışı tüm DM'lerde mesaj metinleri 14 Kasım 2026'dan, sesli ve görüntülü aramalar 23 Kasım 2026'dan itibaren uçtan uca şifrelidir: bunlara yalnız sen ve konuştuğun kişilerin cihazları erişebilir, Kankaverse erişemez. Bu tarihten önce gönderilmiş mesajlar şifreli değildir; sohbette şifrelemenin başladığı yer bir ayraçla gösterilir. DM'de paylaşılan görsel, dosya, ses ve videolar ile ortam ses kanalları şu an bu şifrelemenin kapsamında değildir.",
+
       "s3Item4": "Web ve masaüstü uygulamasının kodu her açılışta sunucumuzdan yüklenir. Bu yüzden şifreleme güvencesi orada mobil uygulamaya göre daha zayıftır.",
       "s3Item5": "Şifreleme mesajın içeriğini korur. Kimlerle konuştuğun, mesajın zamanı, grup adı ve üyeleri, tepkiler ve bir mesajda kimden bahsedildiği gibi bilgiler hizmetin çalışması için sunucuda kalır.",
+      "s3Item6": "Bir kişiyle güvenlik kodunu karşılaştırarak konuşmanıza kimsenin araya girmediğini doğrulayabilirsin. Bir sohbete doğrulanmamış bir cihaz eklenirse sohbette görünür. Gruplara kimin eklendiğini sunucumuz yönetir; yeni üyeler sohbette görünür.",
       "s4Title": "4. Çocuk güvenliği",
       "s4Item1": "Reşit olmayan (18 yaş altı) kullanıcılar için mimariye gömülü korumalar vardır (yabancıyla iletişim kısıtları, yaş-kapılı alanlar, grup kısıtları). Minör verisi özel hassasiyetle işlenir.",
       "s4Item2": "İstismar içeriği (CSAM) için ayrı, sıfır-tolerans süreç hedeflenmektedir (hukuk + uzman tasarımı bekleniyor).",

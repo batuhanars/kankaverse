@@ -26,6 +26,7 @@ import { EmailVerificationBanner } from './EmailVerificationBanner';
 import { DateSeparator } from './message/DateSeparator';
 import { E2eeDeviceNotice } from './message/E2eeDeviceNotice';
 import { E2eeDivider } from './message/E2eeDivider';
+import { E2eeIntroBox } from './message/E2eeIntroBox';
 import { GroupEventNotice } from './message/GroupEventNotice';
 import { useGroupEventSlots } from './message/useGroupEventSlots';
 import { E2eeWarningBanner } from './message/E2eeWarningBanner';
@@ -367,7 +368,7 @@ export function MessageScreen({
   const hasMoreOlder = useMessagesStore((s) => s.byChannel[channelId]?.hasMore ?? false);
   // E5b Parça C: cihaz öncesi mesajlar gizlendiyse (daha eskisi yokken) listenin başında tek satır bilgi.
   const hiddenBefore = useMessagesStore((s) => s.byChannel[channelId]?.hiddenBefore ?? false);
-  const e2eeView = useE2eeChannelView(channelId, plainMessages, hasMoreOlder);
+  const e2eeView = useE2eeChannelView(channelId, plainMessages, hasMoreOlder, hiddenBefore);
   const safetyEnabled = useE2eeStore((s) => s.engine?.identity?.enabled === true);
   const [safetyOpen, setSafetyOpen] = useState(false);
   // Kod iki kişi arasındadır: 1-1'de karşı taraf, grupta üyeler (bahsetme listesi zaten "ben hariç").
@@ -527,6 +528,9 @@ export function MessageScreen({
 
       {loadState === 'loading' && <MessageLoading />}
       {loadState === 'error' && <MessageError message={errorMessage} onRetry={retryLoad} />}
+      {loadState === 'ready' && items.length === 0 && e2eeView.showIntro && (
+        <E2eeIntroBox onPress={safetyEnabled ? () => setSafetyOpen(true) : undefined} />
+      )}
       {loadState === 'ready' && items.length === 0 && (
         <MessageEmpty message={hiddenBefore ? t('e2ee.backup.history.hiddenNote') : undefined} />
       )}
@@ -565,6 +569,9 @@ export function MessageScreen({
               <ActivityIndicator color={theme.colors.textMuted} style={styles.loadMore} />
             ) : !hasMoreOlder && hiddenBefore ? (
               <Text style={styles.hiddenNote}>{t('e2ee.backup.history.hiddenNote')}</Text>
+            ) : e2eeView.showIntro ? (
+              // Inverted listede footer görsel olarak EN ÜSTTE: sohbetin başı.
+              <E2eeIntroBox onPress={safetyEnabled ? () => setSafetyOpen(true) : undefined} />
             ) : null
           }
           renderItem={({ item, index }) => (

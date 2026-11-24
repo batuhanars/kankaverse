@@ -36,6 +36,7 @@ import E2eeDeviceNotice from '@/components/shared/E2eeDeviceNotice.vue'
 import E2eeDivider from '@/components/shared/E2eeDivider.vue'
 import E2eeLockIcon from '@/components/shared/E2eeLockIcon.vue'
 import SafetyCodeModal from '@/components/shared/SafetyCodeModal.vue'
+import E2eeIntroBox from '@/components/shared/E2eeIntroBox.vue'
 import E2eeWarningBanner from '@/components/shared/E2eeWarningBanner.vue'
 import { useE2eeChannelView } from '@/composables/useE2eeChannelView'
 import { useE2eeStore } from '@/stores/e2ee'
@@ -390,7 +391,7 @@ useAudioQueue(() => props.channel.id, messages)
 const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channel.id] ?? false)
 // E5b Parça C: cihaz öncesi mesajlar gizlendiyse (daha eskisi yokken) listenin başında tek satır.
 const hiddenBefore = computed(() => messagesStore.hiddenBeforeDevice[props.channel.id] ?? false)
-const e2eeView = useE2eeChannelView(() => props.channel.id, messages, hasMore)
+const e2eeView = useE2eeChannelView(() => props.channel.id, messages, hasMore, hiddenBefore)
 // C64: üyelik olay satırlarının akıştaki yerleri (cihaz satırlarıyla aynı kural)
 const groupEventSlotMap = computed(() =>
   groupEventSlots(groupEventsStore.byChannel[props.channel.id] ?? [], messages.value, hasMore.value),
@@ -1189,6 +1190,7 @@ const dayLabels = computed<(string | null)[]>(() =>
             {{ t('message.loadMore') }}
           </button>
         </div>
+        <E2eeIntroBox v-if="e2eeView.showIntro.value" @open="safetyOpen = true" />
         <p
           v-if="!hasMore && hiddenBefore"
           class="text-center text-[13px] px-4"
