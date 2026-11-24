@@ -177,6 +177,8 @@ async function handleCall(p: Record<string, unknown>): Promise<boolean> {
     { id: callerId, username: str(p.callerName) ?? '', avatarUrl: str(p.callerAvatarUrl) },
     { kind: p.isGroup === true || p.isGroup === 'true' ? 'group' : 'dm' },
   );
+  // C72: native arama bildirimi metinleri bir sonraki arama için önbellekte taze kalsın (çizimden SONRA, gecikme yok).
+  await cacheNotificationDefaults(await loadHidePreview());
   return true;
 }
 

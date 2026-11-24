@@ -4543,3 +4543,15 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Sahip turu (web + mobil) — 2026-10-27 geçti
 - [x] Tur revizeleri: web'de Kaldır pencereden çıktı, sayfada yalnız görsel varken (mobilde alt sayfada kalır) · mobil ortam ayarları profil düzeninde (afiş + üstüne binen simge, kalemler; "Ortam Afişi" satırı kalktı)
 - [x] Mağaza sürümü (vc29) — AAB derlendi 2026-10-27
+
+## Sprint C72 — Gelen arama bildirimini native çizmek — 2026-11-24
+
+> Sözleşme: `contracts/SPRINT_C72_NATIVE_CALL_PUSH_CONTRACT.md`. Yalnız mobil. Dev checkbox işaretler, item EKLEMEZ.
+
+- [x] Native: `CallPush` ayrıştırıcı + `KvFirebaseMessagingService` call/call_end dalı (§2)
+- [x] Native: Katıl/aç aktivite ekstraları + Reddet `CallActionService` (headless `KvCallAction`) (§2.1)
+- [x] Native modül: `isNativeCallShowing`, `dismissNativeCall`, açılış ekstrası okuma (§2.1, §3)
+- [x] JS: `presentIncomingCall` sahiplenme, `dismissIncomingCall` native kapatma, bayat temizlik, headless görev kaydı (§3)
+- [x] JS: arama etiketleri bildirim önbelleğine (§4)
+- [x] tsc + eslint + testler; yerel prebuild + gradlew; pakette servis/görev kaydı (§6)
+- [x] Cihaz turu: düşük bellekli test cihazı (Redmi Note 9) 6/6 geçti 2026-11-24; sahip telefonu regresyonu sahip kararıyla atlandı (§6)

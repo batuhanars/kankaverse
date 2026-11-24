@@ -16,6 +16,12 @@ import java.util.concurrent.TimeUnit
  */
 class KvFirebaseMessagingService : ExpoFirebaseMessagingService() {
   override fun onMessageReceived(remoteMessage: RemoteMessage) {
+    // C72: arama bildirimi JS'i beklemeden, `super`den ONCE cizilir (dusuk bellekte JS ayaga kalkmadan surec olur).
+    try {
+      CallPush.parse(remoteMessage.data)?.let { CallPush.handle(applicationContext, it) }
+    } catch (e: Exception) {
+      Log.e(TAG, "native arama cizimi basarisiz", e)
+    }
     val incoming = PushHold.parse(remoteMessage.data)
     // Kapi, JS gorevi baslamadan ONCE kurulur: JS cok hizli biterse sinyal kaybolmasin.
     val latch = incoming?.let { PushHold.register(it.messageId) }

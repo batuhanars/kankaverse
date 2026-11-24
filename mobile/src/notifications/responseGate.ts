@@ -4,8 +4,11 @@ import * as Notifications from 'expo-notifications';
 import { useNavigationContainerRef } from 'expo-router';
 import { useAuthStore } from '@/stores/auth';
 import {
+  addCallActionListener,
   addConversationTapListener,
+  getInitialCallAction,
   getInitialConversationTap,
+  type CallAction,
   type ConversationTap,
 } from '../../modules/conversation-notification';
 
@@ -89,6 +92,37 @@ export function useGatedConversationTap(onTap: (tap: ConversationTap) => void): 
       appState.remove();
     };
   }, onTap);
+}
+
+/**
+ * C72: native arama bildirimindeki Katıl / gövdeye dokunma, aynı kapıdan geçer (oturum hazır olmadan
+ * katılma denenmez). `useGatedConversationTap` ile aynı desen: soğuk açılış `getInitialCallAction`, sıcak
+ * olay modül olayı, öne gelince bir kez daha bakılır; `tapId` ile tekilleştirilir.
+ */
+export function useGatedCallAction(onAction: (action: CallAction) => void): void {
+  useGatedDelivery<CallAction>((deliver) => {
+    let lastTapId: number | undefined;
+    const deliverOnce = (action: CallAction) => {
+      if (action.tapId !== undefined && action.tapId === lastTapId) return;
+      lastTapId = action.tapId;
+      // Açılış ekranı "kaldığın yerden aç" ile bizim yönlendirmemizi ezmesin (bkz. nativeTapSeen).
+      nativeTapSeen = true;
+      deliver(action);
+    };
+    const unsubscribe = addCallActionListener(deliverOnce);
+    const checkInitial = () => {
+      const initial = getInitialCallAction();
+      if (initial) deliverOnce(initial);
+    };
+    checkInitial();
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkInitial();
+    });
+    return () => {
+      unsubscribe();
+      appState.remove();
+    };
+  }, onAction);
 }
 
 type GateSource<T> = (deliver: (item: T) => void) => () => void;

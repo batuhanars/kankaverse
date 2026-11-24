@@ -16,8 +16,11 @@ import java.util.concurrent.CountDownLatch
 internal object PushHold {
   const val HOLD_TIMEOUT_SECONDS = 8L
   private const val FALLBACK_CHANNEL_ID = "messages_v6" // push.ts MESSAGE_CHANNEL_ID ile ayni; JS onbellegi yoksa yedek
-  private const val PREFS = "kv_notification_defaults"
-  private val DEFAULT_KEYS = listOf("replyLabel", "markReadLabel", "muteLabel", "meName", "color", "notificationChannelId", "hiddenPreviewText")
+  internal const val PREFS = "kv_notification_defaults"
+  private val DEFAULT_KEYS = listOf("replyLabel", "markReadLabel", "muteLabel", "meName", "color", "notificationChannelId", "hiddenPreviewText",
+    // C72: native arama bildirimi metinleri (CallPush); gomulu metin yok, kaynak JS onbellegi.
+    "callTitle", "callBody", "callGroupTitle", "callGroupBody", "callRejectLabel", "callJoinLabel",
+  )
 
   private val latches = ConcurrentHashMap<String, CountDownLatch>()
   private val jsDrew: MutableSet<String> = ConcurrentHashMap.newKeySet()
@@ -28,13 +31,17 @@ internal object PushHold {
 
   /**
    * JS `extractV2` ile ayni alanlar: Expo FCM `data` haritasinda nesneyi `body` (JSON metni) altinda tasir;
-   * `dataString` ve duz alanlar yedek.
+   * `dataString` ve duz alanlar yedek. C72: `CallPush` de ayni kaynagi kullanir.
    */
-  fun parse(data: Map<String, String>): Incoming? {
+  internal fun v2Payload(data: Map<String, String>): JSONObject? {
     val candidates = listOf(data["body"], data["dataString"]).mapNotNull { raw ->
       raw?.let { runCatching { JSONObject(it) }.getOrNull() }
     } + JSONObject(data as Map<*, *>)
-    val p = candidates.firstOrNull { it.optString("v") == "2" } ?: return null
+    return candidates.firstOrNull { it.optString("v") == "2" }
+  }
+
+  fun parse(data: Map<String, String>): Incoming? {
+    val p = v2Payload(data) ?: return null
     if (p.optString("kind") != "message" || !p.has("e2ee") || p.isNull("e2ee")) return null
     val messageId = str(p, "messageId") ?: return null
     if (str(p, "conversationId") == null) return null
@@ -107,6 +114,6 @@ internal object PushHold {
   }
 
   /** Eksik ya da JSON null ise null (org.json `optString` null'u "null" metnine cevirir). */
-  private fun str(p: JSONObject, key: String): String? =
+  internal fun str(p: JSONObject, key: String): String? =
     if (p.isNull(key)) null else p.optString(key).takeIf { it.isNotEmpty() }
 }

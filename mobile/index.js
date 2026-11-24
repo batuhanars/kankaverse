@@ -26,4 +26,8 @@ const { AppRegistry } = require('react-native');
 const { runQuickReply } = require('./src/notifications/quickReply');
 AppRegistry.registerHeadlessTask('KvQuickReply', () => runQuickReply);
 
+// C72: native arama bildirimindeki Reddet headless gorevi.
+const { runCallAction } = require('./src/notifications/callAction');
+AppRegistry.registerHeadlessTask('KvCallAction', () => runCallAction);
+
 require('expo-router/entry');

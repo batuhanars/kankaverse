@@ -44,6 +44,13 @@ export type NotificationDefaults = {
   replyLabel: string;
   markReadLabel: string;
   muteLabel: string;
+  /** C72: native arama bildirimi metinleri; gövde şablonları `{name}` yer tutucusuyla HAM (native yerine koyar). */
+  callTitle: string;
+  callBody: string;
+  callGroupTitle: string;
+  callGroupBody: string;
+  callRejectLabel: string;
+  callJoinLabel: string;
   /** D94: açıkken yedek çizim `text` yerine `hiddenPreviewText` yazar. */
   hidePreview: boolean;
   hiddenPreviewText: string;
@@ -58,7 +65,16 @@ export type ConversationTap = {
   messageId: string | null;
 };
 
-type TapEvents = { onTap: (tap: ConversationTap) => void };
+/** C72: native arama bildiriminden Katıl ("accept") ya da gövdeye dokunma ("open"). */
+export type CallAction = {
+  tapId?: number;
+  action: 'accept' | 'open';
+  channelId: string;
+  callerName: string;
+  isGroup: boolean;
+};
+
+type TapEvents = { onTap: (tap: ConversationTap) => void; onCallAction: (action: CallAction) => void };
 
 declare class NativeConversationNotificationModule extends NativeModule<TapEvents> {
   show(params: ConversationNotificationParams): Promise<void>;
@@ -75,6 +91,10 @@ declare class NativeConversationNotificationModule extends NativeModule<TapEvent
   isPushHoldActive?(): boolean;
   setNotificationDefaults?(defaults: NotificationDefaults): Promise<void>;
   getInitialTap(): ConversationTap | null;
+  isNativeCallShowing?(channelId: string): Promise<boolean>;
+  dismissNativeCall?(channelId: string): Promise<void>;
+  dismissNativeCalls?(exceptChannelId: string | null): Promise<void>;
+  getInitialCallAction?(): CallAction | null;
 }
 
 const loaded =
@@ -157,5 +177,32 @@ export function getInitialConversationTap(): ConversationTap | null {
 export function addConversationTapListener(listener: (tap: ConversationTap) => void): () => void {
   if (!native) return () => {};
   const sub = native.addListener('onTap', listener);
+  return () => sub.remove();
+}
+
+/** C72: bu arama için native bildirim görünüyor mu (JS sahiplenmeden önce sorar). Modül eskiyse false. */
+export function isNativeCallShowing(channelId: string): Promise<boolean> {
+  return native?.isNativeCallShowing?.(channelId) ?? Promise.resolve(false);
+}
+
+/** C72: native arama bildirimini kapatır. Modül eskiyse no-op. */
+export function dismissNativeCall(channelId: string): Promise<void> {
+  return native?.dismissNativeCall?.(channelId) ?? Promise.resolve();
+}
+
+/** C72: `exceptChannelId` dışındaki native arama bildirimlerini kapatır (bayat temizlik). Modül eskiyse no-op. */
+export function dismissNativeCalls(exceptChannelId: string | null): Promise<void> {
+  return native?.dismissNativeCalls?.(exceptChannelId) ?? Promise.resolve();
+}
+
+/** C72: uygulamayı native arama bildirimindeki Katıl/dokunma ile açan eylem (soğuk açılış); bir kez teslim edilir. */
+export function getInitialCallAction(): CallAction | null {
+  return native?.getInitialCallAction?.() ?? null;
+}
+
+/** C72: uygulama açıkken/arka plandayken gelen arama eylemi. Dönen fonksiyon aboneliği kaldırır. */
+export function addCallActionListener(listener: (action: CallAction) => void): () => void {
+  if (!native || typeof native.getInitialCallAction !== 'function') return () => {};
+  const sub = native.addListener('onCallAction', listener);
   return () => sub.remove();
 }

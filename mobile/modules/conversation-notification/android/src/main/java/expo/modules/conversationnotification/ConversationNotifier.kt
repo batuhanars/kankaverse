@@ -400,7 +400,7 @@ object ConversationNotifier {
   }
 
   /** Uygulamanin bildirim kucuk ikonu (expo-notifications plugin'i `notification_icon` drawable'i yazar). */
-  private fun smallIconRes(context: Context): Int {
+  internal fun smallIconRes(context: Context): Int {
     val id = context.resources.getIdentifier("notification_icon", "drawable", context.packageName)
     return if (id != 0) id else context.applicationInfo.icon
   }

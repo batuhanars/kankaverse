@@ -27,6 +27,13 @@ export function cacheNotificationDefaults(hidePreview: boolean): Promise<void> {
     replyLabel: t('mobile.notifications.reply'),
     markReadLabel: t('mobile.notifications.markRead'),
     muteLabel: t('mobile.notifications.mute'),
+    // C72: native arama bildirimi; gövde şablonları `{name}` ile ham, Kotlin yerine koyar.
+    callTitle: t('mobile.call.incomingTitle'),
+    callBody: t('mobile.call.incomingBody', { name: '{name}' }),
+    callGroupTitle: t('mobile.call.incomingGroupTitle'),
+    callGroupBody: t('mobile.call.incomingGroupBody', { name: '{name}' }),
+    callRejectLabel: t('call.reject'),
+    callJoinLabel: t('mobile.call.joinAction'),
     hidePreview,
     hiddenPreviewText: t('mobile.notifications.hiddenPreview'),
   }).catch(() => undefined);

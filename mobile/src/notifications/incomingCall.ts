@@ -9,7 +9,8 @@ import { getAccessToken, refreshAccessToken } from '@/api/http';
 import { voiceApi } from '@/api/voice';
 import { channelTitle } from '@/utils/channelTitle';
 import { dmTarget } from '@/utils/pushNavigation';
-import { useGatedNotificationResponder } from '@/notifications/responseGate';
+import { useGatedCallAction, useGatedNotificationResponder } from '@/notifications/responseGate';
+import { dismissNativeCall, dismissNativeCalls, isNativeCallShowing } from '../../modules/conversation-notification';
 import { t } from '@/i18n';
 
 /**
@@ -154,6 +155,8 @@ let setupDone = false;
 interface RingingCall {
   channelId: string;
   notificationId: string | null;
+  /** C72: bildirimi native (Kotlin) çizdi, JS sahiplendi; kapatma `dismissNativeCall` ile. */
+  native?: boolean;
   timeoutTimer: ReturnType<typeof setTimeout>;
   /** Uygulama-içi şerit yolunda bildirim KURULMAZ; o durumda null (bkz. `presentIncomingCall`). */
 }
@@ -315,6 +318,16 @@ export async function presentIncomingCall(
 
   const kind: IncomingCallKind = options?.kind ?? 'dm';
 
+  // C72: arka planda native servis bildirimi JS'ten önce çizmiş olabilir. Varsa ikinci bildirim kurma, sahiplen
+  // (kanal titreşimi zaten çalıyor: JS titreşimi de yok, çift titreşim olmasın).
+  if (!foreground && (await isNativeCallShowing(channelId))) {
+    const timeoutTimer = setTimeout(() => {
+      void dismissIncomingCall(channelId);
+    }, RING_TIMEOUT_MS);
+    current = { channelId, notificationId: null, native: true, timeoutTimer };
+    return;
+  }
+
   const notificationId = permission.granted
     ? await scheduleRingNotification(channelId, caller, kind, foreground)
     : null;
@@ -408,9 +421,10 @@ export async function dismissIncomingCall(channelId: string): Promise<void> {
   }
   if (current?.channelId === channelId) {
     clearTimeout(current.timeoutTimer);
-    const { notificationId } = current;
+    const { notificationId, native } = current;
     current = null;
     Vibration.cancel();
+    if (native) await dismissNativeCall(channelId).catch(() => undefined);
     if (notificationId) {
       try {
         await Notifications.dismissNotificationAsync(notificationId);
@@ -457,6 +471,8 @@ export async function dismissIncomingCall(channelId: string): Promise<void> {
  * 30 sn'lik `ttl` zaten geç düşen push'ı server tarafında eliyor, bu da kalan asılı kayıtları siler.
  */
 async function clearStaleIncomingCallNotifications(): Promise<void> {
+  // C72: JS'in sahiplendiği dışındaki native arama bildirimleri de bayattır.
+  await dismissNativeCalls(current?.native ? current.channelId : null).catch(() => undefined);
   const presented = await Notifications.getPresentedNotificationsAsync();
   const stale = presented.filter((n) => {
     const data = n.request.content.data as Record<string, unknown> | undefined;
@@ -488,22 +504,23 @@ async function clearStaleIncomingCallNotifications(): Promise<void> {
  * §14.1: grupta reddet YALNIZ YEREL, sunucuya hiçbir şey gitmez (`voice:call_reject` grupta
  * rastgele bir üyeye giderdi). 1-1'de sinyal gönderilir.
  */
-export function rejectIncomingCall(channelId: string, isGroup: boolean): void {
+export function rejectIncomingCall(channelId: string, isGroup: boolean): Promise<void> {
   void dismissIncomingCall(channelId);
-  if (isGroup) return;
+  if (isGroup) return Promise.resolve();
   // C53: arka plan görevi ve bildirim yanıtı dinleyicisi AYNI JS ortamında aynı reddi iki kez
   // getirebilir; kısa pencerede ikinci sinyal atlanır.
   const now = Date.now();
   if (lastReject?.channelId === channelId && now - lastReject.at < REJECT_DEDUPE_MS) {
-    return;
+    return Promise.resolve();
   }
   lastReject = { channelId, at: now };
   // Tek fonksiyon, iki yol: soket bağlıysa soketle, değilse (uygulama kapalı/arka plan) HTTP ile.
   if (isSocketConnected()) {
     callReject(channelId);
-    return;
+    return Promise.resolve();
   }
-  void rejectOverHttp(channelId);
+  // C72: headless Reddet görevi HTTP bitene kadar beklesin diye söz döner (diğer çağıranlar yok sayar).
+  return rejectOverHttp(channelId);
 }
 
 async function rejectOverHttp(channelId: string): Promise<void> {
@@ -588,6 +605,15 @@ export function useIncomingCallResponder(): void {
 
   // §9.2.5 — asılı bildirim temizliği: her ön plana dönüşte VE mount anında (uygulama az önce
   // arka plandan/ölüden açıldıysa da aynı temizlik geçerli olsun diye).
+  // C72: native arama bildiriminden Katıl / gövdeye dokunma (soğuk açılışta da buradan, aynı kapı).
+  useGatedCallAction((action) => {
+    if (action.action === 'accept') {
+      acceptIncomingCall(action.channelId, action.callerName, action.isGroup);
+      return;
+    }
+    router.push(dmTarget(action.channelId));
+  });
+
   useEffect(() => {
     void clearStaleIncomingCallNotifications();
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {

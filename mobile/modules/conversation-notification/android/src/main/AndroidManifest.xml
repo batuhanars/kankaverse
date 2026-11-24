@@ -20,5 +20,9 @@
     <service
       android:name="expo.modules.conversationnotification.QuickReplyService"
       android:exported="false" />
+    <!-- C72: native arama bildirimi Reddet dugmesi -> headless JS servisi (KvCallAction). -->
+    <service
+      android:name="expo.modules.conversationnotification.CallActionService"
+      android:exported="false" />
   </application>
 </manifest>

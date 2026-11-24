@@ -14,6 +14,17 @@ class ConversationNotificationModule : Module() {
    */
   @Volatile private var pendingTap: Map<String, Any?>? = null
 
+  /** C72: native arama bildirimi Katil/dokunma eylemi; `pendingTap` ile ayni desen. */
+  @Volatile private var pendingCallAction: Map<String, Any?>? = null
+
+  private fun captureCallAction(intent: Intent?, emit: Boolean) {
+    val context = appContext.reactContext
+    if (context == null || intent == null || !intent.hasExtra(CallPush.EXTRA_CALL_ACTION)) return
+    val action = CallPush.consumeAction(context, intent) ?: return
+    pendingCallAction = action
+    if (emit) sendEvent("onCallAction", action)
+  }
+
   private fun capture(source: String, intent: Intent?, emit: Boolean) {
     val hasExtra = intent?.hasExtra(ConversationNotifier.EXTRA_CONVERSATION_ID) == true
     val context = appContext.reactContext
@@ -30,7 +41,7 @@ class ConversationNotificationModule : Module() {
 
     // Bildirime dokunma olayi (JS dinleyicisi varsa); ayni dokunus getInitialTap ile de gelebilir,
     // JS tarafi tapId ile tekilleştirir.
-    Events("onTap")
+    Events("onTap", "onCallAction")
 
     // Map ile alinir: alan sozlesmesi index.ts ConversationNotificationParams.
     AsyncFunction("show") { params: Map<String, Any?> ->
@@ -100,6 +111,29 @@ class ConversationNotificationModule : Module() {
       }
     }
 
+    // C72: JS arama bildirimini sahiplenmeden once native cizim var mi (tag `kv-call:<id>`).
+    AsyncFunction("isNativeCallShowing") { channelId: String ->
+      val context = appContext.reactContext
+      context != null && CallPush.isShowing(context, channelId)
+    }
+
+    AsyncFunction("dismissNativeCall") { channelId: String ->
+      appContext.reactContext?.let { CallPush.cancel(it, channelId) }
+    }
+
+    // Bayat temizlik: `exceptChannelId` (JS'in sahiplendigi) disindaki native arama bildirimlerini kaldirir.
+    AsyncFunction("dismissNativeCalls") { exceptChannelId: String? ->
+      appContext.reactContext?.let { CallPush.cancelAll(it, exceptChannelId) }
+    }
+
+    // Bekleyen Katil/ac eylemi (soguk acilis); bir kez teslim edilir.
+    Function("getInitialCallAction") {
+      if (pendingCallAction == null) captureCallAction(appContext.currentActivity?.intent, false)
+      val action = pendingCallAction
+      pendingCallAction = null
+      action
+    }
+
     // Bekleyen dokunus (yoksa etkinligin intent'i); bir kez teslim edilir, sonra temizlenir.
     Function("getInitialTap") {
       if (pendingTap == null) capture("getInitialTap", appContext.currentActivity?.intent, false)
@@ -110,10 +144,12 @@ class ConversationNotificationModule : Module() {
 
     OnActivityEntersForeground {
       capture("foreground", appContext.currentActivity?.intent, true)
+      captureCallAction(appContext.currentActivity?.intent, true)
     }
 
     OnNewIntent { intent ->
       capture("newIntent", intent, true)
+      captureCallAction(intent, true)
     }
   }
 

@@ -6,6 +6,8 @@ import * as SystemUI from 'expo-system-ui';
 import { useAuthStore } from '@/stores/auth';
 import { usePushNotificationResponder } from '@/notifications/push';
 import { useIncomingCallResponder } from '@/notifications/incomingCall';
+import { cacheNotificationDefaults } from '@/notifications/notificationDefaults';
+import { loadHidePreview } from '@/notifications/previewSetting';
 import { useOwnAvatarPersistence } from '@/notifications/ownAvatar';
 import { useCachedUserIdPersistence } from '@/notifications/headlessEngine';
 import { useShareIntentCapture } from '@/hooks/useShareIntentCapture';
@@ -29,6 +31,11 @@ export default function RootLayout() {
   // M4a-2 sözleşme §8 — gelen arama bildirimi (Reddet/Aramaya Katıl/gövde). Aynı mount noktası,
   // aynı native response akışı (bkz. notifications/incomingCall.ts dosya başı yorumu).
   useIncomingCallResponder();
+  // C72: native arama bildirimi metinleri (ve diğer önbellek) uygulama açılışında da yazılır; uygulama hiç
+  // mesaj/arama görevi çalıştırmadan kapanırsa bile native servis çizebilsin.
+  useEffect(() => {
+    void loadHidePreview().then(cacheNotificationDefaults);
+  }, []);
   // C41 - Android paylaşım menüsünden gelen içerik (soğuk/sıcak) bellek deposuna alınır; yönlendirme
   // `(app)/_layout.tsx`te (oturum + gezinme hazır olunca).
   useShareIntentCapture();
