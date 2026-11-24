@@ -139,8 +139,12 @@ jobs:
           # veri temizliği, force push) pull "divergent branches" ile düşüyordu. Sunucuda takip edilen
           # dosyada elle değişiklik varsa SİLMEZ, durur (.env.production ve config/ git dışı, etkilenmez).
           retry git -c http.extraheader="$AUTH_HEADER" fetch origin main
-          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-            git status --short --untracked-files=no
+          # Elle değişmiş dosya gelen sürümle birebir aynıysa (ör. repoya da işlenmiş chmod) sorun değil.
+          LOCAL_ONLY=$(git diff --name-only HEAD | while read -r f; do
+            git diff --quiet FETCH_HEAD -- "$f" || echo "$f"
+          done)
+          if [ -n "$LOCAL_ONLY" ]; then
+            echo "$LOCAL_ONLY"
             echo "::error::Sunucuda takip edilen dosyalarda elle değişiklik var; deploy durduruldu, önce bunlara bak."
             exit 1
           fi
