@@ -1,6 +1,6 @@
 # SPRINT C73: Cevapsız arama bildirimi + zil titreşim deseni
 
-> Durum: **AÇIK (2026-11-24).** PM compose (Opus). Mobil (Android native + JS) + api'de küçük alan ekleme. Web değişmez.
+> Durum: **TAMAM (2026-11-24).** Titreşim + cevapsız bildirimi cihazda geçti (vc90, incelemede). PM compose (Opus). Mobil (Android native + JS) + api'de küçük alan ekleme. Web değişmez.
 > R7 kapsamı dışında (auth/T&S karar fonksiyonu yok). Native değişiklik: yeni build (versionCode 90, C72 Rev.1 ile aynı paket).
 > Önkoşul: C72 (native arama bildirimi) + C72 Rev.1 (`FLAG_INSISTENT`).
 

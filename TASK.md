@@ -4566,4 +4566,4 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] JS: `resolveNativeCall`, önbellek anahtarları, tr.json, `missed_call_v1` kanalı (§3)
 - [x] Zil kanalları v5 / quiet_v2, desen `[0,1000,1500]`, eski kanallar silinir (§4)
 - [x] api testleri + mobil tsc/eslint; yerel prebuild + gradlew; manifestte alıcı (§6)
-- [ ] Cihaz turu: düşük bellekli test cihazı (§6)
+- [x] Cihaz turu: düşük bellekli test cihazı 2026-11-24: uzun titreşim + cevapsız bildirimi ("X seni aradı") geçti; ret ve kabul de geçti (cevapsız düşmedi); cevapsız bildirimine dokunma DM açıyor (§6)
