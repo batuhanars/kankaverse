@@ -2317,6 +2317,8 @@
   "legal": {
     "and": "ve",
     "consentTitle": "Kayıt olmadan önce",
+    "consentEncryption": "Ortam dışındaki DM'lerde mesajların ve aramaların uçtan uca şifrelidir: bunları yalnız sen ve konuştuğun kişilerin cihazları açabilir, Kankaverse açamaz. DM'de paylaşılan görsel ve dosyalar şimdilik bu kapsamda değildir.",
+    "consentModeration": "Ortam kanallarındaki içerik, güvenlik ve moderasyon için, özellikle çocuk güvenliği amacıyla, sunucu tarafında erişilebilir. Bir mesajı şikâyet ettiğinde o mesaj ve sohbetteki önceki birkaç mesaj moderasyon ekibine iletilir.",
     "consentAgreePre": "Devam ederek",
     "consentAgreePost": "metinlerini okuduğunu ve kabul ettiğini onaylarsın.",
     "consentConfirm": "Okudum, kabul ediyorum",

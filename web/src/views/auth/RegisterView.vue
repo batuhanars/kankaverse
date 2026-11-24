@@ -216,6 +216,12 @@ function getError(field: string): string | undefined {
     <!-- Onay modalı: Kayıt Ol (form geçerli) → açılır; "Okudum, kabul ediyorum" asıl kaydı yapar.
          Form kısa kalır, onay tam karar anında + açık → "görmedim duymadım" savunması kapanır. -->
     <KvModal v-if="showConsent" :title="t('legal.consentTitle')" @close="showConsent = false">
+      <p class="text-[13px] leading-relaxed mb-3" style="color: var(--kv-text-body);">
+        {{ t('legal.consentEncryption') }}
+      </p>
+      <p class="text-[13px] leading-relaxed mb-4" style="color: var(--kv-text-body);">
+        {{ t('legal.consentModeration') }}
+      </p>
       <p class="text-[13px] leading-relaxed mb-5" style="color: var(--kv-text-secondary);">
         {{ t('legal.consentAgreePre') }}
         <a href="/kurallar" target="_blank" rel="noopener" style="color: var(--kv-accent-500); text-decoration: underline;">{{ t('legal.rules.linkLabel') }}</a>
