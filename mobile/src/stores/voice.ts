@@ -431,6 +431,8 @@ let foregroundListenerRemove: (() => void) | null = null;
 // YAZAR — arka plan/ön plan geçişi yalnız OKUR (kullanıcının "kapattım" iradesiyle "arka planda
 // geçici durduruldu" birbirine karışmasın). `leave()` her oturumda sıfırlar.
 let cameraIntent = false;
+// `toggleCamera` sürerken ikinci çağrı yok sayılır (bkz. `toggleCameraOnce`).
+let cameraToggling = false;
 // M5a §3 🔴 — web `stores/voice.ts` `muteBeforeDeafen` pariteti (aynı isim, aynı iş): sağırlaştırma
 // ANINDAKİ mikrofon durumunu tutar. `toggleDeafen` yazar; kaldırınca yalnız bu `false` idiyse
 // (yani kullanıcı sağırlaşırken zaten susturulmamıştı) mikrofon geri açılır — susturulmuşsa
@@ -1028,52 +1030,12 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     // §1/§7 + M4e §4 → M4f §2 🔴 — `callKind` bazlı kapı KALKTI (guild artık DIŞARIDA BIRAKILMIYOR).
     // Kapı artık yalnız `canPublishCamera` (sunucu kararı, `resolveVideoSources`) — üç arama türünde
     // de aynı fonksiyon, aynı koşul.
-    if (!room || !get().canPublishCamera) return { ok: false };
-
-    if (get().isCameraOn) {
-      // M4f §3.1 — bu unpublish BİZDEN: `wireRoom`daki `LocalTrackUnpublished` dinleyicisi aynı
-      // olayı sunucu kaynaklı unpublish ile AYIRT EDEMEZ (SDK ikisinde de aynı olayı ateşler); bu
-      // bayrak "zaten biz hallettik" der, dinleyici tekrar iş yapmaz (bkz. modül değişkeni yorumu).
-      localCameraStopping = true;
-      try {
-        await room.localParticipant.setCameraEnabled(false);
-      } catch {
-        // yoksay — yerel state yine de kapanmış sayılır
-      } finally {
-        localCameraStopping = false;
-      }
-      cameraIntent = false;
-      set({ isCameraOn: false, localCameraPublication: null });
-      return { ok: true };
-    }
-
-    // §2 🔴 — desen `requestMicPermission` ile birebir aynı: reddedilirse arama DÜŞMEZ, yalnız
-    // kamera açılmaz. Çağıran ekran bu mesajı gösterip "Ayarları Aç" seçeneği sunar.
-    const granted = await requestCameraPermission();
-    if (!granted) {
-      return { ok: false, message: t('mobile.call.cameraPermissionDenied'), reason: 'camera_denied' };
-    }
+    if (!room || !get().canPublishCamera || cameraToggling) return { ok: false };
+    cameraToggling = true;
     try {
-      const pub = await room.localParticipant.setCameraEnabled(true, { facingMode: get().cameraFacing });
-      // §2 🔴 null-publication tuzağı — sunucu grant vermediğinde SDK sessizce publication
-      // DÖNMEYEBİLİR (web'de yaşandı, bkz. sözleşme §2.4). `isCameraOn` yalnız GERÇEK publication
-      // geldiğinde true olur; aksi halde niyet de yazılmaz (kullanıcı düğmeye tekrar basabilsin).
-      if (!pub) return { ok: false };
-      cameraIntent = true;
-      set({ isCameraOn: true, localCameraPublication: pub });
-      // Sahip kararı (2026-11-24): ahizedeyken kamera açılırsa hoparlöre geçilir (telefon yüzden
-      // uzaklaşır, ahize duyulmaz olur). Kulaklık/Bluetooth ve elle seçilmiş hoparlöre dokunulmaz.
-      if (get().outputId === 'earpiece') {
-        try {
-          await AudioSession.selectAudioOutput('speaker');
-          set({ outputId: 'speaker' });
-        } catch {
-          // yoksay — çıkış seçici kullanıcıya açık kalır
-        }
-      }
-      return { ok: true };
-    } catch {
-      return { ok: false };
+      return await toggleCameraOnce(room, set, get);
+    } finally {
+      cameraToggling = false;
     }
   },
 
@@ -1134,6 +1096,63 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     set({ serverMutedUserIds: s });
   },
 }));
+
+/**
+ * `toggleCamera`in asıl işi. Ayrı fonksiyon çünkü üstte tek seferlik kilit var: kamera E2EE ile açılırken
+ * birkaç saniye sürüyor ve bu sırada ikinci dokunuş İKİNCİ bir kamera izi yayınlayabiliyordu (cihazda iki
+ * "publishing track" görüldü 2026-11-24).
+ */
+async function toggleCameraOnce(
+  room: Room,
+  set: (partial: Partial<VoiceState>) => void,
+  get: () => VoiceState,
+): Promise<{ ok: boolean; message?: string; reason?: 'camera_denied' }> {
+  if (get().isCameraOn) {
+    // M4f §3.1 — bu unpublish BİZDEN: `wireRoom`daki `LocalTrackUnpublished` dinleyicisi aynı
+    // olayı sunucu kaynaklı unpublish ile AYIRT EDEMEZ (SDK ikisinde de aynı olayı ateşler); bu
+    // bayrak "zaten biz hallettik" der, dinleyici tekrar iş yapmaz (bkz. modül değişkeni yorumu).
+    localCameraStopping = true;
+    try {
+      await room.localParticipant.setCameraEnabled(false);
+    } catch {
+      // yoksay — yerel state yine de kapanmış sayılır
+    } finally {
+      localCameraStopping = false;
+    }
+    cameraIntent = false;
+    set({ isCameraOn: false, localCameraPublication: null });
+    return { ok: true };
+  }
+
+  // §2 🔴 — desen `requestMicPermission` ile birebir aynı: reddedilirse arama DÜŞMEZ, yalnız
+  // kamera açılmaz. Çağıran ekran bu mesajı gösterip "Ayarları Aç" seçeneği sunar.
+  const granted = await requestCameraPermission();
+  if (!granted) {
+    return { ok: false, message: t('mobile.call.cameraPermissionDenied'), reason: 'camera_denied' };
+  }
+  try {
+    const pub = await room.localParticipant.setCameraEnabled(true, { facingMode: get().cameraFacing });
+    // §2 🔴 null-publication tuzağı — sunucu grant vermediğinde SDK sessizce publication
+    // DÖNMEYEBİLİR (web'de yaşandı, bkz. sözleşme §2.4). `isCameraOn` yalnız GERÇEK publication
+    // geldiğinde true olur; aksi halde niyet de yazılmaz (kullanıcı düğmeye tekrar basabilsin).
+    if (!pub) return { ok: false };
+    cameraIntent = true;
+    set({ isCameraOn: true, localCameraPublication: pub });
+    // Sahip kararı (2026-11-24): ahizedeyken kamera açılırsa hoparlöre geçilir (telefon yüzden
+    // uzaklaşır, ahize duyulmaz olur). Kulaklık/Bluetooth ve elle seçilmiş hoparlöre dokunulmaz.
+    if (get().outputId === 'earpiece') {
+      try {
+        await AudioSession.selectAudioOutput('speaker');
+        set({ outputId: 'speaker' });
+      } catch {
+        // yoksay — çıkış seçici kullanıcıya açık kalır
+      }
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
 
 /**
  * Yakınlık kilidi (sahip kararı 2026-11-24): ahizeden konuşurken telefon kulağa yaklaşınca ekran kapanır,
