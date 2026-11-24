@@ -135,7 +135,16 @@ jobs:
           # header'ı ile ver (URL'e gömme → ps/reflog sızıntısı yok). actions/checkout deseni.
           # git pull hâlâ gerekli: docker-compose.prod.yml ve Caddyfile repodan okunuyor.
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          retry git -c http.extraheader="$AUTH_HEADER" pull origin main
+          # 2026-11-24: pull yerine fetch + reset. Geçmiş yeniden yazıldığında (repo public öncesi kişisel
+          # veri temizliği, force push) pull "divergent branches" ile düşüyordu. Sunucuda takip edilen
+          # dosyada elle değişiklik varsa SİLMEZ, durur (.env.production ve config/ git dışı, etkilenmez).
+          retry git -c http.extraheader="$AUTH_HEADER" fetch origin main
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            git status --short --untracked-files=no
+            echo "::error::Sunucuda takip edilen dosyalarda elle değişiklik var; deploy durduruldu, önce bunlara bak."
+            exit 1
+          fi
+          git reset --hard FETCH_HEAD
           AFTER=$(git rev-parse HEAD)
           COMPOSE="docker compose --env-file .env.production -f docker-compose.prod.yml"
           # GHCR paketleri private → job token'ıyla giriş, çekince çıkış (token diskte kalmasın).
