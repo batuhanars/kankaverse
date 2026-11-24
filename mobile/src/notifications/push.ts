@@ -142,9 +142,14 @@ const MESSAGE_VIBRATE_PATTERN = [0, 700, 250, 700];
 /**
  * Mesaj bildirimi sayılan push tipleri. `CHANNEL_MESSAGE` (2026-11-08): ortam kanalındaki düz mesaj,
  * bildirim seviyesi "Herkes" olan üyeye gider; banner/ses/tepsi temizliği DM ve bahsetmeyle aynı.
+ *
+ * `REACTION` (sahip bulgusu 2026-11-24): tepki push'u bu listede yoktu. Sonuç: uygulama ön plandayken
+ * tepki bildirimi "aktif sohbet" sayılmıyor, banner'sız ve sessiz olarak tepsiye düşüyordu; kullanıcı
+ * o DM'in içindeyken bile. Artık mesajla aynı kurala bağlı: o sohbetteyken hiç gösterilmez, başka
+ * yerdeyken banner + ses ile iner, sohbet açılınca tepsiden temizlenir.
  */
 function isMessageType(type: unknown): boolean {
-  return type === 'MENTION' || type === 'DM_MESSAGE' || type === 'CHANNEL_MESSAGE';
+  return type === 'MENTION' || type === 'DM_MESSAGE' || type === 'CHANNEL_MESSAGE' || type === 'REACTION';
 }
 
 async function dismissStaleChannelNotifications(channelId: string, excludeIdentifier?: string): Promise<void> {
