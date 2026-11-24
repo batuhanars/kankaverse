@@ -31,6 +31,7 @@ import {
 // DENEMESİ için bir bayrak (arama yokken davranış değişmez); `isPipCurrentlyActive` SENKRON native
 // okuma, yalnız `handleAppStateChange`'in 'background' dalında kullanılır (bkz. o fonksiyondaki yorum).
 import { setPipCallActive, isPipCurrentlyActive } from '@modules/picture-in-picture';
+import { setProximityLock } from '@modules/proximity-lock';
 import { t } from '@/i18n';
 import {
   CALL_E2EE_UPDATE_REQUIRED,
@@ -1115,6 +1116,19 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
     set({ serverMutedUserIds: s });
   },
 }));
+
+/**
+ * Yakınlık kilidi (sahip kararı 2026-11-24): ahizeden konuşurken telefon kulağa yaklaşınca ekran kapanır,
+ * yanak düğmelere değmez. Kural tek yerde: bağlı + çıkış ahize + kamera kapalı. Çıkış seçici, kulaklık
+ * takma ve kamera açma hepsi store'dan geçtiği için abonelik yeter; yalnız değer değişince native'e gidilir.
+ */
+let proximityHeld = false;
+useVoiceStore.subscribe((s) => {
+  const want = s.connectedChannelId !== null && s.outputId === 'earpiece' && !s.isCameraOn;
+  if (want === proximityHeld) return;
+  proximityHeld = want;
+  void setProximityLock(want);
+});
 
 // ── LiveKit Room olayları ──────────────────────────────────────────────────
 function refreshRoomParticipants(
