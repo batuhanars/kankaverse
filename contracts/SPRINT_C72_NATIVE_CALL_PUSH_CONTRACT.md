@@ -39,6 +39,10 @@ JS sonradan ayağa kalkarsa **ikinci bildirim çizmez**, native olanı sahipleni
    sistem kaldırır), `VISIBILITY_PUBLIC`. Başlık/gövde §4 önbelleğinden: 1-1 `incomingTitle` / `incomingBody`
    (`{name}` = callerName), grup `incomingGroupTitle` / `incomingGroupBody`. Ses ve titreşim kanaldan gelir; native ayrıca
    titreşim/ses çalmaz. Avatar bu sprintte YOK (ağ beklenmez; bildirim anında çıkmalı).
+   **Rev.1 (2026-11-24, sahip bulgusu):** kanal titreşimi bildirim başına tek atış; JS'in `Vibration.vibrate` döngüsü
+   native sahiplenmede çalışmadığı için telefon bir kez titreyip duruyordu (sessiz modda arama fark edilmez). Bildirime
+   `Notification.FLAG_INSISTENT` eklenir: ses + titreşim bildirim kapanana dek (kabul · reddet · call_end · 30 sn) tekrarlar.
+   Ayrı titreşim kodu yazılmaz. Doğrulama: düşük bellekli cihazda §6 madde 1 ve 6, telefon titreşim modundayken.
 5. Kimlik: tag `kv-call:<callChannelId>`, sabit id. Aynı kanala ikinci `call` push'u gelirse yeniden çizmez (var olanı bırakır).
 6. Çizimden sonra `super.onMessageReceived` çağrılır (JS görevi bugünkü gibi tetiklenir, §3 yinelenmeyi önler).
 

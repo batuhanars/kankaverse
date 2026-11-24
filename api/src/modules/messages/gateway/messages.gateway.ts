@@ -618,7 +618,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.realtime.emitToUser(m.userId, 'voice.group_call_canceled', { channelId });
       // C53 §2.5 - soket olayini alan AYNI kume; v2 tokenlarina call_end (susturma suzgeci YOK:
       // zili kapatmak her zaman guvenli).
-      void this.push.sendCallEnd(m.userId, channelId);
+      void this.push.sendCallEnd(m.userId, channelId, 'canceled');
     }
     return { ok: true };
   }

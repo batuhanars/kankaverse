@@ -2154,7 +2154,7 @@ describe('MessagesGateway arama sinyalleri (C53)', () => {
     expect(res).toEqual({ ok: true });
     expect(emitToUserMock).toHaveBeenCalledWith(CALLER, 'voice.call_rejected', { channelId: DM });
     expect(emitToUserMock).toHaveBeenCalledWith(CALLEE, 'voice.call_canceled', { channelId: DM });
-    expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM);
+    expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM, 'rejected');
   });
 
   it('call_reject: üye değil → olay yok, call_end yok; ack yine {ok:true}', async () => {
@@ -2168,13 +2168,13 @@ describe('MessagesGateway arama sinyalleri (C53)', () => {
     await gateway.handleCallAccept(sock(CALLEE), { channelId: DM });
     expect(emitToUserMock).toHaveBeenCalledWith(CALLER, 'voice.call_accepted', { channelId: DM });
     expect(emitToUserMock).toHaveBeenCalledWith(CALLEE, 'voice.call_canceled', { channelId: DM });
-    expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM);
+    expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM, 'answered');
   });
 
   it('call_cancel: callee olay alır + callee tokenlarına call_end', async () => {
     await gateway.handleCallCancel(sock(CALLER), { channelId: DM });
     expect(emitToUserMock).toHaveBeenCalledWith(CALLEE, 'voice.call_canceled', { channelId: DM });
-    expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM);
+    expect(pushSendCallEndMock).toHaveBeenCalledWith(CALLEE, DM, 'canceled');
   });
 });
 
@@ -2267,8 +2267,8 @@ describe('MessagesGateway grup arama push (C53 §2.5)', () => {
     ]);
     await gateway.handleGroupCallCancel(sock(CALLER), { channelId: GCH });
     expect(pushSendCallEndMock).toHaveBeenCalledTimes(2);
-    expect(pushSendCallEndMock).toHaveBeenCalledWith(M1, GCH);
-    expect(pushSendCallEndMock).toHaveBeenCalledWith(M2, GCH);
+    expect(pushSendCallEndMock).toHaveBeenCalledWith(M1, GCH, 'canceled');
+    expect(pushSendCallEndMock).toHaveBeenCalledWith(M2, GCH, 'canceled');
   });
 
   it('cancel: kapi reddederse call_end yok', async () => {

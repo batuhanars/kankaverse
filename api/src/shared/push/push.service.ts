@@ -7,6 +7,7 @@ import {
   V2_PENDING_TTL_SECONDS,
   V2_READ_MAX_IDS,
   V2CallData,
+  CallEndReason,
   V2CallEndData,
   V2MessageData,
   V2ReadData,
@@ -237,12 +238,12 @@ export class PushService {
    * C53 §2.2 - arama bitti: kullanicinin YALNIZ v2 tokenlarina `{ v:2, kind:'call_end', callChannelId }`
    * (veri-yalnizca, ttl 30). Bayrak kapaliysa / allowlist disindaysa no-op; v1 cihazlar bugunku davranista kalir.
    */
-  async sendCallEnd(userId: string, callChannelId: string): Promise<void> {
+  async sendCallEnd(userId: string, callChannelId: string, reason: CallEndReason): Promise<void> {
     if (!this.enabled || !this.v2AllowedFor(userId)) return;
     try {
       const tokens = await this.liveTokens({ userId, format: 2 });
       if (tokens.length === 0) return;
-      const data: V2CallEndData = { v: 2, kind: 'call_end', callChannelId };
+      const data: V2CallEndData = { v: 2, kind: 'call_end', callChannelId, reason };
       const messages: ExpoMessage[] = tokens.map((t) => ({
         to: t.token,
         data,

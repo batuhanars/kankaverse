@@ -613,7 +613,7 @@ describe('PushService C53 arama', () => {
       prismaMock.pushToken.findMany.mockResolvedValue([
         { token: 'ExponentPushToken[a]', userId: 'u1', format: 2 },
       ]);
-      await make({ v2: true }).sendCallEnd('u1', 'dm-1');
+      await make({ v2: true }).sendCallEnd('u1', 'dm-1', 'canceled');
 
       expect(prismaMock.pushToken.findMany).toHaveBeenCalledWith({
         where: { userId: 'u1', format: 2 },
@@ -621,7 +621,7 @@ describe('PushService C53 arama', () => {
       expect(sent()).toEqual([
         {
           to: 'ExponentPushToken[a]',
-          data: { v: 2, kind: 'call_end', callChannelId: 'dm-1' },
+          data: { v: 2, kind: 'call_end', callChannelId: 'dm-1', reason: 'canceled' },
           priority: 'high',
           ttl: 30,
         },
@@ -629,19 +629,19 @@ describe('PushService C53 arama', () => {
     });
 
     it('bayrak kapalı → no-op', async () => {
-      await make({ v2: false }).sendCallEnd('u1', 'dm-1');
+      await make({ v2: false }).sendCallEnd('u1', 'dm-1', 'canceled');
       expect(prismaMock.pushToken.findMany).not.toHaveBeenCalled();
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('allowlist dışı kullanıcı → no-op', async () => {
-      await make({ v2: true, allow: ['x'] }).sendCallEnd('u1', 'dm-1');
+      await make({ v2: true, allow: ['x'] }).sendCallEnd('u1', 'dm-1', 'canceled');
       expect(global.fetch).not.toHaveBeenCalled();
     });
 
     it('v2 token yoksa fetch yok; hata fırlatmaz', async () => {
       prismaMock.pushToken.findMany.mockResolvedValue([]);
-      await expect(make({ v2: true }).sendCallEnd('u1', 'dm-1')).resolves.toBeUndefined();
+      await expect(make({ v2: true }).sendCallEnd('u1', 'dm-1', 'canceled')).resolves.toBeUndefined();
       expect(global.fetch).not.toHaveBeenCalled();
     });
   });

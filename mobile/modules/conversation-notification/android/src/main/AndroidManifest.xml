@@ -24,5 +24,9 @@
     <service
       android:name="expo.modules.conversationnotification.CallActionService"
       android:exported="false" />
+    <!-- C73: cevapsiz arama yedek alarmi (arayan kapatma push'u gelmezse 30 sn sonra). -->
+    <receiver
+      android:name="expo.modules.conversationnotification.MissedCallReceiver"
+      android:exported="false" />
   </application>
 </manifest>

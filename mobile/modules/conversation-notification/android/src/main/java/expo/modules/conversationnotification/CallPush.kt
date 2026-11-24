@@ -1,6 +1,7 @@
 package expo.modules.conversationnotification
 
 import android.app.ActivityManager
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -22,7 +23,7 @@ import java.util.concurrent.atomic.AtomicLong
  */
 internal object CallPush {
   private const val TAG = "CallPush"
-  private const val CHANNEL_ID = "incoming_call_v4" // incomingCall.ts CHANNEL_ID ile ayni
+  private const val CHANNEL_ID = "incoming_call_v5" // incomingCall.ts CHANNEL_ID ile ayni (C73: desen degisti, v4 -> v5)
   private const val NOTIFICATION_ID = 7201
   const val TAG_PREFIX = "kv-call:"
   private const val RING_TIMEOUT_MS = 30_000L // sunucu ttl'i ve JS RING_TIMEOUT_MS ile ayni
@@ -44,6 +45,8 @@ internal object CallPush {
     val channelId: String,
     val callerName: String?,
     val isGroup: Boolean,
+    /** Yalniz `call_end`: canceled / answered / rejected; eski sunucuda null. */
+    val reason: String?,
   )
 
   /** v2 `call`/`call_end`; `call` icin `callerId` zorunlu. Aksi halde (arama degil/eksik alan) null. */
@@ -53,13 +56,19 @@ internal object CallPush {
     if (kind != "call" && kind != "call_end") return null
     val channelId = PushHold.str(p, "callChannelId") ?: return null
     if (kind == "call" && PushHold.str(p, "callerId") == null) return null
-    return Incoming(kind, channelId, PushHold.str(p, "callerName"), p.optBoolean("isGroup", false))
+    return Incoming(kind, channelId, PushHold.str(p, "callerName"), p.optBoolean("isGroup", false), PushHold.str(p, "reason"))
   }
 
   /** `super.onMessageReceived`'dan ONCE cagrilir. Kosullar saglanmazsa hicbir sey yapmaz (JS yolu surer). */
   fun handle(context: Context, incoming: Incoming) {
     if (incoming.kind == "call_end") {
       cancel(context, incoming.channelId)
+      // C73: yalniz arayan kapattiysa cevapsiz; baska cihazda yanit (ya da nedeni bilinmeyen eski sunucu) sessiz.
+      if (incoming.reason == "canceled") {
+        MissedCall.missed(context, incoming.channelId)
+      } else {
+        MissedCall.resolve(context, incoming.channelId)
+      }
       return
     }
     // On planda WS + uygulama ici serit calisir; native cizim burada cift sinyal olur.
@@ -94,29 +103,45 @@ internal object CallPush {
       .setTimeoutAfter(RING_TIMEOUT_MS)
       .setWhen(postedAt)
       .addAction(0, rejectLabel, rejectIntent(context, incoming, postedAt))
-    activityIntent(context, incoming, ACTION_OPEN)?.let { builder.setContentIntent(it) }
-    activityIntent(context, incoming, ACTION_ACCEPT)?.let { builder.addAction(0, joinLabel, it) }
+    openIntent(context, incoming.channelId, incoming.callerName, incoming.isGroup)?.let { builder.setContentIntent(it) }
+    activityIntent(context, incoming.channelId, incoming.callerName, incoming.isGroup, ACTION_ACCEPT)
+      ?.let { builder.addAction(0, joinLabel, it) }
     prefs.getString("color", null)
       ?.let { c -> runCatching { Color.parseColor(c) }.getOrNull() }
       ?.let { builder.setColor(it) }
+    val notification = builder.build()
+    // C72 Rev.1: kanal titresimi bildirim basina TEK atis; JS'in Vibration.vibrate dongusu native sahiplenmede yok.
+    // INSISTENT ses + titresimi bildirim kapanana (kabul/reddet/call_end/30 sn) dek tekrarlar; zil boyle olur.
+    notification.flags = notification.flags or Notification.FLAG_INSISTENT
     try {
-      NotificationManagerCompat.from(context).notify(TAG_PREFIX + incoming.channelId, NOTIFICATION_ID, builder.build())
+      NotificationManagerCompat.from(context).notify(TAG_PREFIX + incoming.channelId, NOTIFICATION_ID, notification)
+      MissedCall.ringStarted(context, incoming.channelId, incoming.callerName, incoming.isGroup, postedAt)
     } catch (e: SecurityException) {
       Log.w(TAG, "POST_NOTIFICATIONS izni yok", e)
     }
   }
 
+  /** Govdeye dokunma (zil ve C73 cevapsiz bildirimi): sohbeti acar. */
+  fun openIntent(context: Context, channelId: String, callerName: String?, isGroup: Boolean): PendingIntent? =
+    activityIntent(context, channelId, callerName, isGroup, ACTION_OPEN)
+
   /** Katil / govdeye dokunma: MainActivity (baslatma intent'i), JS ekstrayi acilista okur. */
-  private fun activityIntent(context: Context, incoming: Incoming, action: String): PendingIntent? {
+  private fun activityIntent(
+    context: Context,
+    channelId: String,
+    callerName: String?,
+    isGroup: Boolean,
+    action: String,
+  ): PendingIntent? {
     val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return null
     launch.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
     launch.putExtra(EXTRA_CALL_ACTION, action)
-      .putExtra(EXTRA_CHANNEL_ID, incoming.channelId)
-      .putExtra(EXTRA_CALLER_NAME, incoming.callerName)
-      .putExtra(EXTRA_IS_GROUP, incoming.isGroup)
+      .putExtra(EXTRA_CHANNEL_ID, channelId)
+      .putExtra(EXTRA_CALLER_NAME, callerName)
+      .putExtra(EXTRA_IS_GROUP, isGroup)
     // Kanal + eylem basina ayri request code (intent esitligi ekstralara bakmaz).
     return PendingIntent.getActivity(
-      context, requestCode(incoming.channelId, action), launch,
+      context, requestCode(channelId, action), launch,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
   }
@@ -156,6 +181,8 @@ internal object CallPush {
     intent.removeExtra(EXTRA_CALLER_NAME)
     intent.removeExtra(EXTRA_IS_GROUP)
     cancel(context, channelId)
+    // C73: Katil yanittir (cevapsiz dusmez). Govdeye dokunmak degil: acip cevap vermezse cevapsiz duser.
+    if (action == ACTION_ACCEPT) MissedCall.resolve(context, channelId)
     return result
   }
 

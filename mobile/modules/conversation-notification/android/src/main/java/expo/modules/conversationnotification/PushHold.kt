@@ -20,6 +20,8 @@ internal object PushHold {
   private val DEFAULT_KEYS = listOf("replyLabel", "markReadLabel", "muteLabel", "meName", "color", "notificationChannelId", "hiddenPreviewText",
     // C72: native arama bildirimi metinleri (CallPush); gomulu metin yok, kaynak JS onbellegi.
     "callTitle", "callBody", "callGroupTitle", "callGroupBody", "callRejectLabel", "callJoinLabel",
+    // C73: cevapsiz arama bildirimi (MissedCall).
+    "callMissedTitle", "callMissedBody", "callMissedGroupTitle", "callMissedGroupBody",
   )
 
   private val latches = ConcurrentHashMap<String, CountDownLatch>()

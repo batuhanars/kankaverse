@@ -15,6 +15,7 @@ class CallActionService : HeadlessJsTaskService() {
     val channelId = extras.getString(CallPush.EXTRA_CHANNEL_ID) ?: return null
     // Dugmeye basilinca bildirim ag/JS beklenmeden HEMEN kapanir (kullanici beklemesin).
     CallPush.cancel(applicationContext, channelId)
+    MissedCall.resolve(applicationContext, channelId) // C73: Reddet yanittir, cevapsiz dusmez
     val data = Arguments.createMap().apply {
       putString("action", extras.getString(CallPush.EXTRA_CALL_ACTION) ?: CallPush.ACTION_REJECT)
       putString("channelId", channelId)

@@ -121,6 +121,11 @@ class ConversationNotificationModule : Module() {
       appContext.reactContext?.let { CallPush.cancel(it, channelId) }
     }
 
+    // C73: JS kabul/reddet (uygulama ici serit dahil): bekleyen kayit + yedek alarm silinir, cevapsiz dusmez.
+    AsyncFunction("resolveNativeCall") { channelId: String ->
+      appContext.reactContext?.let { MissedCall.resolve(it, channelId) }
+    }
+
     // Bayat temizlik: `exceptChannelId` (JS'in sahiplendigi) disindaki native arama bildirimlerini kaldirir.
     AsyncFunction("dismissNativeCalls") { exceptChannelId: String? ->
       appContext.reactContext?.let { CallPush.cancelAll(it, exceptChannelId) }

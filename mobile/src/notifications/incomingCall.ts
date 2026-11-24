@@ -10,7 +10,12 @@ import { voiceApi } from '@/api/voice';
 import { channelTitle } from '@/utils/channelTitle';
 import { dmTarget } from '@/utils/pushNavigation';
 import { useGatedCallAction, useGatedNotificationResponder } from '@/notifications/responseGate';
-import { dismissNativeCall, dismissNativeCalls, isNativeCallShowing } from '../../modules/conversation-notification';
+import {
+  dismissNativeCall,
+  dismissNativeCalls,
+  isNativeCallShowing,
+  resolveNativeCall,
+} from '../../modules/conversation-notification';
 import { t } from '@/i18n';
 
 /**
@@ -124,7 +129,8 @@ import { t } from '@/i18n';
 // kurulduktan sonra ayarları (ses/titreşim/önem) **değiştirilemez**; `setNotificationChannelAsync`
 // aynı kimlikle çağrılınca sessizce hiçbir şey yapmaz. Ayar değişince kimlik de artırılır — bu yüzden
 // v3'e geçildi (v2: sessiz kanal, heads-up çıkarmıyordu, §9.2.1 KANIT).
-const CHANNEL_ID = 'incoming_call_v4';
+// C73 §4: titreşim deseni değişti → v4'ten v5'e (kanal ayarı kurulduktan sonra değişmez). Native `CallPush` ile aynı.
+const CHANNEL_ID = 'incoming_call_v5';
 /**
  * 🔴 ÖN PLAN KANALI (sahip bulgusu 2026-08-12, cihaz turu). Uygulama açıkken sunum bizim kendi
  * şeridimiz; bildirim yalnız ZİL SESİ için kuruluyor ve görünmemesi gerekiyor. İlk denemede bu
@@ -138,16 +144,19 @@ const CHANNEL_ID = 'incoming_call_v4';
  * geliyor. MAX/HIGH üstten iner, DEFAULT yalnız ses çalıp gölgeye düşer. Aynı ses, aynı zil-tonu
  * akışı, yalnız önem farklı — yani sessiz mod/DND saygısı da aynen korunuyor.
  */
-const FOREGROUND_CHANNEL_ID = 'incoming_call_quiet_v1';
+const FOREGROUND_CHANNEL_ID = 'incoming_call_quiet_v2'; // C73 §4: v1'den (desen)
 // §9.2.1b — sahip cihaz turunda ayarlarda İKİ ayrı "Gelen arama" kanalı birikmiş görüldü (v1 + v2,
 // aynı adla). Yeni kanal kurulurken eskiler silinir; kullanıcı ayarlarda hangisinin gerçek olduğunu
 // artık ayırt etmek zorunda kalmaz.
-const OLD_CHANNEL_IDS = ['incoming_call', 'incoming_call_v2', 'incoming_call_v3'];
+const OLD_CHANNEL_IDS = ['incoming_call', 'incoming_call_v2', 'incoming_call_v3', 'incoming_call_v4', 'incoming_call_quiet_v1'];
+/** C73: cevapsız arama bildirimi kanalı; native `MissedCall` çizer, kanalı burada kurulur. */
+const MISSED_CHANNEL_ID = 'missed_call_v1';
 const CHANNEL_SOUND_FILE = 'incoming_call_channel.wav'; // app.json expo-notifications plugin `sounds`
 const CATEGORY_ID = 'incoming_call';
 const NOTIFICATION_DATA_TYPE = 'incoming_call';
 
-const VIBRATE_PATTERN = [0, 400, 200, 400, 2000]; // web ringCycle ile aynı ritim (0.4s+0.2s+0.4s+2s=3s)
+// C73 §4: 1 sn titreşim + 1,5 sn ara. Eski kısa parçalı desen (0.4+0.2+0.4+2) düşük cihazda birleşip ~her saniye titriyordu.
+const VIBRATE_PATTERN = [0, 1000, 1500];
 const RING_TIMEOUT_MS = 30_000; // §8.2 — 30 sn cevapsız; §9.2.4'te "eski yanıt" eşiği olarak da kullanılır
 
 let setupDone = false;
@@ -238,6 +247,11 @@ export async function ensureIncomingCallNotificationsSetup(): Promise<void> {
       usage: Notifications.AndroidAudioUsage.NOTIFICATION_RINGTONE,
       contentType: Notifications.AndroidAudioContentType.SONIFICATION,
     },
+  });
+  await Notifications.setNotificationChannelAsync(MISSED_CHANNEL_ID, {
+    name: t('mobile.call.missedNotifChannel'),
+    importance: Notifications.AndroidImportance.DEFAULT,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
   });
   await Notifications.setNotificationCategoryAsync(CATEGORY_ID, [
     { identifier: 'reject', buttonTitle: t('call.reject'), options: { opensAppToForeground: false } },
@@ -505,6 +519,7 @@ async function clearStaleIncomingCallNotifications(): Promise<void> {
  * rastgele bir üyeye giderdi). 1-1'de sinyal gönderilir.
  */
 export function rejectIncomingCall(channelId: string, isGroup: boolean): Promise<void> {
+  void resolveNativeCall(channelId); // C73: yanıt verildi, cevapsız düşmez
   void dismissIncomingCall(channelId);
   if (isGroup) return Promise.resolve();
   // C53: arka plan görevi ve bildirim yanıtı dinleyicisi AYNI JS ortamında aynı reddi iki kez
@@ -540,6 +555,7 @@ async function rejectOverHttp(channelId: string): Promise<void> {
  * yazılmadı — aynı kuralın iki tüketicisi var, iki ayrı kopyası değil.
  */
 export function acceptIncomingCall(channelId: string, callerName: string, isGroup: boolean): void {
+  void resolveNativeCall(channelId); // C73: yanıt verildi, cevapsız düşmez
   void dismissIncomingCall(channelId);
   if (!isGroup) callAccept(channelId);
   // Grupta arama ekranının başlığı grubun adı olmalı; ad DM store'undan gelir (bildirim yükünde yok),

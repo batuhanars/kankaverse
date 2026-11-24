@@ -34,6 +34,11 @@ export function cacheNotificationDefaults(hidePreview: boolean): Promise<void> {
     callGroupBody: t('mobile.call.incomingGroupBody', { name: '{name}' }),
     callRejectLabel: t('call.reject'),
     callJoinLabel: t('mobile.call.joinAction'),
+    // C73: cevapsız arama bildirimi (native MissedCall).
+    callMissedTitle: t('mobile.call.missedTitle'),
+    callMissedBody: t('mobile.call.missedBody', { name: '{name}' }),
+    callMissedGroupTitle: t('mobile.call.missedGroupTitle'),
+    callMissedGroupBody: t('mobile.call.missedGroupBody', { name: '{name}' }),
     hidePreview,
     hiddenPreviewText: t('mobile.notifications.hiddenPreview'),
   }).catch(() => undefined);

@@ -51,6 +51,11 @@ export type NotificationDefaults = {
   callGroupBody: string;
   callRejectLabel: string;
   callJoinLabel: string;
+  /** C73: cevapsız arama bildirimi; gövde şablonları `{name}` ile HAM. */
+  callMissedTitle: string;
+  callMissedBody: string;
+  callMissedGroupTitle: string;
+  callMissedGroupBody: string;
   /** D94: açıkken yedek çizim `text` yerine `hiddenPreviewText` yazar. */
   hidePreview: boolean;
   hiddenPreviewText: string;
@@ -94,6 +99,7 @@ declare class NativeConversationNotificationModule extends NativeModule<TapEvent
   isNativeCallShowing?(channelId: string): Promise<boolean>;
   dismissNativeCall?(channelId: string): Promise<void>;
   dismissNativeCalls?(exceptChannelId: string | null): Promise<void>;
+  resolveNativeCall?(channelId: string): Promise<void>;
   getInitialCallAction?(): CallAction | null;
 }
 
@@ -193,6 +199,11 @@ export function dismissNativeCall(channelId: string): Promise<void> {
 /** C72: `exceptChannelId` dışındaki native arama bildirimlerini kapatır (bayat temizlik). Modül eskiyse no-op. */
 export function dismissNativeCalls(exceptChannelId: string | null): Promise<void> {
   return native?.dismissNativeCalls?.(exceptChannelId) ?? Promise.resolve();
+}
+
+/** C73: arama yanıtlandı (kabul/ret): native bekleyen kayıt + yedek alarm silinir, cevapsız düşmez. Modül eskiyse no-op. */
+export function resolveNativeCall(channelId: string): Promise<void> {
+  return native?.resolveNativeCall?.(channelId) ?? Promise.resolve();
 }
 
 /** C72: uygulamayı native arama bildirimindeki Katıl/dokunma ile açan eylem (soğuk açılış); bir kez teslim edilir. */

@@ -47,7 +47,7 @@ describe('CallSignalService', () => {
     expect(realtimeMock.emitToUser).toHaveBeenCalledWith(CALLER, 'voice.call_rejected', {
       channelId: CH,
     });
-    expect(pushMock.sendCallEnd).toHaveBeenCalledWith(CALLEE, CH);
+    expect(pushMock.sendCallEnd).toHaveBeenCalledWith(CALLEE, CH, 'rejected');
   });
 
   it('reject: üye değil → false, olay ve push yok', async () => {
@@ -61,7 +61,7 @@ describe('CallSignalService', () => {
     expect(realtimeMock.emitToUser).toHaveBeenCalledWith(CALLER, 'voice.call_accepted', {
       channelId: CH,
     });
-    expect(pushMock.sendCallEnd).toHaveBeenCalledWith(CALLEE, CH);
+    expect(pushMock.sendCallEnd).toHaveBeenCalledWith(CALLEE, CH, 'answered');
   });
 
   it('cancel: callee call_canceled alır + callee tokenlarına call_end', async () => {
@@ -69,7 +69,7 @@ describe('CallSignalService', () => {
     expect(realtimeMock.emitToUser).toHaveBeenCalledWith(CALLEE, 'voice.call_canceled', {
       channelId: CH,
     });
-    expect(pushMock.sendCallEnd).toHaveBeenCalledWith(CALLEE, CH);
+    expect(pushMock.sendCallEnd).toHaveBeenCalledWith(CALLEE, CH, 'canceled');
   });
 
   it('accept/cancel: üye değil → olay ve push yok', async () => {

@@ -4555,3 +4555,15 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] JS: arama etiketleri bildirim önbelleğine (§4)
 - [x] tsc + eslint + testler; yerel prebuild + gradlew; pakette servis/görev kaydı (§6)
 - [x] Cihaz turu: düşük bellekli test cihazı (Redmi Note 9) 6/6 geçti 2026-11-24; sahip telefonu regresyonu sahip kararıyla atlandı (§6)
+
+## Sprint C73 — Cevapsız arama bildirimi + zil titreşim deseni — 2026-11-24
+
+> Sözleşme: `contracts/SPRINT_C73_MISSED_CALL_NOTIFICATION_CONTRACT.md`. Mobil + api'de küçük alan. Dev checkbox işaretler, item EKLEMEZ.
+
+- [x] C72 Rev.1: zil bildirimine `FLAG_INSISTENT` (ses + titreşim kapanana dek tekrar)
+- [x] api: `call_end` yüküne `reason` (canceled/answered/rejected) + spec'ler (§1)
+- [x] Native: bekleyen arama kaydı, yedek alarm, `MissedCallReceiver`, cevapsız bildirimi (§2, §2.1)
+- [x] JS: `resolveNativeCall`, önbellek anahtarları, tr.json, `missed_call_v1` kanalı (§3)
+- [x] Zil kanalları v5 / quiet_v2, desen `[0,1000,1500]`, eski kanallar silinir (§4)
+- [x] api testleri + mobil tsc/eslint; yerel prebuild + gradlew; manifestte alıcı (§6)
+- [ ] Cihaz turu: düşük bellekli test cihazı (§6)

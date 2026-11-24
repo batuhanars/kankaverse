@@ -65,11 +65,18 @@ export interface V2CallData {
   groupName: string | null;
 }
 
-/** C53 — arama bitti (iptal / başka cihazda kabul-ret): istemci zili kapatır. */
+/**
+ * C73 §1 — arama neden bitti. `canceled`: arayan kapattı (ya da arayanın 30 sn zaman aşımı) → istemci cevapsız
+ * arama bildirimi gösterir. `answered` / `rejected`: aynı hesabın başka cihazında yanıtlandı → cevapsız YOK.
+ */
+export type CallEndReason = 'canceled' | 'answered' | 'rejected';
+
+/** C53 — arama bitti (iptal / başka cihazda kabul-ret): istemci zili kapatır. C73: `reason` eklendi (eski istemci yok sayar). */
 export interface V2CallEndData {
   v: 2;
   kind: 'call_end';
   callChannelId: string;
+  reason: CallEndReason;
 }
 
 /** Redis anahtarı: bu kullanıcıya bu sohbet için v2 bildirimi gönderildi (okundu push'u buna bakar). */
