@@ -654,16 +654,21 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
         android: { audioTypeOptions: AndroidAudioTypePresets.communication },
       });
       await AudioSession.startAudioSession();
-      // §5 — varsayılan Hoparlör (Discord pariteti), AMA yalnız kablolu/Bluetooth kulaklık YOKSA:
-      // biri bağlıysa `preferredOutputList` (bluetooth > headset > speaker > earpiece) zaten onu
-      // seçer, üstüne yazmak takılı kulaklığı görmezden gelirdi.
+      // §5 — varsayılan çıkış, yalnız kablolu/Bluetooth kulaklık YOKSA: biri bağlıysa
+      // `preferredOutputList` (bluetooth > headset > speaker > earpiece) zaten onu seçer, üstüne
+      // yazmak takılı kulaklığı görmezden gelirdi.
+      // Sahip kararı (2026-11-24): 1-1 sesli aramada AHİZE (telefon araması gibi kulağa), hoparlör
+      // kullanıcı seçimi. Ortam ses kanalı, grup DM ve görüntülü başlayan arama HOPARLÖR (önceki
+      // varsayılan). Cihazda ahize yoksa (tablet) hoparlöre düşer.
+      const wantEarpiece = !isGuild && !isGroup && !options?.startWithCamera;
       try {
         const outputs = await AudioSession.getAudioOutputs();
         if (outputs.includes('bluetooth') || outputs.includes('headset')) {
           set({ outputId: outputs.includes('bluetooth') ? 'bluetooth' : 'headset' });
         } else {
-          await AudioSession.selectAudioOutput('speaker');
-          set({ outputId: 'speaker' });
+          const target: AudioOutputId = wantEarpiece && outputs.includes('earpiece') ? 'earpiece' : 'speaker';
+          await AudioSession.selectAudioOutput(target);
+          set({ outputId: target });
         }
       } catch {
         // yoksay — platform varsayılanı geçerli kalır, seçici açılınca kendi listesini okur
@@ -1037,6 +1042,16 @@ export const useVoiceStore = create<VoiceState>((set, get) => ({
       if (!pub) return { ok: false };
       cameraIntent = true;
       set({ isCameraOn: true, localCameraPublication: pub });
+      // Sahip kararı (2026-11-24): ahizedeyken kamera açılırsa hoparlöre geçilir (telefon yüzden
+      // uzaklaşır, ahize duyulmaz olur). Kulaklık/Bluetooth ve elle seçilmiş hoparlöre dokunulmaz.
+      if (get().outputId === 'earpiece') {
+        try {
+          await AudioSession.selectAudioOutput('speaker');
+          set({ outputId: 'speaker' });
+        } catch {
+          // yoksay — çıkış seçici kullanıcıya açık kalır
+        }
+      }
       return { ok: true };
     } catch {
       return { ok: false };
