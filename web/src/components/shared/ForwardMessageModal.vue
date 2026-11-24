@@ -1,13 +1,14 @@
 <script setup lang="ts">
 /**
- * ForwardMessageModal — bir mesajı başka bir DM'e/gruba ilet.
- * DM listesinden hedef seç → mesajın metni + her eki o kanala gönderilir.
+ * ForwardMessageModal: bir mesajı başka bir DM'e, gruba ya da ortam metin kanalına ilet (kanallar sahip isteği
+ * 2026-11-24). Listeden hedef seç → mesajın metni + her eki o kanala gönderilir. Şifreli DM'den ortam kanalına
+ * iletilen içerik orada düz gider: `useE2eeStore().send` kanal türüne göre yolu kendisi seçer.
  *
  * C30: ekler sunucuda KOPYALANIR (`POST /attachments/:id/forward` → yeni ek kimliği), sonra normal
  * mesaj gönderimiyle (`attachmentIds`) hedefe bağlanır. İstemci dosyayı indirip yeniden yüklemez.
  * Kapılar (kaynak kanal erişimi, tarama, hedef kanal kuralları) sunucuda; ret mesajı toast'ta.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useToastStore } from '@/stores/toast'
@@ -28,6 +29,7 @@ const { t } = useI18n()
 const toast = useToastStore()
 
 const router = useRouter()
+const targetList = useTemplateRef<{ guildIdOf: (channelId: string) => string | null }>('targetList')
 const sending = ref(false)
 const selectedIds = ref<Set<string>>(new Set())
 const sentIds = ref<Set<string>>(new Set())
@@ -75,16 +77,19 @@ async function sendSelected() {
   }
 }
 
-/** §3: tek hedef, mevcut DM açma yolu (router 'dm' rotası; HomeView.selectDm ile aynı); açıksa yalnız kapat. */
+/** §3: tek hedef o sohbete/kanala gider (DM: 'dm' rotası, ortam kanalı: 'channel'); zaten açıksa yalnız kapat. */
 function finish(okIds: string[]) {
   emit('close')
   if (okIds.length > 1) {
     toast.success(t('message.forwardedMany', { n: okIds.length }))
     return
   }
+  const channelId = okIds[0]
   const route = router.currentRoute.value
-  if (route.name === 'dm' && route.params.channelId === okIds[0]) return
-  void router.push({ name: 'dm', params: { channelId: okIds[0] } })
+  if (route.params.channelId === channelId) return
+  const guildId = targetList.value?.guildIdOf(channelId)
+  if (guildId) void router.push({ name: 'channel', params: { guildId, channelId } })
+  else void router.push({ name: 'dm', params: { channelId } })
 }
 </script>
 
@@ -117,8 +122,10 @@ function finish(okIds: string[]) {
       </div>
 
       <DmTargetList
+        ref="targetList"
         v-model:selected-ids="selectedIds"
         selectable
+        with-guild-channels
         :max="MAX_TARGETS"
         :disabled="!hasContent || sending"
         :sent-ids="sentIds"

@@ -25,7 +25,7 @@ interface Section {
   data: ShareTarget[];
 }
 
-interface GuildChannels {
+export interface GuildChannels {
   guildId: string;
   guildName: string;
   targets: ShareTarget[];
@@ -35,8 +35,9 @@ interface GuildChannels {
  * Ortamların metin kanalları (mevcut uçlar: ortam listesi + kanal listesi). Kilitli kanal (özel,
  * üye değilim) listelenmez; sesli kanal metin hedefi değildir. Kanal başına yazma izni ayrı bir
  * alan olarak gelmez: kalan kapılar (yavaş mod vb.) sunucuda, ret mesajı gönderimde gösterilir.
+ * Mesaj iletme (`ForwardMessageModal`) de aynı listeyi kullanır.
  */
-async function loadGuildTargets(): Promise<GuildChannels[]> {
+export async function loadGuildTargets(): Promise<GuildChannels[]> {
   const guilds = await guildsApi.list();
   const settled = await Promise.allSettled(guilds.map((g) => channelsApi.listByGuild(g.id)));
   const out: GuildChannels[] = [];

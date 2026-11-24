@@ -2,6 +2,7 @@
 /**
  * DmTargetList: DM/grup DM hedef listesi (arama + satırlar). ForwardMessageModal'dan ayrıştırıldı (C49 Revize 1):
  * mesaj iletme ve yapay zeka video gönderimi aynı listeyi kullanır. Yalnız seçimi emit eder; gönderim çağırandadır.
+ * İkisi de ortam metin kanallarını listeler (iletme 2026-11-24'ten beri); seçim modunda kanallar da seçilebilir.
  */
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -15,7 +16,7 @@ const props = defineProps<{
   sendingId?: string | null
   sentIds?: Set<string>
   sentLabel: string
-  /** C49 R2: DM'lere ek olarak ortam metin kanallarını da listeler (varsayılan kapalı, iletme etkilenmez). */
+  /** C49 R2: DM'lere ek olarak ortam metin kanallarını da listeler (varsayılan kapalı). */
   withGuildChannels?: boolean
   /** C68: seçim modu (opt-in). Verilmezse satıra dokunmak bugünkü gibi `pick` emit eder. */
   selectable?: boolean
@@ -30,23 +31,29 @@ const emit = defineEmits<{
   limit: []
 }>()
 
-function onRowClick(c: DmChannelDto) {
-  if (!props.selectable) {
-    emit('pick', c)
-    return
-  }
-  if (props.sentIds?.has(c.id)) return
+function toggle(id: string) {
+  if (props.sentIds?.has(id)) return
   const next = new Set(props.selectedIds ?? [])
-  if (next.has(c.id)) {
-    next.delete(c.id)
+  if (next.has(id)) {
+    next.delete(id)
   } else {
     if (props.max !== undefined && next.size >= props.max) {
       emit('limit')
       return
     }
-    next.add(c.id)
+    next.add(id)
   }
   emit('update:selectedIds', next)
+}
+
+function onRowClick(c: DmChannelDto) {
+  if (props.selectable) toggle(c.id)
+  else emit('pick', c)
+}
+
+function onChannelClick(channelId: string) {
+  if (props.selectable) toggle(channelId)
+  else emit('pickChannel', channelId)
 }
 
 const { t } = useI18n()
@@ -105,6 +112,12 @@ const filteredGroups = computed(() => {
 
 const isEmpty = computed(() => !filtered.value.length && !filteredGroups.value.length)
 
+/** Seçilen ortam kanalının ortamı (gönderim sonrası kanala gitmek için); DM ise null. */
+function guildIdOf(channelId: string): string | null {
+  return guildGroups.value.find((g) => g.channels.some((c) => c.id === channelId))?.guildId ?? null
+}
+defineExpose({ guildIdOf })
+
 onMounted(() => {
   if (!dmStore.channels.length) dmStore.fetchChannels().catch(() => {})
   if (props.withGuildChannels) loadGuildGroups().catch(() => {})
@@ -162,11 +175,27 @@ onMounted(() => {
           v-for="c in g.channels"
           :key="c.id"
           class="flex items-center gap-2.5 px-2 py-2 rounded-[var(--kv-radius-md)] text-left transition-colors hover:bg-[var(--kv-accent-subtle)]"
-          :disabled="props.disabled || props.sendingId === c.id"
-          @click="emit('pickChannel', c.id)"
+          :disabled="props.disabled || props.sendingId === c.id || (props.selectable && props.sentIds?.has(c.id))"
+          :aria-pressed="props.selectable ? props.selectedIds?.has(c.id) ?? false : undefined"
+          @click="onChannelClick(c.id)"
         >
           <span class="w-8 h-8 shrink-0 flex items-center justify-center text-[16px]" style="color: var(--kv-text-muted);">#</span>
           <span class="flex-1 truncate text-[14px]" style="color: var(--kv-text-primary);">{{ c.name }}</span>
+          <span
+            v-if="props.sentIds?.has(c.id)"
+            class="shrink-0 text-[12px] font-medium"
+            style="color: var(--kv-online, #3DB46E);"
+          >{{ props.sentLabel }}</span>
+          <span
+            v-else-if="props.selectable"
+            class="shrink-0 w-5 h-5 rounded-full border flex items-center justify-center"
+            :style="props.selectedIds?.has(c.id)
+              ? 'background-color: var(--kv-accent-500); border-color: var(--kv-accent-500); color: #fff;'
+              : 'border-color: var(--kv-border-strong);'"
+            aria-hidden="true"
+          >
+            <svg v-if="props.selectedIds?.has(c.id)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          </span>
         </button>
       </template>
 

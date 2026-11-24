@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Image,
   Modal,
   Pressable,
+  SectionList,
   StyleSheet,
   Text,
   TextInput,
@@ -22,6 +22,7 @@ import { showToast } from '@/stores/toast';
 import { channelTitle } from '@/utils/channelTitle';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { sheetBottomPadding, useSheetInsets } from '../home/sheetInsets';
+import { loadGuildTargets, type GuildChannels } from '../share/ShareTargetList';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -34,12 +35,25 @@ import { theme } from '@/theme';
  * (`attachmentIds`) hedefe baglanir; istemci dosyayi indirip yeniden yuklemez. Eskiden metin bos ise
  * DOSYA ADI metin olarak gidiyordu (gorsel yazi oluyordu); bu davranis KALDIRILDI.
  *
- * Hedef listesi **mevcut DM kanalları** (web ile aynı): yeni sohbet başlatma yolu buraya konmadı,
- * o "Yeni Mesaj" ekranının işi.
+ * Hedef listesi **mevcut DM kanalları + ortam metin kanalları** (web ile aynı; kanallar sahip isteği
+ * 2026-11-24, kaynak paylaşım listesiyle ortak `loadGuildTargets`). Yeni sohbet başlatma yolu buraya
+ * konmadı, o "Yeni Mesaj" ekranının işi. Şifreli DM'den kanala iletilen içerik orada düz gider:
+ * `sendMessage` kanal türüne göre yolu kendisi seçer.
  *
  * T&S: engelli/izinsiz DM'e iletmeyi sunucu reddeder (`canDm`); istemci kapıyı taklit etmez,
  * sunucunun Türkçe mesajını satırın altında gösterir.
  */
+/** Liste satırı: DM, grup DM ya da ortam kanalı (`# ad`). */
+interface Target {
+  id: string;
+  label: string;
+}
+interface TargetSection {
+  key: string;
+  title: string;
+  data: Target[];
+}
+
 /** C68 §1: tek seferde en fazla bu kadar hedef (toplu yayma sinirı). */
 const MAX_TARGETS = 5;
 
@@ -69,11 +83,33 @@ export function ForwardMessageModal({ message, onClose }: Props) {
   // Onizleme kucuk resmi: video icin mesajdaki kare, gorsel icin sunucudan kisa omurlu adres.
   const previewUri = useAttachmentThumb(first);
 
-  const filtered = useMemo(() => {
+  const [guildGroups, setGuildGroups] = useState<GuildChannels[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    loadGuildTargets()
+      .then((g) => !cancelled && setGuildGroups(g))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const sections = useMemo<TargetSection[]>(() => {
     const q = query.trim().toLocaleLowerCase('tr');
-    if (!q) return channels;
-    return channels.filter((c) => channelTitle(c).toLocaleLowerCase('tr').includes(q));
-  }, [channels, query]);
+    const match = (s: string) => !q || s.toLocaleLowerCase('tr').includes(q);
+    const chats: Target[] = channels
+      .map((c) => ({ id: c.id, label: channelTitle(c) }))
+      .filter((x) => match(x.label));
+    const out: TargetSection[] = chats.length
+      ? [{ key: 'chats', title: t('mobile.share.sectionChats'), data: chats }]
+      : [];
+    for (const g of guildGroups) {
+      const targets = g.targets.map((x) => ({ id: x.id, label: `# ${x.label}` }));
+      const data = match(g.guildName) ? targets : targets.filter((x) => match(x.label));
+      if (data.length) out.push({ key: g.guildId, title: g.guildName, data });
+    }
+    return out;
+  }, [channels, guildGroups, query]);
 
   function toggle(channelId: string) {
     if (sending || sentIds.includes(channelId)) return;
@@ -104,15 +140,18 @@ export function ForwardMessageModal({ message, onClose }: Props) {
   }
 
   // C68 §3: kaynak ekran bir DM sohbetiyse (`/dm/<id>`) replace, degilse push; hedef = kaynak ise yalniz kapat.
+  // Hedef ortam kanalıysa paylaşım listesinin kanal rotası kullanılır.
   function openTarget(channelId: string) {
     const sourceMatch = /^\/dm\/([^/]+)/.exec(pathname);
     const sourceChannelId = sourceMatch ? decodeURIComponent(sourceMatch[1]) : null;
     onClose();
     if (sourceChannelId === channelId) return;
     const channel = channels.find((c) => c.id === channelId);
-    if (!channel) return;
-    if (sourceChannelId) router.replace(dmRouteParams(channel));
-    else router.push(dmRouteParams(channel));
+    const guildHref = guildGroups.flatMap((g) => g.targets).find((x) => x.id === channelId)?.href;
+    const href = channel ? dmRouteParams(channel) : guildHref;
+    if (!href) return;
+    if (sourceChannelId) router.replace(href);
+    else router.push(href);
   }
 
   async function send() {
@@ -188,15 +227,21 @@ export function ForwardMessageModal({ message, onClose }: Props) {
 
             {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
 
-            {channels.length === 0 ? (
+            {channels.length === 0 && guildGroups.length === 0 ? (
               <Text style={styles.empty}>{t('message.forwardNoChannels')}</Text>
             ) : (
-              <FlatList
-                data={filtered}
+              <SectionList
+                sections={sections}
                 keyExtractor={(item) => item.id}
                 style={styles.list}
                 keyboardShouldPersistTaps="handled"
+                stickySectionHeadersEnabled={false}
                 extraData={selectedIds}
+                renderSectionHeader={({ section }) => (
+                  <Text style={styles.sectionTitle} numberOfLines={1}>
+                    {section.title}
+                  </Text>
+                )}
                 renderItem={({ item }) => {
                   const sent = sentIds.includes(item.id);
                   const selected = selectedIds.includes(item.id);
@@ -207,7 +252,7 @@ export function ForwardMessageModal({ message, onClose }: Props) {
                       style={styles.row}
                     >
                       <Text style={styles.rowName} numberOfLines={1}>
-                        {channelTitle(item)}
+                        {item.label}
                       </Text>
                       {sent ? (
                         <View style={styles.sentRow}>
@@ -329,6 +374,13 @@ const styles = StyleSheet.create({
   },
   list: {
     maxHeight: 320,
+  },
+  sectionTitle: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.sm,
+    fontWeight: '700',
+    paddingTop: 8,
+    paddingBottom: 6,
   },
   row: {
     flexDirection: 'row',
