@@ -10,11 +10,13 @@ import { useI18n } from 'vue-i18n'
 import { useCallStore } from '@/stores/call'
 import { useCall } from '@/composables/useCall'
 import { useCallSounds } from '@/composables/useCallSounds'
+import { useDesktopCallWindow } from '@/composables/useDesktopCallWindow'
 
 const { t } = useI18n()
 const callStore = useCallStore()
 const { acceptCall, rejectCall } = useCall()
 const { startRingtone, stopRingtone } = useCallSounds()
+useDesktopCallWindow() // C74: tepsideyken ekranın ortasında arama penceresi (yalnız masaüstü 1.3.0+)
 
 let timer: ReturnType<typeof setTimeout> | null = null
 

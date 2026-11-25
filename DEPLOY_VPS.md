@@ -222,7 +222,7 @@ Artık yalnız davet koduyla kayıt olunur. DB zaten temiz (fresh) → ayrı pur
 ## 11b. Masaüstü sürüm yayını (otomatik güncelleme)
 
 Masaüstü istemci `electron-updater` ile `https://kankaverse.com/indir/latest.yml` dosyasına bakar (6 saatte bir + açılışta).
-Web kodu canlıdan geldiği için yalnız `desktop/src/` (main, preload, picker) değişince yeni sürüm yayınlanır.
+Web kodu canlıdan geldiği için yalnız `desktop/src/` (main, preload, picker, call) değişince yeni sürüm yayınlanır.
 
 1. `desktop/package.json` içinde `version` değerini ARTIR. Artmazsa güncelleyici "yeni sürüm yok" der.
 2. `cd desktop && npm run dist` → `dist/` altında `kankaverse-setup.exe`, `kankaverse-setup.exe.blockmap`, `latest.yml`.

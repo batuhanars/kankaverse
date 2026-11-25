@@ -2,6 +2,7 @@ const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, session, de
 const path = require('path')
 const fs = require('fs')
 const { createGameDetector } = require('./game-detector')
+const { setupCallWindow } = require('./call-window')
 
 // Şu an açık olan picker penceresi (eşzamanlı isteği engeller)
 let pickerWin = null
@@ -28,6 +29,8 @@ const APP_URL = process.env.KANKAVERSE_URL ?? 'https://kankaverse.com/channels/@
 
 let win = null
 let tray = null
+// C74: gelen arama penceresi (IPC kanallarını burada kurar; pencere ilk aramada yaratılır).
+const callWindow = setupCallWindow({ getMainWindow: () => win, bringToFront })
 // Tepsi "Çıkış" veya app.quit() → gerçek kapanma; pencere X tuşu → ayara göre gizle/kapat.
 let isQuitting = false
 
@@ -262,6 +265,7 @@ function createWindow() {
   })
 
   win.loadURL(APP_URL)
+  callWindow.attachToMainWindow(win)
 
   // İndirme sayfa yüklenmeden bittiyse ya da sayfa yenilendiyse bant kaybolmasın: her yüklemede tekrar bildir.
   win.webContents.on('did-finish-load', () => {

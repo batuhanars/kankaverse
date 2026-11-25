@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Avatar CDN'den (https) gelir; yerel geliştirmede http://localhost. Betik yalnız yerel dosya. -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data: https: http:;" />
+  <title>Kankaverse</title>
+  <style>
+    /* C74 — gelen arama penceresi. Renkler web/src/styles/tokens.css'ten (--kv-*) birebir. */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-elevated:   #2A2724;
+      --border-strong: rgba(255, 255, 255, 0.12);
+      --text-primary:  #F4F1ED;
+      --text-muted:    #847C71;
+      --accent:        #FF6B3D;
+      --danger:        #F23B4B;
+      --online:        #3DB46E;
+      --radius:        14px;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: transparent; /* pencere şeffaf; görünen yalnız kart */
+      overflow: hidden;
+      user-select: none;
+    }
+
+    body {
+      font-family: 'Figtree', 'Segoe UI', system-ui, sans-serif;
+      color: var(--text-primary);
+    }
+
+    .card {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 28px 24px 24px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius);
+      -webkit-app-region: drag; /* kart tutulup taşınabilir */
+      visibility: hidden; /* veri gelene dek boş kart görünmesin */
+    }
+    .card.ready { visibility: visible; }
+
+    /* Avatar: kullanıcı avatarı daire kalır (tasarım kuralı). Çevresinde yavaş "çalıyor" halkası. */
+    .avatar-wrap {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      margin-bottom: 14px;
+    }
+    .avatar-wrap::before {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 2px solid var(--online);
+      opacity: 0;
+      animation: ring 1.8s ease-out infinite;
+    }
+    @keyframes ring {
+      0%   { transform: scale(0.92); opacity: 0.7; }
+      100% { transform: scale(1.18); opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .avatar-wrap::before { animation: none; opacity: 0.5; }
+    }
+
+    .avatar {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent);
+      color: #fff;
+      font-size: 36px;
+      font-weight: 700;
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+    .name {
+      max-width: 100%;
+      font-size: 18px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .actions {
+      display: flex;
+      gap: 56px;
+      margin-top: 26px;
+    }
+    .btn {
+      -webkit-app-region: no-drag; /* sürükleme bölgesi tıklamayı yutmasın */
+      width: 56px;
+      height: 56px;
+      border: none;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      cursor: pointer;
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+    .btn:hover  { opacity: 0.9; }
+    .btn:active { transform: scale(0.94); }
+    .btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
+    .btn.reject { background: var(--danger); }
+    .btn.accept { background: var(--online); }
+  </style>
+</head>
+<body>
+  <main class="card" id="card">
+    <div class="avatar-wrap">
+      <div class="avatar" id="avatar"></div>
+    </div>
+    <p class="name" id="name"></p>
+    <p class="subtitle" id="subtitle"></p>
+
+    <div class="actions">
+      <!-- İkonlar web IncomingCallModal ile aynı (Feather phone-off / phone). -->
+      <button class="btn reject" id="reject" type="button">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/>
+          <line x1="23" y1="1" x2="1" y2="23"/>
+        </svg>
+      </button>
+      <button class="btn accept" id="accept" type="button">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+        </svg>
+      </button>
+    </div>
+  </main>
+  <script src="call.js"></script>
+</body>
+</html>

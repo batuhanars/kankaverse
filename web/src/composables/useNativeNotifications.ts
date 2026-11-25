@@ -12,6 +12,7 @@ import {
   type ReactionNotifyPayload,
 } from '@/utils/reactionNotification'
 import { i18n } from '@/i18n'
+import { playMessageTone } from '@/utils/messageTone'
 import type { NotificationDto } from '@/types'
 
 /**
@@ -54,6 +55,8 @@ export function useNativeNotifications() {
       // bittiğinde de (kabul/ret/iptal/zaman aşımı) — arkada asılı toast kalmasın.
       callNotif?.close()
       callNotif = null
+      // C74 §1: masaüstünde arama penceresi varsa toast yok (aynı arama iki kez görünmesin).
+      if (window.kankaverse?.showIncomingCall) return
       if (!id || !document.hidden) return
       // 🔴 Sahip cihaz turu 2026-08-10 — burada ÖNCE `permission !== 'granted'` kontrolü vardı ve
       // masaüstünde arama bildirimi hiç çıkmıyordu. Sebep: Electron bildirimi izin istemeden
@@ -148,7 +151,8 @@ export function useNativeNotifications() {
   }
 
   function _showToast(body: string, onClick: () => void) {
-    const notif = new Notification(t('notification.nativeTitle'), { body })
+    const notif = new Notification(t('notification.nativeTitle'), { body, silent: true })
+    playMessageTone() // C74 §4
     notif.onclick = () => {
       window.kankaverse?.focusWindow()
       onClick()
@@ -199,9 +203,11 @@ export function useNativeNotifications() {
     const title = isAiVideo ? t('notification.aiVideoTitle') : t('notification.nativeTitle')
     const notif = new Notification(title, {
       body,
+      silent: true, // C74 §4: Windows sesi yerine mobilin mesaj sesi
       // Electron'da /src/assets/brand/... yolu yerine ana domain'deki favicon kullanılır.
       // Electron kendisi uygulama ikonunu zaten gösterir; icon alanı boş bırakılabilir.
     })
+    playMessageTone()
 
     notif.onclick = () => {
       window.kankaverse?.focusWindow()
@@ -211,7 +217,10 @@ export function useNativeNotifications() {
 
   function _navigate(dto: NotificationDto) {
     if (dto.type === 'MENTION' && dto.guildId && dto.channelId) {
-      router.push({ name: 'channel', params: { guildId: dto.guildId, channelId: dto.channelId } })
+      void router.push({
+        name: 'channel',
+        params: { guildId: dto.guildId, channelId: dto.channelId },
+      })
     } else if (dto.type === 'REACTION' && dto.channelId) {
       // Bahsetme yolu: ortam kanalı ya da DM'e git, sonra mesaja zıpla
       if (dto.guildId) {
@@ -224,9 +233,9 @@ export function useNativeNotifications() {
       }
       if (dto.messageId) requestJump(dto.channelId, dto.messageId)
     } else if (dto.type === 'FRIEND_REQUEST' || dto.type === 'FRIEND_ACCEPT') {
-      router.push({ name: 'app' }) // HomeView → kankaları göster
+      void router.push({ name: 'app' }) // HomeView → kankaları göster
     } else if (dto.type === 'GUILD_INVITE' && dto.guildId) {
-      router.push({ name: 'app' }) // davet; invite akışı ayrı
+      void router.push({ name: 'app' }) // davet; invite akışı ayrı
     } else if ((dto.type === 'AI_VIDEO_READY' || dto.type === 'AI_VIDEO_FAILED') && dto.aiVideoId) {
       openAiVideoView(dto.aiVideoId) // C49 — çandaki bell diyaloğu açar
     } else {

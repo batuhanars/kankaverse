@@ -4567,3 +4567,14 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Zil kanalları v5 / quiet_v2, desen `[0,1000,1500]`, eski kanallar silinir (§4)
 - [x] api testleri + mobil tsc/eslint; yerel prebuild + gradlew; manifestte alıcı (§6)
 - [x] Cihaz turu: düşük bellekli test cihazı 2026-11-24: uzun titreşim + cevapsız bildirimi ("X seni aradı") geçti; ret ve kabul de geçti (cevapsız düşmedi); cevapsız bildirimine dokunma DM açıyor (§6)
+
+## Sprint C74 — Masaüstü gelen arama penceresi + web/masaüstünde mobil sesleri — 2026-11-25
+
+> Sözleşme: `contracts/SPRINT_C74_DESKTOP_CALL_WINDOW_CONTRACT.md`. Web + desktop, backend değişmez. Dev checkbox işaretler, item EKLEMEZ.
+
+- [x] Sesler: üç dosya web'e, `useCallSounds` zil/geri-zil dosyadan döngü (§4)
+- [x] Mesaj sesi: masaüstü toast'ları sessiz + `message_tone` (§4)
+- [x] Desktop: `call.html`/`call.js`/`call-preload.js`, main'de pencere + IPC, preload köprüsü (§2, §3)
+- [x] Web: köprü varsa toast yerine `showIncomingCall`, `onCallAction` → kabul/ret, tip dosyası (§1, §3)
+- [x] Doğrulama: vue-tsc -b, eslint, vite build, node --check; desktop sürüm 1.3.0 (§6)
+- [ ] Sahip cihaz turu (§6)

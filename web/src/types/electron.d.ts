@@ -39,6 +39,23 @@ interface KankaverseElectronBridge {
   setGameList?: (list: Array<{ id: string; executables: string[] }>) => void
   /** C31b: ekran seçici bu adı içeren pencereyi seçili açsın (null temizler). */
   setShareHint?: (name: string | null) => void
+  /** C74: gelen arama penceresini göster (ana pencere öndeyse main göstermez). 1.3.0 öncesinde yok. */
+  showIncomingCall?: (data: IncomingCallWindowData) => void
+  /** C74: gelen arama penceresini kapat. 1.3.0 öncesinde yok. */
+  hideIncomingCall?: () => void
+  /** C74: arama penceresinde basılan buton; abonelikten çıkış döner. 1.3.0 öncesinde yok. */
+  onCallAction?: (cb: (e: { action: 'accept' | 'reject'; channelId: string }) => void) => () => void
+}
+
+/** C74 §3: arama penceresine giden yük. Metinler web'de çevrilmiş gelir, pencere metin gömmez. */
+interface IncomingCallWindowData {
+  channelId: string
+  name: string
+  subtitle: string
+  avatarUrl: string | null
+  initial: string
+  acceptLabel: string
+  rejectLabel: string
 }
 
 declare global {

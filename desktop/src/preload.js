@@ -52,4 +52,24 @@ contextBridge.exposeInMainWorld('kankaverse', {
 
   /** İndirilen güncellemeyi kurup uygulamayı yeniden başlatır. */
   installUpdate: () => ipcRenderer.send('update:install'),
+
+  /**
+   * C74: gelen arama penceresini göster. Ana pencere öndeyse main göstermez (uygulama içi şerit yeter).
+   * @param {{ channelId: string, name: string, subtitle: string, avatarUrl: string | null,
+   *   initial: string, acceptLabel: string, rejectLabel: string }} data
+   */
+  showIncomingCall: (data) => ipcRenderer.send('call:show', data),
+
+  /** C74: arama bitti (kabul/ret/iptal/zaman aşımı) → pencereyi kapat. */
+  hideIncomingCall: () => ipcRenderer.send('call:hide'),
+
+  /**
+   * C74: arama penceresinde butona basılınca cb({ action: 'accept' | 'reject', channelId }).
+   * Abonelikten çıkış fonksiyonu döner.
+   */
+  onCallAction: (cb) => {
+    const handler = (_event, e) => cb(e)
+    ipcRenderer.on('call:action', handler)
+    return () => ipcRenderer.removeListener('call:action', handler)
+  },
 })

@@ -5,6 +5,7 @@ import { useDmStore } from '@/stores/dm'
 import { useChannelsStore } from '@/stores/channels'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { NotificationLevel } from '@/types'
+import { playMessageTone } from '@/utils/messageTone'
 
 /**
  * Masaüstü (Electron) "yeni mesaj" toast'ları — DM, grup DM ve sunucu kanalları.
@@ -39,7 +40,9 @@ function throttled(channelId: string) {
 
 function fire(title: string, body: string, onClick: () => void, tag: string) {
   // tag: aynı kanaldan ardışık toast görsel olarak üst üste yığılmaz, tekini günceller.
-  const notif = new Notification(title, { body, tag })
+  // C74 §4: silent → Windows sesi yerine mobilin mesaj sesi.
+  const notif = new Notification(title, { body, tag, silent: true })
+  playMessageTone()
   notif.onclick = () => {
     window.kankaverse?.focusWindow()
     onClick()
@@ -97,7 +100,7 @@ export function maybeFireDmToast(
   fire(
     title,
     body,
-    () => router.push({ name: 'dm', params: { channelId: payload.channelId } }),
+    () => void router.push({ name: 'dm', params: { channelId: payload.channelId } }),
     payload.channelId,
   )
 }
@@ -144,7 +147,7 @@ export function maybeFireChannelToast(
     title,
     body,
     () =>
-      router.push({
+      void router.push({
         name: 'channel',
         params: { guildId: payload.guildId, channelId: payload.channelId },
       }),

@@ -1381,6 +1381,8 @@
   "call": {
     "incoming": "Gelen sesli arama",
     "incomingGroup": "Gelen grup araması",
+    "windowRinging": "arıyor…",
+    "windowRingingGroup": "grup araması başlattı",
     "accept": "Kabul et",
     "reject": "Reddet",
     "ringing": "Çalıyor…",
