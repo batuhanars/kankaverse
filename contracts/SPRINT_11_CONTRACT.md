@@ -47,4 +47,4 @@ Ortam sahibinin ortamı şekillendirebilmesi: **metin kanalları ekle/adlandır/
 
 ## 8. Notlar
 - **Round 2 — Ortam ikonu:** `Guild.iconUrl` var + Sprint 5 upload var. Serving: PM round 2'de netleştirir (attachment presigned-GET reuse vs public path). Altıgen `clip-path` (rail deseni).
-- Özel kanal / roller / kategoriler / ses / etkinlik → kademeli roadmap (`ORTAM_AYARLARI_ROADMAP.md` + PLAN V2/V3).
+- Özel kanal / roller / kategoriler / ses / etkinlik → kademeli roadmap (`docs/ORTAM_AYARLARI_ROADMAP.md` + PLAN V2/V3).

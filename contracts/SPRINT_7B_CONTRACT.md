@@ -80,5 +80,5 @@ geciktiren anti-spam/anti-raid sertleştirme (mevcut `canDm`/`canSendFriendReque
 > - **Liste eklendi (sahip onayı):** `yarak`, `amcık`/`amcik`, `ipne`, `godoş`, `götveren`/`göt veren`, `götlek`.
 
 ## 7. Notlar
-- Per-ortam karantina süresi/ayarı + DM automod + per-ortam özel kelime listesi → **V2** (`ORTAM_AYARLARI_ROADMAP.md`).
+- Per-ortam karantina süresi/ayarı + DM automod + per-ortam özel kelime listesi → **V2** (`docs/ORTAM_AYARLARI_ROADMAP.md`).
 - Automod kayıtsız (block-only); flag→moderasyon kuyruğu = **4B** (hukuk beklemede).

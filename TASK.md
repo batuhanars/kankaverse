@@ -541,7 +541,7 @@ gerçek davet linkleri/kodları + T&S kapıları (Sprint 7 davet sistemi). Bunla
 
 - [x] **Upload feature-flag** `UPLOADS_ENABLED` (default true) → presign'ler `403 UPLOADS_DISABLED` (kapalı önizlemede CSAM-taramasız yüklemeyi tek config ile kapat — D14)
 - [x] **WS CORS config** (D5 borcu): gateway `*` → `FRONTEND_URL` (adapter seviyesi, dev-güvenli + `credentials`)
-- [x] **Gizlilik & Şeffaflık sayfası** (`/gizlilik`, TASLAK bandı, auth linkleri) — içerik `GIZLILIK_SEFFAFLIK_TASLAK.md`; **nihai metin hukuk onayı bekliyor**
+- [x] **Gizlilik & Şeffaflık sayfası** (`/gizlilik`, TASLAK bandı, auth linkleri) — içerik `docs/GIZLILIK_SEFFAFLIK_TASLAK.md`; **nihai metin hukuk onayı bekliyor**
 - [ ] **Bekleyen (uzman ekip):** kanıt/log saklama politikası + savcılık teslim süreci + CSAM akışı + nihai KVKK/5651 metinleri → hukukçu + siber güvenlik + CSAM uzmanı
 - [ ] Config-tabanlı limit ince-ayar (throttle/cursor — D5 kalıntısı) · entitlement dikişleri → fırsatta
 

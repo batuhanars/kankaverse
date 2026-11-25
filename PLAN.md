@@ -2,7 +2,7 @@
 
 > Genel mimari yol haritası ve V1 kapsam kilidi. Aktif sprint sözleşmesi `contracts/SPRINT_X_CONTRACT.md`'de;
 > canlı ilerleme `TASK.md`'de. Brief: `knowledge/projects/kankaverse/kankaverse-proje-brief.md`.
-> Ortam ayarları vizyon/kademe haritası: `ORTAM_AYARLARI_ROADMAP.md` (V1→V3, sözleşme değil — referans).
+> Ortam ayarları vizyon/kademe haritası: `docs/ORTAM_AYARLARI_ROADMAP.md` (V1→V3, sözleşme değil — referans).
 
 ---
 
