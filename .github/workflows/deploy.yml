@@ -9,6 +9,12 @@ name: Deploy to VPS
 on:
   push:
     branches: [main]
+    # Yalnız belge değişen push'ta deploy yok (hiçbir imaj .md okumuyor). Commit'te
+    # tek bir kod dosyası bile varsa deploy normal çalışır. Elle tetikleme her zaman açık.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'contracts/**'
   workflow_dispatch: {}
 
 # Aynı anda tek deploy çalışsın.
