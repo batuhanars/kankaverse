@@ -48,10 +48,10 @@ Kaynak `mobile/assets/sounds/`. Web kopyası `web/src/assets/sounds/` (Vite hash
 |---|---|---|---|
 | Gelen arama | `incoming_call.mp3` | `incoming_call_channel.wav` (30 sn) → MP3 mono 64 kbps | döngü |
 | Giden arama | `outgoing_call.mp3` | aynı dosya | döngü |
-| Mesaj | `message_tone.mp3` | aynı dosya | tek atış |
+| Bildirim | `notification.mp3` | `message_channel.wav` (bildirim kanalı sesi; `message_tone` DEĞİL, o DM-açık sesi) | tek atış |
 - `useCallSounds` `startRingtone/stopRingtone/startRingback/stopRingback` imzaları değişmez, içleri `HTMLAudioElement`
   döngüsüne geçer. Bağlanma/ayrılma/peer/alert blipleri sentezli kalır (mobilde dosyası yok).
-- Mesaj sesi: masaüstü toast'ları `silent: true` ile açılır, yerine `message_tone` çalınır. Kapsam: `useMessageToasts`
+- Mesaj sesi: masaüstü toast'ları `silent: true` ile açılır, yerine `notification.mp3` çalınır. Kapsam: `useMessageToasts`
   (DM, grup DM, kanal) ve `useNativeNotifications` toast'ları (bahsetme, istek, davet, tepki, YZ video).
   Ses toast'ın çıktığı her durumda çalar, çıkmadığı durumda çalmaz (kural değişmez, yalnız ses değişir).
 - Tarayıcı autoplay kilidi: `play()` reddi sessizce yutulur (bugünkü davranış). Electron'da kilit yok.

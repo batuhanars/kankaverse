@@ -5,7 +5,7 @@ import { useDmStore } from '@/stores/dm'
 import { useChannelsStore } from '@/stores/channels'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { NotificationLevel } from '@/types'
-import { playMessageTone } from '@/utils/messageTone'
+import { playNotificationTone } from '@/utils/notificationTone'
 
 /**
  * Masaüstü (Electron) "yeni mesaj" toast'ları — DM, grup DM ve sunucu kanalları.
@@ -40,9 +40,9 @@ function throttled(channelId: string) {
 
 function fire(title: string, body: string, onClick: () => void, tag: string) {
   // tag: aynı kanaldan ardışık toast görsel olarak üst üste yığılmaz, tekini günceller.
-  // C74 §4: silent → Windows sesi yerine mobilin mesaj sesi.
+  // C74 §4: silent → Windows sesi yerine mobilin bildirim sesi.
   const notif = new Notification(title, { body, tag, silent: true })
-  playMessageTone()
+  playNotificationTone()
   notif.onclick = () => {
     window.kankaverse?.focusWindow()
     onClick()

@@ -12,7 +12,7 @@ import {
   type ReactionNotifyPayload,
 } from '@/utils/reactionNotification'
 import { i18n } from '@/i18n'
-import { playMessageTone } from '@/utils/messageTone'
+import { playNotificationTone } from '@/utils/notificationTone'
 import type { NotificationDto } from '@/types'
 
 /**
@@ -152,7 +152,7 @@ export function useNativeNotifications() {
 
   function _showToast(body: string, onClick: () => void) {
     const notif = new Notification(t('notification.nativeTitle'), { body, silent: true })
-    playMessageTone() // C74 §4
+    playNotificationTone() // C74 §4
     notif.onclick = () => {
       window.kankaverse?.focusWindow()
       onClick()
@@ -203,11 +203,11 @@ export function useNativeNotifications() {
     const title = isAiVideo ? t('notification.aiVideoTitle') : t('notification.nativeTitle')
     const notif = new Notification(title, {
       body,
-      silent: true, // C74 §4: Windows sesi yerine mobilin mesaj sesi
+      silent: true, // C74 §4: Windows sesi yerine mobilin bildirim sesi
       // Electron'da /src/assets/brand/... yolu yerine ana domain'deki favicon kullanılır.
       // Electron kendisi uygulama ikonunu zaten gösterir; icon alanı boş bırakılabilir.
     })
-    playMessageTone()
+    playNotificationTone()
 
     notif.onclick = () => {
       window.kankaverse?.focusWindow()
