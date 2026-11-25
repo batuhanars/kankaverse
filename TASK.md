@@ -4577,4 +4577,4 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Desktop: `call.html`/`call.js`/`call-preload.js`, main'de pencere + IPC, preload köprüsü (§2, §3)
 - [x] Web: köprü varsa toast yerine `showIncomingCall`, `onCallAction` → kabul/ret, tip dosyası (§1, §3)
 - [x] Doğrulama: vue-tsc -b, eslint, vite build, node --check; desktop sürüm 1.3.0 (§6)
-- [ ] Sahip cihaz turu (§6)
+- [x] Sahip cihaz turu (§6): tepsideyken orta pencere, birincil ekran, zil, bildirim sesi, DM-açık mesaj sesi onaylandı (2026-11-25). Ret, arayan iptali, 30 sn ve grup araması ayrıca denenmedi.

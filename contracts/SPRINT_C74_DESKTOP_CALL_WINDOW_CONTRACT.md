@@ -1,6 +1,6 @@
 # SPRINT C74: Masaüstü gelen arama penceresi + web/masaüstünde mobil sesleri
 
-> Durum: **GELİŞTİRMEDE (2026-11-25).** PM compose (Opus). Web + desktop. Backend değişmez.
+> Durum: **CANLI (2026-11-25).** Desktop 1.3.1. Web + desktop. Backend değişmez.
 > R7 kapsamı dışında (auth/T&S karar fonksiyonu yok; arama kabul/ret akışı aynen mevcut fonksiyonlardan geçer).
 > Desktop yeni sürüm: `1.2.1` → `1.3.0` (auto-update ile yayılır).
 
@@ -49,6 +49,7 @@ Kaynak `mobile/assets/sounds/`. Web kopyası `web/src/assets/sounds/` (Vite hash
 | Gelen arama | `incoming_call.mp3` | `incoming_call_channel.wav` (30 sn) → MP3 mono 64 kbps | döngü |
 | Giden arama | `outgoing_call.mp3` | aynı dosya | döngü |
 | Bildirim | `notification.mp3` | `message_channel.wav` (bildirim kanalı sesi; `message_tone` DEĞİL, o DM-açık sesi) | tek atış |
+| DM-açık mesaj | `message_tone.mp3` | `message_tone.mp3` (mobil `mesaj-sesi.mp3`, ses 0.8) | tek atış; yalnız o DM açık, pencere önde ve mesaj başkasındansa (bildirim çıkmadığı durum) |
 - `useCallSounds` `startRingtone/stopRingtone/startRingback/stopRingback` imzaları değişmez, içleri `HTMLAudioElement`
   döngüsüne geçer. Bağlanma/ayrılma/peer/alert blipleri sentezli kalır (mobilde dosyası yok).
 - Mesaj sesi: masaüstü toast'ları `silent: true` ile açılır, yerine `notification.mp3` çalınır. Kapsam: `useMessageToasts`
