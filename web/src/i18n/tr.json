@@ -72,8 +72,7 @@
   },
   "desktopUpdate": {
     "message": "Kankaverse güncellendi. Yeniden başlatınca yeni sürüm açılır.",
-    "restart": "Yeniden başlat",
-    "dismiss": "Kapat"
+    "restart": "Yeniden başlat"
   },
   "emailVerification": {
     "bannerMessage": "E-postanı henüz doğrulamadın. Bazı özellikler kısıtlı.",

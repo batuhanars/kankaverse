@@ -2,7 +2,8 @@
 /**
  * Masaüstü güncelleme bandı (C31a). Yalnız Electron kabuğunda ve yeni sürüm indirildiyse görünür;
  * tarayıcıda ve eski kurulumlarda (onUpdateReady yok) hiç render edilmez.
- * Kapatılırsa bu oturumda tekrar çıkmaz; çıkışta güncelleme zaten kurulur.
+ * Kapatma düğmesi yok (2026-11-25, mobil bantla aynı karar): güncelleme varken bandı gizlemenin
+ * kullanıcıya faydası yok. Yeniden başlatmazsa çıkışta güncelleme zaten kurulur.
  */
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -40,7 +41,6 @@ function restart() {
       >
         {{ t('desktopUpdate.restart') }}
       </button>
-      <button class="cursor-pointer" :aria-label="t('desktopUpdate.dismiss')" @click="ready = false">&times;</button>
     </div>
   </div>
 </template>
