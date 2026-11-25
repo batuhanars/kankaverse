@@ -36,6 +36,7 @@ import {
 import { invalidateReactionUsers } from '@/composables/useReactionUsers'
 import { REACTION_NOTIFY_EVENT, type ReactionNotifyPayload } from '@/utils/reactionNotification'
 import { maybeFireDmToast, maybeFireChannelToast } from '@/composables/useMessageToasts'
+import { playMessageTone } from '@/utils/messageTone'
 import type {
   MessageDto,
   FriendRequestDto,
@@ -280,6 +281,10 @@ export function useSocket() {
         dmStore.applyActivity(data, { countUnread })
         // Masaüstü toast (DM/grup) — pencere arkada VEYA bu DM açık değilse
         const isActive = dmStore.activeDmChannelId === data.channelId
+        // Bu DM'e bakarken karşıdan mesaj: mobildeki kısa mesaj sesi (mobil stores/dm.ts ile aynı
+        // kural). Pencere arkadaysa çalmaz: o durumda bildirim çıkar ve bildirim sesi çalar.
+        const lookingAtIt = !document.hidden && document.hasFocus()
+        if (isActive && lookingAtIt && data.senderId !== authStore.user?.id) playMessageTone()
         const { id, e2ee } = data.lastMessage
         if (!data.lastMessage.encrypted || !e2ee || !id) {
           maybeFireDmToast(data, isActive)
