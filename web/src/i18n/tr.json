@@ -1530,7 +1530,7 @@
     "divider": "Bu noktadan sonra mesajlar uçtan uca şifreli",
     "intro": {
       "title": "Mesajlar ve aramalar uçtan uca şifreli",
-      "body": "Yazdıklarını ve aramalarını yalnız bu sohbetteki kişilerin cihazları açabilir. Paylaşılan görsel ve dosyalar şimdilik bu kapsamda değil.",
+      "body": "Yazdıklarını ve aramalarını yalnız bu sohbetteki kişilerin cihazları açabilir.",
       "actionClick": "Güvenlik kodunu görmek için tıkla.",
       "actionTap": "Güvenlik kodunu görmek için dokun."
     },
@@ -2318,7 +2318,7 @@
   "legal": {
     "and": "ve",
     "consentTitle": "Kayıt olmadan önce",
-    "consentEncryption": "Ortam dışındaki DM'lerde mesajların ve aramaların uçtan uca şifrelidir: bunları yalnız sen ve konuştuğun kişilerin cihazları açabilir, Kankaverse açamaz. DM'de paylaşılan görsel ve dosyalar şimdilik bu kapsamda değildir.",
+    "consentEncryption": "Ortam dışındaki DM'lerde mesajların ve aramaların uçtan uca şifrelidir: bunları yalnız sen ve konuştuğun kişilerin cihazları açabilir, Kankaverse açamaz.",
     "consentModeration": "Ortam kanallarındaki içerik, güvenlik ve moderasyon için, özellikle çocuk güvenliği amacıyla, sunucu tarafında erişilebilir. Bir mesajı şikâyet ettiğinde o mesaj ve sohbetteki önceki birkaç mesaj moderasyon ekibine iletilir.",
     "consentAgreePre": "Devam ederek",
     "consentAgreePost": "metinlerini okuduğunu ve kabul ettiğini onaylarsın.",
