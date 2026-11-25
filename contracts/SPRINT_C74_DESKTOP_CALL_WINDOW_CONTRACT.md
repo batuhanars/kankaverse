@@ -21,7 +21,7 @@
 - Ayrı yerel dosya (`desktop/src/call.html` + `call.js` + `call-preload.js`), picker kalıbı: contextIsolation, sandbox,
   nodeIntegration kapalı, kendi dar köprüsü (`accept`, `reject`, `onData`).
 - Çerçevesiz, şeffaf zemin üstünde yuvarlak köşeli kart, gölge yok (token kuralı), görev çubuğunda yok, her zaman üstte.
-  İmleç hangi ekrandaysa o ekranın çalışma alanının ortasında açılır.
+  Birincil ekranın çalışma alanının ortasında açılır (imleç ekranı değil; sahip kararı 2026-11-25).
 - **Odak çalmaz** (`showInactive`): klavye odağı kullanıcıda kalır.
 - İçerik: avatar (daire; yoksa baş harf, aksan rengi), ad, alt satır `call.incoming` / `call.incomingGroup`.
   Altta iki yuvarlak ikon buton: reddet `--kv-danger`, kabul `#3DB46E`. `title` metinleri `call.reject` / `call.accept`.

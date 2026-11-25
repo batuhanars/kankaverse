@@ -60,8 +60,9 @@ function setupCallWindow({ getMainWindow, bringToFront }) {
   function open() {
     if (!current) return
     if (callWin && !callWin.isDestroyed()) return // zaten açık
-    // İmleç hangi ekrandaysa onun ortası: iki ekranlı kurulumda kullanıcının baktığı yer.
-    const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+    // Birincil ekranın ortası (sahip kararı 2026-11-25). İlk sürüm imlecin olduğu ekranı seçiyordu;
+    // çift ekranda pencere "en son işlem yapılan" ekrana düşüyor, yeri tahmin edilemiyordu.
+    const { workArea } = screen.getPrimaryDisplay()
     callWin = new BrowserWindow({
       width: WIDTH,
       height: HEIGHT,
