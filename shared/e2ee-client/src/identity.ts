@@ -35,6 +35,9 @@ export interface OwnDeviceView {
   createdAt: string
   verified: boolean
   current: boolean
+  /** C79: oturumun cihaz adı (eski kayıtlarda null) ve son kullanım. */
+  label: string | null
+  activityAt: string | null
 }
 
 /** Güvenlik kodu ekranı (§4.7). `null` = kişinin kimliği henüz yok ("güncelleyince görünecek"). */
@@ -246,6 +249,8 @@ export class IdentityManager {
       createdAt: dev.createdAt,
       verified: identity ? isSigned(identity, this.d.userId, dev) : false,
       current: dev.deviceId === current,
+      label: dev.label ?? null,
+      activityAt: dev.activityAt ?? null,
     }))
     return {
       hasIdentity: identity !== null,

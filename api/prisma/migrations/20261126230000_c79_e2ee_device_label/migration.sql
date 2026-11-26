@@ -1,0 +1,1 @@
+ALTER TABLE "E2eeDevice" ADD COLUMN "label" TEXT;

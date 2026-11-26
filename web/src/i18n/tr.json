@@ -1595,6 +1595,13 @@
       "notReady": "Sohbet şifreleniyor, birkaç saniye sonra tekrar dene.",
       "deviceRemoved": "Bu cihaz bu sohbetten çıkarıldı."
     },
+    "devices": {
+      "evicted": "Yer açmak için uzun süredir kullanılmayan bir cihazının ({device}) oturumu kapatıldı.",
+      "limitTitle": "Bu cihazda şifreleme açılamadı",
+      "limitBody": "Hesabında son bir haftada kullanılmış çok fazla cihaz var (en fazla 10). Kullanmadığın oturumları kapat, sonra uygulamayı yeniden aç.",
+      "openSessions": "Oturumları aç",
+      "lastActive": "Son kullanım: {ago}"
+    },
     "backup": {
       "history": {
         "banner": "Eski mesajlarını bu cihaza getirmek ister misin?",

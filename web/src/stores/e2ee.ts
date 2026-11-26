@@ -15,6 +15,7 @@ import type {
   WarningKind,
 } from '@kankaverse/e2ee-client'
 import { startWebEngine } from '@/lib/e2ee/adapter'
+import { announceDeviceLimit, isDeviceLimit } from '@/lib/e2ee/deviceNotices'
 import { destroyAllVaults } from '@/lib/e2ee/vault'
 import type { MessageDto } from '@/types'
 
@@ -37,6 +38,8 @@ export const useE2eeStore = defineStore('e2ee', () => {
   const channels = ref<Record<string, ChannelInfo>>({})
   /** Her yeni düz metin depoya yazıldığında artar; liste önizlemesi buna bağlıdır (E3 Rev.5). */
   const plainTick = ref(0)
+  /** C79: bu cihaz hesabın cihaz sınırı yüzünden kaydolamadı (Ayarlar → Hesap uyarısı). */
+  const deviceLimit = ref(false)
   let ready: Promise<void> = Promise.resolve()
 
   const setWarning = (channelId: string, kind: WarningKind | null) => {
@@ -48,6 +51,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
   function init(userId: string): Promise<void> {
     if (engine.value?.userId === userId) return ready
     ready = (async () => {
+      deviceLimit.value = false
       try {
         engine.value = await startWebEngine(userId, e2eeApi, setWarning)
         await engine.value?.onWelcome()
@@ -56,7 +60,13 @@ export const useE2eeStore = defineStore('e2ee', () => {
         // E5b: uygulama kapalıyken açılan aktarım isteği (soket olayı kaçtı) açılışta sorulur.
         if (engine.value?.transfer) void useE2eeTransferStore().checkPending()
       } catch (e) {
-        console.error('[e2ee] başlatılamadı', e2eeErrorTag(e))
+        const tag = e2eeErrorTag(e)
+        console.error('[e2ee] başlatılamadı', tag)
+        // C79: 7 gün içinde kullanılmış 10 cihaz varken kayıt reddedilir; sessiz kalmasın (Ayarlar'da uyarı).
+        if (isDeviceLimit(tag)) {
+          deviceLimit.value = true
+          announceDeviceLimit()
+        }
       }
     })()
     return ready
@@ -335,6 +345,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
     engine,
     warnings,
     channels,
+    deviceLimit,
     init,
     wipe,
     release,

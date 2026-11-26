@@ -7,11 +7,19 @@ import { identitySigView, identityView } from './e2ee-identity.util';
 import { E2eeNotifyService } from './e2ee-notify.service';
 import { RegisterDeviceDto, UploadKeyPackagesDto } from './dto/e2ee.dto';
 import {
+  E2EE_DEVICE_LABEL_MAX,
   E2EE_KEY_PACKAGES_PENDING_MAX,
   E2EE_MAX_ACTIVE_DEVICES,
   E2EE_SIGNATURE_KEY_BYTES,
 } from './e2ee.constants';
 import { E2EE_ERRORS, bytesEqual, e2eeError, fromB64, toB64 } from './e2ee.util';
+import { activityByDevice, evictionOps, findEvictable } from './e2ee-eviction';
+
+/** C79 §2.1: `evicted` = yer açmak için çıkarılan cihaz (yoksa null). Alan eklemeli, eski istemci yok sayar. */
+type RegisterResult = {
+  deviceId: string;
+  evicted: { platform: string; label: string | null; activityAt: string } | null;
+};
 
 /** Cihaz kaydı + KeyPackage yükleme/sayım + cihaz listeleme (§2.3; claim: E2eeClaimService). */
 @Injectable()
@@ -32,7 +40,7 @@ export class E2eeDevicesService {
     return device;
   }
 
-  async register(user: RequestUser, dto: RegisterDeviceDto): Promise<{ deviceId: string }> {
+  async register(user: RequestUser, dto: RegisterDeviceDto): Promise<RegisterResult> {
     const key = fromB64(dto.signatureKey);
     if (key.length !== E2EE_SIGNATURE_KEY_BYTES) {
       throw E2EE_ERRORS.invalidPayload('İmza anahtarı 32 bayt olmalı.');
@@ -43,10 +51,16 @@ export class E2eeDevicesService {
     });
     if (existing) return this.returnExisting(existing, key);
 
+    // 🔴 R7 / C79 §2.1: sınır doluysa en az 7 gündür kullanılmamış en eski cihaz çıkarılır (yeni kayıtla aynı
+    // transaction'da). Aday yoksa eskisi gibi 422; hiçbir şey değişmez.
     const active = await this.prisma.e2eeDevice.count({
       where: { userId: user.id, revokedAt: null },
     });
-    if (active >= E2EE_MAX_ACTIVE_DEVICES) {
+    const victim =
+      active >= E2EE_MAX_ACTIVE_DEVICES
+        ? await findEvictable(this.prisma, user.id, new Date())
+        : null;
+    if (active >= E2EE_MAX_ACTIVE_DEVICES && !victim) {
       throw e2eeError(
         HttpStatus.UNPROCESSABLE_ENTITY,
         'En fazla 10 etkin cihaz kaydedebilirsiniz.',
@@ -55,15 +69,28 @@ export class E2eeDevicesService {
     }
 
     try {
-      const created = await this.prisma.e2eeDevice.create({
+      const create = this.prisma.e2eeDevice.create({
         data: {
           userId: user.id,
           tokenFamily: user.tokenFamily,
           platform: dto.platform,
+          label: await this.sessionLabel(user.sessionId),
           signatureKey: key,
         },
       });
-      return { deviceId: created.id };
+      const ops = victim ? evictionOps(this.prisma, user.id, victim) : [];
+      const results = await this.prisma.$transaction([...ops, create]);
+      const created = results[results.length - 1] as { id: string };
+      if (!victim) return { deviceId: created.id, evicted: null };
+      void this.notify.devicesChanged(user.id);
+      return {
+        deviceId: created.id,
+        evicted: {
+          platform: victim.platform,
+          label: victim.label,
+          activityAt: victim.activityAt.toISOString(),
+        },
+      };
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         // Aynı zincirle eşzamanlı iki kayıt: kazananı döndür (anahtar aynıysa idempotent).
@@ -91,7 +118,16 @@ export class E2eeDevicesService {
       where: { id: device.id },
       data: { lastSeenAt: new Date() },
     });
-    return { deviceId: device.id };
+    return { deviceId: device.id, evicted: null };
+  }
+
+  /** C79 §2.2: kaydı yapan oturumun cihaz adı (yalnız sahibine gösterilir). */
+  private async sessionLabel(sessionId: string): Promise<string | null> {
+    const s = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      select: { device: true },
+    });
+    return s?.device ? s.device.slice(0, E2EE_DEVICE_LABEL_MAX) : null;
   }
 
   /** Tüketilmemiş (son çare hariç) KeyPackage sayısı. */
@@ -175,6 +211,10 @@ export class E2eeDevicesService {
       }),
       this.identityOf(userId),
     ]);
+    // 🔴 C79 §2.2: etiket ve son kullanım YALNIZ kendi listende. Sohbet ettiğin kişi cihaz modelini ve ne zaman
+    // kullandığını görmez; başkasının listesinde bu alanlar hiç yoktur.
+    const own = callerId === userId;
+    const activity = own ? await activityByDevice(this.prisma, userId, devices) : null;
     // E7 Rev.1: dizi yerine nesne. Bu ucu bugün hiçbir istemci çağırmıyor (grep, 2026-11-23); geçiş düzeni gerekmez.
     return {
       identity,
@@ -184,6 +224,9 @@ export class E2eeDevicesService {
         signatureKey: toB64(d.signatureKey),
         createdAt: d.createdAt.toISOString(),
         ...identitySigView(d, this.flag.identity),
+        ...(activity
+          ? { label: d.label, activityAt: activity.get(d.id)?.toISOString() ?? null }
+          : {}),
       })),
     };
   }

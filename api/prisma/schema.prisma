@@ -1027,6 +1027,7 @@ model E2eeDevice {
   user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenFamily     String?          @unique // refresh rotasyonunda sabit; zincir bitince cihaz iptal (§2.6). C69: çıkışta null (park)
   platform        String // 'web' | 'android'
+  label           String? // C79: kayıttaki oturumun cihaz adı (ör. "Android - Xiaomi ..."). YALNIZ sahibine döner
   signatureKey    Bytes // MLS leaf imza açık anahtarı (Ed25519, 32 bayt)
   createdAt       DateTime         @default(now())
   lastSeenAt      DateTime         @default(now())

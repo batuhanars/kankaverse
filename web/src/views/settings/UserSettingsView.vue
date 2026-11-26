@@ -38,6 +38,7 @@ import QuickReactionsSection from './components/QuickReactionsSection.vue'
 import ConnectionsSection from './components/ConnectionsSection.vue'
 import BackupSection from './components/BackupSection.vue'
 import IdentitySection from './components/IdentitySection.vue'
+import E2eeDeviceLimitNotice from './components/E2eeDeviceLimitNotice.vue'
 import { integrationsApi } from '@/api/integrations'
 import AnimatedClipModal from '@/components/shared/AnimatedClipModal.vue'
 
@@ -678,6 +679,9 @@ async function toggleReadReceipts(next: boolean) {
                     </button>
                   </div>
                 </section>
+
+                <!-- C79: cihaz sınırı yüzünden E2EE açılamadıysa (yoksa çizilmez) -->
+                <E2eeDeviceLimitNotice @open-sessions="editModal = 'sessions'" />
 
                 <!-- E5a: Sohbet yedeği (yedek bayrağı kapalıysa çizilmez) -->
                 <BackupSection />

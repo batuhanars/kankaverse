@@ -1,4 +1,5 @@
 import http from './axios'
+import { announceEvicted } from '@/lib/e2ee/deviceNotices'
 import type {
   BackupInfo,
   E2eeApi,
@@ -10,6 +11,7 @@ import type {
   ExistingMeta,
   IdentityMaterial,
   E2eeWelcomeRow,
+  EvictedDevice,
   Reauth,
   SnapshotRef,
   TransferPending,
@@ -40,8 +42,18 @@ export const e2eeApi = {
       transfer?: boolean
       identity?: boolean
     }>('/e2ee/status'),
-  registerDevice: (signatureKey: string) =>
-    http.post<{ deviceId: string }>('/e2ee/devices', { platform: 'web', signatureKey }),
+  // C79: sınır doluyken yer açmak için eski bir cihaz çıkarıldıysa kullanıcıya söylenir.
+  registerDevice: async (signatureKey: string) => {
+    const res = await http.post<{ deviceId: string; evicted?: EvictedDevice | null }>(
+      '/e2ee/devices',
+      {
+        platform: 'web',
+        signatureKey,
+      },
+    )
+    announceEvicted(res.data.evicted)
+    return res
+  },
   available: () => http.get<{ available: number }>('/e2ee/devices/me'),
   // C69: çıkışta park edilen cihazı yeni oturuma bağla.
   rebindChallenge: () => http.post<{ nonce: string }>('/e2ee/devices/rebind/challenge'),

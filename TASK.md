@@ -4636,3 +4636,15 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] mobile: canlı liste (store), sıkı satır + detay ekranı, detayda seen, Tümünü reddet (Rev.7 c)
 - [x] mobile: rail rozeti kökü (bulgu: arka planda soket kapatılıyor, yeniden bağlanınca DM listesi tazelenmiyordu, `unread` bayat; rozet ayrıca ikondan önce çiziliyordu) + DM / istek / kanka toplamı (Rev.7 c)
 - [x] Doğrulama + sahip diff onayı (R7) → deploy → APK (yerel cihaz turu geçti 2026-11-26; tur bulgusu: başlık rozeti yalnız görülmemişi sayar, hepsi görülünce kaybolur)
+
+## Sprint C79 — E2EE cihaz hijyeni (sınır dolunca boştaki cihazı çıkar, ölü oturum temizliği) — 2026-11-26
+
+> Sözleşme: `contracts/SPRINT_C79_E2EE_DEVICE_HYGIENE_CONTRACT.md`. api + shared + web + mobile. 🔴 R7: diff sahibe sunulur, commit onayla.
+
+- [x] api: kayıtta 7 günlük boştaki cihazı çıkarma + `evicted` yanıtı + audit (§2.1)
+- [x] api: `E2eeDevice.label` + migration, kendi listende `label`/`activityAt` (§2.2)
+- [x] api: `sweepDeadSessions` + günlük iş (§2.3) (uygulama: `auth/session-sweep.job.ts`)
+- [x] shared: tipler + `ownDevices` (§3)
+- [x] web: çıkarma toast'u, sınır uyarısı, etiketli cihaz listesi (§4)
+- [x] mobile: aynı üçü (§5)
+- [x] Doğrulama (§7) + sahip turu + R7 diff onayı → deploy → AAB (yerel tur 2026-11-26: çıkarma, sınır uyarısı, etiketli liste geçti; tur bulgusu: sınırda bir kez bildirim eksikti, eklendi)

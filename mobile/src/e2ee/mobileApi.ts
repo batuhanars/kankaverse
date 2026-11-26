@@ -12,8 +12,10 @@ import type {
   TransferView,
   E2eeIdentityInfo,
   E2eeUserDevice,
+  EvictedDevice,
 } from '@kankaverse/e2ee-client'
 import http from '@/api/http'
+import { announceEvicted } from '@/e2ee/deviceNotices'
 
 type TransferStep = { id: string; status: TransferStatus }
 type TransferBlobRef = { size: number; sha256: string }
@@ -23,8 +25,15 @@ export const mobileE2eeApi: E2eeApi = {
     http.get<{ enabled: boolean; franking?: boolean; backup?: boolean; transfer?: boolean; identity?: boolean }>(
       '/e2ee/status',
     ),
-  registerDevice: (signatureKey) =>
-    http.post<{ deviceId: string }>('/e2ee/devices', { platform: 'android', signatureKey }),
+  // C79: sınır doluyken yer açmak için eski bir cihaz çıkarıldıysa kullanıcıya söylenir.
+  registerDevice: async (signatureKey) => {
+    const res = await http.post<{ deviceId: string; evicted?: EvictedDevice | null }>('/e2ee/devices', {
+      platform: 'android',
+      signatureKey,
+    });
+    announceEvicted(res.data.evicted);
+    return res;
+  },
   available: () => http.get<{ available: number }>('/e2ee/devices/me'),
   // C69: çıkışta park edilen cihazı yeni oturuma bağla (hata kodu `response.data.error`).
   rebindChallenge: () => http.post<{ nonce: string }>('/e2ee/devices/rebind/challenge'),

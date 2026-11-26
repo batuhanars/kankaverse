@@ -22,6 +22,8 @@ export default function AccountSecurityScreen() {
   const user = useAuthStore((s) => s.user);
   const backupEnabled = useE2eeBackupStore((s) => s.state?.enabled === true);
   const identityEnabled = useE2eeStore((s) => s.engine?.identity?.enabled === true);
+  // C79: cihaz sınırı yüzünden E2EE açılamadı; eskiden sessizdi (yedek/kimlik satırları hiç çıkmıyordu).
+  const deviceLimit = useE2eeStore((s) => s.deviceLimit);
 
   if (!user) return null;
 
@@ -81,6 +83,18 @@ export default function AccountSecurityScreen() {
           ) : null}
         </View>
 
+        {deviceLimit ? (
+          <Pressable
+            style={styles.limitBox}
+            onPress={() => router.push('/security-sessions')}
+            accessibilityRole="button"
+          >
+            <Text style={styles.limitTitle}>{t('e2ee.devices.limitTitle')}</Text>
+            <Text style={styles.limitBody}>{t('e2ee.devices.limitBody')}</Text>
+            <Text style={styles.limitAction}>{t('e2ee.devices.openSessions')}</Text>
+          </Pressable>
+        ) : null}
+
         {/* Yıkıcı eylem ayrı grupta ve en altta: yanlışlıkla dokunma mesafesini artırır. */}
         <Text style={styles.sectionTitle}>{t('security.deleteAccount.title')}</Text>
         <View style={styles.group}>
@@ -132,6 +146,18 @@ function Row({
 }
 
 const styles = StyleSheet.create({
+  limitBox: {
+    marginTop: theme.layout.panelGap,
+    padding: theme.layout.panelGap,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+    backgroundColor: theme.colors.bgSidebar,
+    gap: 6,
+  },
+  limitTitle: { color: theme.colors.textPrimary, fontSize: theme.fontSize.base, fontWeight: '600' },
+  limitBody: { color: theme.colors.textSecondary, fontSize: theme.fontSize.sm, lineHeight: 20 },
+  limitAction: { color: theme.colors.accent500, fontSize: theme.fontSize.sm, fontWeight: '600' },
   flex: { flex: 1, backgroundColor: theme.colors.bgContent },
   body: {
     padding: theme.layout.panelGap * 1.5,

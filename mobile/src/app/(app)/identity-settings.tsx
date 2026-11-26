@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import type { OwnDeviceView } from '@kankaverse/e2ee-client';
 import { useE2eeStore } from '@/stores/e2ee';
 import { startNewTransfer, useE2eeTransferStore } from '@/stores/e2eeTransfer';
+import { deviceName } from '@/e2ee/deviceNotices';
+import { formatAgo } from '@/utils/formatAgo';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -55,8 +57,6 @@ export default function IdentitySettingsScreen() {
   const canVerify = hasIdentity && !thisVerified && transferAvailable;
   // §4.6: yalnız bu cihaz kimliği taşımıyorsa anlamlı (taşıyorsa diğer cihazları kendisi doğrulatabilir).
   const canReset = hasIdentity && !holdsKey;
-  const platformLabel = (p: string) =>
-    p === 'android' ? t('e2ee.identity.platformAndroid') : t('e2ee.identity.platformWeb');
 
   return (
     <View style={styles.flex}>
@@ -71,10 +71,18 @@ export default function IdentitySettingsScreen() {
           ) : (
             devices.map((d, i) => (
               <View key={d.deviceId} style={[styles.device, i < devices.length - 1 && styles.rowDivider]}>
-                <Text style={styles.deviceName} numberOfLines={1}>
-                  {platformLabel(d.platform)}
-                  {d.current ? <Text style={styles.thisDevice}>{`  ·  ${t('e2ee.identity.thisDevice')}`}</Text> : null}
-                </Text>
+                <View style={styles.deviceText}>
+                  <Text style={styles.deviceName} numberOfLines={1}>
+                    {deviceName(d)}
+                    {d.current ? <Text style={styles.thisDevice}>{`  ·  ${t('e2ee.identity.thisDevice')}`}</Text> : null}
+                  </Text>
+                  {/* C79: hangi satırın hangi cihaz olduğu ve ne zaman kullanıldığı (yalnız kendi listende gelir) */}
+                  {d.activityAt && !d.current ? (
+                    <Text style={styles.lastActive}>
+                      {t('e2ee.devices.lastActive', { ago: formatAgo(d.activityAt) })}
+                    </Text>
+                  ) : null}
+                </View>
                 <Text style={[styles.status, d.verified ? styles.verified : styles.unverified]}>
                   {d.verified ? t('e2ee.identity.deviceVerified') : t('e2ee.identity.deviceUnverified')}
                 </Text>
@@ -131,7 +139,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.layout.panelGap,
     paddingVertical: 8,
   },
-  deviceName: { flex: 1, color: theme.colors.textPrimary, fontSize: theme.fontSize.base, fontWeight: '600' },
+  deviceText: { flex: 1, minWidth: 0 },
+  deviceName: { color: theme.colors.textPrimary, fontSize: theme.fontSize.base, fontWeight: '600' },
+  lastActive: { marginTop: 2, color: theme.colors.textMuted, fontSize: theme.fontSize.xs },
   thisDevice: { color: theme.colors.textMuted, fontSize: theme.fontSize.sm, fontWeight: '400' },
   status: { fontSize: theme.fontSize.sm, fontWeight: '600' },
   verified: { color: theme.colors.online },

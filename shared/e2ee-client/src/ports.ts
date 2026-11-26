@@ -111,6 +111,16 @@ export interface E2eeUserDevice {
   createdAt: string
   identitySig: string | null
   identityVersion: number | null
+  /** C79: yalnız KENDİ listende gelir (oturumun cihaz adı, son kullanım). Başkasının listesinde alan yoktur. */
+  label?: string | null
+  activityAt?: string | null
+}
+
+/** C79: sınır doluyken yer açmak için çıkarılan cihaz (`POST /e2ee/devices` yanıtı). */
+export interface EvictedDevice {
+  platform: string
+  label: string | null
+  activityAt: string
 }
 
 /** E7: kimlik kurulum/sıfırlama gövdesi. İmzalar yalnız çağıranın kendi etkin cihazlarına. */
@@ -144,7 +154,7 @@ export interface E2eeApi {
     Reply<{ enabled: boolean; franking?: boolean; backup?: boolean; transfer?: boolean; identity?: boolean }>
   >
   /** Platform bilgisini (web/android) adaptör ekler; motor bilmez. */
-  registerDevice(signatureKey: string): Promise<Reply<{ deviceId: string }>>
+  registerDevice(signatureKey: string): Promise<Reply<{ deviceId: string; evicted?: EvictedDevice | null }>>
   available(): Promise<Reply<{ available: number }>>
   /** C69: park cihazı yeniden bağlama. Nonce base64(32 bayt), 2 dk, tek kullanımlık. */
   rebindChallenge(): Promise<Reply<{ nonce: string }>>

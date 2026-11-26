@@ -9,6 +9,7 @@ import { isDepartedGroup } from '@/e2ee/departed';
 import { clearDeviceNotices, loadDeviceNotices } from '@/stores/e2eeNotices';
 import { t } from '@/i18n';
 import { e2eeErrorTag } from '@/e2ee/errorTag';
+import { announceDeviceLimit, isDeviceLimit } from '@/e2ee/deviceNotices';
 
 /**
  * E1 mobil istemcinin tek girişi (web `stores/e2ee.ts` karşılığı). Motor (shared/e2ee-client) arayüzden
@@ -21,9 +22,17 @@ interface E2eeState {
   channels: Record<string, ChannelInfo>;
   /** Yeni düz metin depoya yazılınca artar; DM listesi önizlemesi buna bağlıdır (E3 Rev.5). */
   plainTick: number;
+  /** C79: bu cihaz hesabın cihaz sınırı yüzünden kaydolamadı (Hesap güvenliği uyarısı). */
+  deviceLimit: boolean;
 }
 
-export const useE2eeStore = create<E2eeState>(() => ({ engine: null, warnings: {}, channels: {}, plainTick: 0 }));
+export const useE2eeStore = create<E2eeState>(() => ({
+  engine: null,
+  warnings: {},
+  channels: {},
+  plainTick: 0,
+  deviceLimit: false,
+}));
 
 const set = useE2eeStore.setState;
 const get = useE2eeStore.getState;
@@ -45,13 +54,20 @@ export const markDecrypted = () => set((s) => ({ plainTick: s.plainTick + 1 }));
 export function initE2ee(userId: string): Promise<void> {
   if (get().engine?.userId === userId) return ready;
   ready = (async () => {
+    set({ deviceLimit: false });
     try {
       const engine = await startMobileEngine(userId, setWarning);
       set({ engine });
       await engine?.onWelcome();
     } catch (e) {
       // İçerik yok: yalnız hata türü. Rastgelelik yoksa buraya düşer, E2EE başlamaz (§5).
-      console.error('[E2EE] başlatılamadı', e2eeErrorTag(e));
+      const tag = e2eeErrorTag(e);
+      console.error('[E2EE] başlatılamadı', tag);
+      // C79: 7 gün içinde kullanılmış 10 cihaz varken kayıt reddedilir; sessiz kalmasın (Hesap güvenliği uyarısı).
+      if (isDeviceLimit(tag)) {
+        set({ deviceLimit: true });
+        announceDeviceLimit();
+      }
     }
   })();
   return ready;

@@ -9,6 +9,7 @@ import { useI18n } from 'vue-i18n'
 import type { OwnDeviceView } from '@kankaverse/e2ee-client'
 import { useAuthStore } from '@/stores/auth'
 import { useE2eeStore } from '@/stores/e2ee'
+import { agoText, deviceName } from '@/lib/e2ee/deviceNotices'
 import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
 import { useToastStore } from '@/stores/toast'
 import KvButton from '@/components/ui/KvButton.vue'
@@ -57,8 +58,6 @@ const canVerify = computed(() => hasIdentity.value && !thisVerified.value && tra
 // §4.6: yalnız bu cihaz kimliği taşımıyorsa anlamlı (taşıyorsa diğer cihazları kendisi doğrulatabilir).
 const canReset = computed(() => hasIdentity.value && !holdsKey.value)
 
-const platformLabel = (p: string) =>
-  p === 'android' ? t('e2ee.identity.platformAndroid') : t('e2ee.identity.platformWeb')
 
 async function onReauth(reauth: { currentPassword: string; totpCode?: string }): Promise<void> {
   const id = identity.value
@@ -97,9 +96,15 @@ async function onReauth(reauth: { currentPassword: string; totpCode?: string }):
         :key="d.deviceId"
         class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-3"
       >
-        <span class="text-[14px] min-w-0" style="color: var(--kv-text-secondary);">
-          {{ platformLabel(d.platform) }}
-          <span v-if="d.current" class="text-[12px]" style="color: var(--kv-text-muted);">· {{ t('e2ee.identity.thisDevice') }}</span>
+        <span class="flex flex-col min-w-0">
+          <span class="text-[14px] truncate" style="color: var(--kv-text-secondary);">
+            {{ deviceName(d) }}
+            <span v-if="d.current" class="text-[12px]" style="color: var(--kv-text-muted);">· {{ t('e2ee.identity.thisDevice') }}</span>
+          </span>
+          <!-- C79: hangi satırın hangi cihaz olduğu ve ne zaman kullanıldığı (yalnız kendi listende gelir) -->
+          <span v-if="d.activityAt && !d.current" class="text-[12px]" style="color: var(--kv-text-muted);">
+            {{ t('e2ee.devices.lastActive', { ago: agoText(d.activityAt) }) }}
+          </span>
         </span>
         <span
           class="text-[13px] font-medium"

@@ -15,7 +15,14 @@ function setup(flag = { identity: false }) {
       count: jest.fn().mockResolvedValue(0),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
+    session: {
+      findUnique: jest.fn().mockResolvedValue({ device: 'Android - Test Model' }),
+      groupBy: jest.fn().mockResolvedValue([]),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    auditLog: { create: jest.fn().mockResolvedValue({}) },
     e2eeKeyPackage: {
       count: jest.fn().mockResolvedValue(0),
       deleteMany: jest.fn(),
@@ -41,6 +48,7 @@ describe('E2eeDevicesService.register (§2.3)', () => {
 
     await expect(svc.register(USER, { platform: 'web', signatureKey: KEY_B64 })).resolves.toEqual({
       deviceId: 'dev-1',
+      evicted: null,
     });
     expect(prisma.e2eeDevice.create.mock.calls[0][0].data).toMatchObject({
       userId: 'u1',
@@ -59,6 +67,7 @@ describe('E2eeDevicesService.register (§2.3)', () => {
     });
     await expect(svc.register(USER, { platform: 'web', signatureKey: KEY_B64 })).resolves.toEqual({
       deviceId: 'dev-1',
+      evicted: null,
     });
     expect(prisma.e2eeDevice.create).not.toHaveBeenCalled();
   });
@@ -79,6 +88,7 @@ describe('E2eeDevicesService.register (§2.3)', () => {
     const { prisma, svc } = setup();
     prisma.e2eeDevice.findUnique.mockResolvedValue(null);
     prisma.e2eeDevice.count.mockResolvedValue(10);
+    prisma.e2eeDevice.findMany.mockResolvedValue([]);
     await expect(
       svc.register(USER, { platform: 'android', signatureKey: KEY_B64 }),
     ).rejects.toMatchObject({ status: 422, response: { error: 'E2EE_DEVICE_LIMIT' } });
@@ -101,6 +111,7 @@ describe('E2eeDevicesService.register (§2.3)', () => {
     );
     await expect(svc.register(USER, { platform: 'web', signatureKey: KEY_B64 })).resolves.toEqual({
       deviceId: 'dev-w',
+      evicted: null,
     });
   });
 
@@ -114,6 +125,142 @@ describe('E2eeDevicesService.register (§2.3)', () => {
     await expect(
       svc.register(USER, { platform: 'web', signatureKey: KEY_B64 }),
     ).rejects.toMatchObject({ status: 403, response: { error: 'E2EE_DEVICE_REQUIRED' } });
+  });
+});
+
+describe('C79 §2.1 — sınır dolunca boştaki cihazı çıkarma (R7)', () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const ago = (days: number) => new Date(Date.now() - days * DAY);
+  /** 10 etkin cihaz; `over` ile bazılarının etkinliği değiştirilir. */
+  function rows(
+    over: Record<string, { lastSeenAt?: Date; parkedAt?: Date | null; fam?: string | null }>,
+  ) {
+    return Array.from({ length: 10 }, (_, i) => {
+      const id = `d${i}`;
+      const o = over[id] ?? {};
+      return {
+        id,
+        tokenFamily: o.fam === undefined ? `f${i}` : o.fam,
+        platform: 'android',
+        label: `Model ${i}`,
+        lastSeenAt: o.lastSeenAt ?? ago(1),
+        parkedAt: o.parkedAt ?? null,
+      };
+    });
+  }
+
+  it('7 günden eski adaylardan EN ESKİSİ çıkarılır: ailesinin oturumları kapanır, paketleri silinir, audit yazılır', async () => {
+    const { prisma, notify, svc } = setup();
+    prisma.e2eeDevice.findUnique.mockResolvedValue(null);
+    prisma.e2eeDevice.count.mockResolvedValue(10);
+    prisma.e2eeDevice.findMany.mockResolvedValue(
+      rows({ d3: { lastSeenAt: ago(8) }, d7: { lastSeenAt: ago(20) } }),
+    );
+    prisma.session.groupBy.mockResolvedValue([
+      { tokenFamily: 'f3', _max: { lastActiveAt: ago(9) } },
+      { tokenFamily: 'f7', _max: { lastActiveAt: ago(21) } },
+    ]);
+    prisma.e2eeDevice.create.mockResolvedValue({ id: 'yeni' });
+
+    const res = await svc.register(USER, { platform: 'android', signatureKey: KEY_B64 });
+
+    expect(res).toMatchObject({
+      deviceId: 'yeni',
+      evicted: { platform: 'android', label: 'Model 7' },
+    });
+    expect(prisma.session.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'u1', tokenFamily: 'f7', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(prisma.e2eeKeyPackage.deleteMany).toHaveBeenCalledWith({
+      where: { device: { id: 'd7', userId: 'u1' } },
+    });
+    expect(prisma.e2eeDevice.updateMany.mock.calls[0][0].where).toMatchObject({
+      id: 'd7',
+      userId: 'u1',
+    });
+    expect(prisma.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      action: 'e2ee.device.evict',
+      entityId: 'd7',
+    });
+    expect(prisma.e2eeDevice.create.mock.calls[0][0].data.label).toBe('Android - Test Model');
+    expect(notify.devicesChanged).toHaveBeenCalledWith('u1');
+  });
+
+  it('cihaz açılmasa da oturumu son 7 günde yenilenmişse aday DEĞİL → 422, hiçbir şey değişmez', async () => {
+    const { prisma, svc } = setup();
+    prisma.e2eeDevice.findUnique.mockResolvedValue(null);
+    prisma.e2eeDevice.count.mockResolvedValue(10);
+    prisma.e2eeDevice.findMany.mockResolvedValue(rows({ d2: { lastSeenAt: ago(30) } }));
+    prisma.session.groupBy.mockResolvedValue([
+      { tokenFamily: 'f2', _max: { lastActiveAt: ago(1) } },
+    ]);
+
+    await expect(
+      svc.register(USER, { platform: 'android', signatureKey: KEY_B64 }),
+    ).rejects.toMatchObject({ status: 422, response: { error: 'E2EE_DEVICE_LIMIT' } });
+    expect(prisma.session.updateMany).not.toHaveBeenCalled();
+    expect(prisma.e2eeDevice.updateMany).not.toHaveBeenCalled();
+    expect(prisma.e2eeDevice.create).not.toHaveBeenCalled();
+  });
+
+  it('park cihazın etkinliği parkedAt: 10 gün önce park edilen çıkarılır, oturum kapatma işlemi yok', async () => {
+    const { prisma, svc } = setup();
+    prisma.e2eeDevice.findUnique.mockResolvedValue(null);
+    prisma.e2eeDevice.count.mockResolvedValue(10);
+    prisma.e2eeDevice.findMany.mockResolvedValue(
+      rows({ d5: { fam: null, lastSeenAt: ago(12), parkedAt: ago(10) } }),
+    );
+    prisma.e2eeDevice.create.mockResolvedValue({ id: 'yeni' });
+
+    const res = await svc.register(USER, { platform: 'web', signatureKey: KEY_B64 });
+    expect(res.evicted).toMatchObject({ label: 'Model 5' });
+    expect(prisma.session.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('sınır dolu değilken çıkarma denenmez', async () => {
+    const { prisma, svc } = setup();
+    prisma.e2eeDevice.findUnique.mockResolvedValue(null);
+    prisma.e2eeDevice.count.mockResolvedValue(9);
+    prisma.e2eeDevice.create.mockResolvedValue({ id: 'yeni' });
+    await svc.register(USER, { platform: 'web', signatureKey: KEY_B64 });
+    expect(prisma.e2eeDevice.findMany).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('C79 §2.2 — etiket ve son kullanım yalnız sahibine (gizlilik)', () => {
+  const dev = {
+    id: 'd1',
+    platform: 'android',
+    label: 'Android - Test Model',
+    signatureKey: KEY,
+    createdAt: new Date(),
+    lastSeenAt: new Date(),
+    parkedAt: null,
+    tokenFamily: 'f1',
+    identitySig: null,
+    identityVersion: null,
+  };
+
+  it('kendi listemde label + activityAt var', async () => {
+    const { prisma, svc } = setup();
+    prisma.e2eeDevice.findMany.mockResolvedValue([dev]);
+    const out = await svc.listUserDevices('u1', 'u1');
+    expect(out.devices[0]).toMatchObject({
+      label: 'Android - Test Model',
+      activityAt: expect.any(String),
+    });
+  });
+
+  it('başkasının listesinde label ve activityAt HİÇ yok', async () => {
+    const { prisma, svc } = setup();
+    prisma.channelMember.findFirst.mockResolvedValue({ id: 'm' });
+    prisma.e2eeDevice.findMany.mockResolvedValue([dev]);
+    const out = await svc.listUserDevices('u2', 'u1');
+    expect(out.devices[0]).not.toHaveProperty('label');
+    expect(out.devices[0]).not.toHaveProperty('activityAt');
+    expect(prisma.session.groupBy).not.toHaveBeenCalled();
   });
 });
 

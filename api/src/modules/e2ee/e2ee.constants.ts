@@ -12,6 +12,10 @@ export const E2EE_PUSH_COMMIT_MAX = 2;
 export const E2EE_PUSH_DATA_MAX_BYTES = 3800;
 
 export const E2EE_MAX_ACTIVE_DEVICES = 10;
+/** C79: sınır doluyken yalnız bu kadar gündür kullanılmamış cihaz çıkarılabilir. */
+export const E2EE_EVICT_IDLE_DAYS = 7;
+/** C79: cihaz etiketi (oturumun cihaz adı) en çok bu kadar karakter saklanır. */
+export const E2EE_DEVICE_LABEL_MAX = 100;
 export const E2EE_KEY_PACKAGES_PER_CALL = 50;
 export const E2EE_KEY_PACKAGES_PENDING_MAX = 100;
 export const E2EE_CLAIM_MAX_DEVICES = 20;
