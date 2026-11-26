@@ -4593,3 +4593,14 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Doğrulama komutları (§7)
 - [x] Sahip diff onayı (R7) → commit → deploy (2026-11-26)
 - [ ] Sahip cihaz turu (§7, 5 adım)
+
+## Sprint C76 — Aktif cihaz kuralı (bildirim yalnız bakmadığın cihaza) — 2026-11-26
+
+> Sözleşme: `contracts/SPRINT_C76_ACTIVE_DEVICE_NOTIFICATIONS_CONTRACT.md`. api + web + mobile. PresenceService değişmez. Dev checkbox işaretler, item EKLEMEZ.
+
+- [ ] api: handshake `client`, `ClientActivityService`, `client:activity`, `client:mobile_foreground` (§2.1, §2.2)
+- [ ] api: mesaj türü push bastırma, aramalar ve E2EE_TRANSFER hariç, spec'ler (§2.3)
+- [ ] web: handshake + aktiflik bildirimi, mobil ön plandayken OS bildirimi ve ses yok, read:self ile OS bildirimi kapanır (§3)
+- [ ] mobile: handshake + AppState aktiflik (§4)
+- [ ] Doğrulama komutları (§6)
+- [ ] Sahip cihaz turu (§6, 6 adım)

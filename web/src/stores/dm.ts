@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { dmApi } from '@/api/dm'
 import { useAuthStore } from '@/stores/auth'
 import type {
@@ -17,6 +17,17 @@ export const useDmStore = defineStore('dm', () => {
   // C9 — Mesaj İstekleri (bana gelen bekleyen istekler)
   const requests = ref<MessageRequestDto[]>([])
   const requestCount = computed(() => requests.value.length)
+
+  // Oturum kullanıcısı değişince (çıkış = undefined, ya da başka hesap) kullanıcıya özel durum
+  // sıfırlanır; yoksa önceki hesabın yerel giden-PENDING kanalı yeni hesabın listesine sızar.
+  watch(
+    () => useAuthStore().user?.id,
+    () => {
+      channels.value = []
+      requests.value = []
+      activeDmChannelId.value = null
+    },
+  )
 
   async function fetchRequests() {
     const res = await dmApi.getRequests()
@@ -42,7 +53,18 @@ export const useDmStore = defineStore('dm', () => {
 
   async function fetchChannels() {
     const res = await dmApi.getChannels()
-    channels.value = res.data
+    // Sunucu PENDING istek kanallarını listeye HİÇ koymaz (C9 filtresi). Yerelde `openChannel` ile
+    // eklenmiş giden bekleyen kanal sunucu cevabında yoktur; ezmeyelim, yoksa DM ekranı boşalır.
+    // Sunucu aynı kanalı döndürürse (ör. ACCEPTED) sunucununki geçerli.
+    const serverIds = new Set(res.data.map((c) => c.id))
+    const keptPending = channels.value.filter(
+      (c) =>
+        !serverIds.has(c.id) &&
+        c.type === 'DM' &&
+        c.requestStatus === 'PENDING' &&
+        c.requestOutgoing === true,
+    )
+    channels.value = [...keptPending, ...res.data]
     // 🔴 Açık sohbetin rozeti sunucu yanıtıyla GERİ GELMESİN (mobilde sahip bulgusu
     // 2026-08-12, aynı kusur sınıfı burada da duruyordu — `applyActivity` listede olmayan bir
     // kanal görünce bu fonksiyonu çağırıyor). Sunucu `unread`i `lastReadAt`e göre hesaplıyor;
@@ -72,6 +94,12 @@ export const useDmStore = defineStore('dm', () => {
   function applyRequestAccepted(channelId: string) {
     const ch = channels.value.find((c) => c.id === channelId)
     if (ch?.type === 'DM' && ch.requestStatus === 'PENDING') ch.requestStatus = 'ACCEPTED'
+  }
+
+  /** C75 §2.7 — WS `dm.request_resolved`: gelen isteği başka cihazımda çözdüm. Listeden düşer; kabulse DM listesi tazelenir. Idempotent. */
+  function applyRequestResolved(channelId: string, outcome: 'accepted' | 'rejected') {
+    requests.value = requests.value.filter((r) => r.channelId !== channelId)
+    if (outcome === 'accepted') void fetchChannels().catch(() => {})
   }
 
   /** C62 — ayrıldığım/çıkarıldığım grup: sunucu bu kanalda okundu/gönderme/tepki kapılarını kapatır (403). */
@@ -422,6 +450,7 @@ export const useDmStore = defineStore('dm', () => {
     activeDmChannelId,
     requests,
     requestCount,
+    applyRequestResolved,
     fetchRequests,
     acceptRequest,
     rejectRequest,

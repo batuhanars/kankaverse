@@ -368,6 +368,11 @@ function ensureSocket(): Socket {
     useDmStore.getState().applyRequestAccepted(data.channelId);
   });
 
+  // C75 §2.7 — gelen isteği başka cihazımda kabul/ret ettim: istek ekranından düşer.
+  socket.on('dm.request_resolved', (data: { channelId: string; outcome: 'accepted' | 'rejected' }) => {
+    useDmStore.getState().applyRequestResolved(data.channelId, data.outcome);
+  });
+
   // Sprint M2a §6 — ortam kanallarında rail/kanal listesi rozetlerinin canlı kaynağı. Bugüne kadar
   // (M1a-M1j) bu olay hiç dinlenmiyordu; Home sekmesi oturum boyunca mount'lu kaldığı için kullanıcı
   // ana ekranda otururken rozetler hiç artmıyordu — yalnız ekran odaklanınca REST'ten geliyordu.

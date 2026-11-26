@@ -25,7 +25,11 @@ export default function DmRequestsScreen() {
   // C75: bildirim/push `?channel=<id>` ile gelir; o istek listenin başına alınıp vurgulanır.
   const { channel: focusChannelId } = useLocalSearchParams<{ channel?: string }>();
   const [state, setState] = useState<LoadState>('loading');
-  const [items, setItems] = useState<MessageRequestDto[]>([]);
+  const [fetched, setItems] = useState<MessageRequestDto[]>([]);
+  // C75 §2.7: başka cihazda çözülen istek store'dan düşer (`applyRequestResolved`); ekran yerel listeyi
+  // store'daki güncel kimliklerle süzer, böylece istek ekrandan da kalkar.
+  const liveRequests = useDmStore((s) => s.requests);
+  const items = fetched.filter((r) => liveRequests.some((l) => l.channelId === r.channelId));
   const [errorMessage, setErrorMessage] = useState('');
   const [notice, setNotice] = useState('');
   const [actingId, setActingId] = useState<string | null>(null);
@@ -198,7 +202,7 @@ export default function DmRequestsScreen() {
         />
       )}
 
-      {blockTarget && (
+      {blockTarget && items.some((r) => r.channelId === blockTarget.channelId) && (
         <ConfirmDialog
           title={t('messageRequests.blockConfirmTitle')}
           message={t('messageRequests.blockConfirmMessage', {

@@ -101,6 +101,8 @@ const e2eeMock = { planSend: jest.fn(), planEdit: jest.fn() };
 // C75: örtük kabulde mesaj isteği bildirimi okundu işaretlenir
 const notificationsActionedMock = { markMessageRequestActioned: jest.fn() };
 
+const realtimeResolvedMock = { emitToUser: jest.fn() };
+
 function makeService() {
   return new MessagesService(
     prismaMock as any,
@@ -111,6 +113,7 @@ function makeService() {
     moderationMock as any,
     e2eeMock as any,
     notificationsActionedMock as any,
+    realtimeResolvedMock as any,
   );
 }
 
@@ -3544,6 +3547,12 @@ describe('MessagesService.create — C9 mesaj isteği kapısı', () => {
       RECIPIENT,
       PENDING_CH,
     );
+    // C75 §2.7: alıcının diğer cihazlarına istek temizliği olayı
+    expect(realtimeResolvedMock.emitToUser).toHaveBeenCalledWith(
+      RECIPIENT,
+      'dm.request_resolved',
+      { channelId: PENDING_CH, outcome: 'accepted' },
+    );
   });
 
   it('istek sahibi ilk mesaj → bildirimi okundu işaretleme çağrılmaz (örtük kabul değil)', async () => {
@@ -3554,6 +3563,7 @@ describe('MessagesService.create — C9 mesaj isteği kapısı', () => {
     await service.create(REQUESTER, PENDING_CH, DTO);
 
     expect(notificationsActionedMock.markMessageRequestActioned).not.toHaveBeenCalled();
+    expect(realtimeResolvedMock.emitToUser).not.toHaveBeenCalled();
   });
 });
 

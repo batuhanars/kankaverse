@@ -25,6 +25,7 @@ import {
 import { E2eeMessageService, E2eeSendPlan } from '../e2ee/e2ee-message.service';
 import { toB64 } from '../e2ee/e2ee.util';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { Attachment, Message, MessageReaction, Prisma, ScanStatus, User } from '@prisma/client';
@@ -284,6 +285,8 @@ export class MessagesService {
     private e2ee: E2eeMessageService,
     // C75: alıcının cevabıyla örtük kabulde mesaj isteği bildirimi okundu işaretlenir.
     private notifications?: NotificationsService,
+    // C75 §2.7: örtük kabulde alıcının diğer cihazlarına istek temizliği olayı.
+    private realtime?: RealtimeService,
   ) {
     this.scanEnabled = config.get<boolean>('attachmentScanEnabled') ?? false;
   }
@@ -754,6 +757,10 @@ export class MessagesService {
           data: { dmRequestStatus: 'ACCEPTED' },
         });
         await this.notifications?.markMessageRequestActioned(userId, channelId);
+        this.realtime?.emitToUser(userId, 'dm.request_resolved', {
+          channelId,
+          outcome: 'accepted',
+        });
       }
     }
 

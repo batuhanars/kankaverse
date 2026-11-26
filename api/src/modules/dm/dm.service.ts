@@ -1449,6 +1449,8 @@ export class DmService {
       throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
     // C75 §2.6: gönderenin kilitli kutusu açılsın (yalnız durum senkronu; bildirim/push yok).
     this.realtime.emitToUser(channel.dmRequesterId!, 'dm.request_accepted', { channelId });
+    // C75 §2.7: alıcının diğer cihazlarında istek ekrandan düşsün.
+    this.realtime.emitToUser(userId, 'dm.request_resolved', { channelId, outcome: 'accepted' });
     return this.toDmChannelDto(channelId, other, userId);
   }
 
@@ -1473,6 +1475,8 @@ export class DmService {
       }
     });
     await this.notifications?.markMessageRequestActioned(userId, channelId);
+    // C75 §2.7: alıcının diğer cihazlarında istek ekrandan düşsün (engelle dahil).
+    this.realtime.emitToUser(userId, 'dm.request_resolved', { channelId, outcome: 'rejected' });
     return null;
   }
 }

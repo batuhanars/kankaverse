@@ -863,6 +863,11 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     expect(realtimeMock.emitToUser).toHaveBeenCalledWith(TARGET, 'dm.request_accepted', {
       channelId: CH,
     });
+    // C75 §2.7: alıcıya (SENDER) diğer cihazları için çözüldü olayı
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(SENDER, 'dm.request_resolved', {
+      channelId: CH,
+      outcome: 'accepted',
+    });
   });
 
   it('acceptMessageRequest: istek SAHİBİ kendi isteğini kabul edemez → FORBIDDEN', async () => {
@@ -922,6 +927,11 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     expect(prismaMock.userBlock.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ create: { blockerId: SENDER, blockedId: TARGET } }),
     );
+    // C75 §2.7: alıcının diğer cihazları için çözüldü olayı
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(SENDER, 'dm.request_resolved', {
+      channelId: CH,
+      outcome: 'rejected',
+    });
   });
 
   it('rejectMessageRequest block=false: kanal soft-delete, engelleme YOK', async () => {

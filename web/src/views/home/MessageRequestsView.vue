@@ -53,6 +53,12 @@ watch(
   },
 )
 
+// C75 §2.7: seçili istek başka cihazda çözülüp listeden düştüyse seçim sıradaki isteğe (yoksa boş) geçer.
+watch(requests, (list) => {
+  if (loading.value || !selectedChannelId.value) return
+  if (!list.some((r) => r.channelId === selectedChannelId.value)) selectedChannelId.value = list[0]?.channelId ?? null
+})
+
 function formatTime(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })

@@ -50,6 +50,8 @@ interface DmState {
   refreshRequests: () => Promise<void>;
   /** C75 §2.6: `dm.request_accepted` — giden isteğim kabul edildi, kutunun kilidi kalkar. */
   applyRequestAccepted: (channelId: string) => void;
+  /** C75 §2.7: başka cihazda çözülen gelen isteği düşür; `accepted` ise DM listesini tazele. Idempotent. */
+  applyRequestResolved: (channelId: string, outcome: 'accepted' | 'rejected') => void;
   /**
    * Sprint M3b R6 — mesaj isteğini reddet; `block: true` ise sunucu aynı işlemde **engeller**.
    *
@@ -126,6 +128,14 @@ function outgoingPending(list: DmChannelDto[]): string[] {
   return list.filter((c) => c.type === 'DM' && c.requestStatus === 'PENDING' && c.requestOutgoing === true).map((c) => c.id);
 }
 
+/** C75: sunucu `GET /dm/channels` PENDING istekleri HİÇ döndürmez; yenileme giden-bekleyen kimlikleri
+ *  silmesin. Sunucu listesinden hesaplananlara, listede (hiçbir durumla) görünmeyen önceki kimlikler
+ *  eklenir; listede ACCEPTED görünen düşer. */
+function mergeOutgoing(prev: string[], list: DmChannelDto[]): string[] {
+  const seen = new Set(list.map((c) => c.id));
+  return [...outgoingPending(list), ...prev.filter((id) => !seen.has(id))];
+}
+
 /** C75: tek kanal için giden-bekleyen kimlik listesini günceller (istek ise ekle, değilse çıkar). */
 function syncOutgoing(ids: string[], channel: DmChannelDto): string[] {
   const rest = ids.filter((id) => id !== channel.id);
@@ -159,7 +169,7 @@ export const useDmStore = create<DmState>((set, get) => ({
         ),
         requestCount: requests.length,
         requests,
-        outgoingPendingIds: outgoingPending(list),
+        outgoingPendingIds: mergeOutgoing(s.outgoingPendingIds, list),
         state: 'ready' as LoadState,
         errorMessage: '',
       }));
@@ -183,6 +193,14 @@ export const useDmStore = create<DmState>((set, get) => ({
         ? { outgoingPendingIds: s.outgoingPendingIds.filter((id) => id !== channelId) }
         : s,
     );
+  },
+
+  applyRequestResolved(channelId, outcome) {
+    set((s) => {
+      const requests = s.requests.filter((r) => r.channelId !== channelId);
+      return requests.length === s.requests.length ? s : { requests, requestCount: requests.length };
+    });
+    if (outcome === 'accepted') void get().fetchAll();
   },
 
   async rejectRequest(channelId, block) {

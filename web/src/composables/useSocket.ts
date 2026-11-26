@@ -374,6 +374,14 @@ export function useSocket() {
       dmStore.applyRequestAccepted(data.channelId)
     })
 
+    // C75 §2.7 — gelen isteği başka cihazımda kabul/ret ettim: istek listesinden düşer
+    socket.on(
+      'dm.request_resolved',
+      (data: { channelId: string; outcome: 'accepted' | 'rejected' }) => {
+        dmStore.applyRequestResolved(data.channelId, data.outcome)
+      },
+    )
+
     // friend.* event'leri YALNIZ friends store senkronu için kalır (arkadaş listesi).
     // Bell artık bunlardan beslenmiyor → kalıcı `notification` event'i kullanır (Sprint C1).
     socket.on('friend.request', (request: FriendRequestDto) => {

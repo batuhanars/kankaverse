@@ -59,6 +59,20 @@ Reddedince gönderene bildirim gitmemesi **doğru**, değişmez. Alıcı istek e
   gönderenin kilitli kutusu başka hiçbir olayla açılmıyordu. Ret için olay YOK (§0, bilinçli).
 - Örtük kabulde (alıcı cevap yazınca) olay gerekmez: gönderene zaten `dm.message` gidiyor, istemci onu ACCEPTED sayar.
 
+### §2.7 Rev.3 (2026-11-26): alıcının diğer cihazlarında istek temizliği
+Sahip bulgusu: masaüstünde reddedilen istek mobilde (ve tersi) istek ekranında kalıyor.
+- Alıcı isteği çözünce **alıcının kendisine** (tüm soketleri: `emitToUser(userId, ...)`) `dm.request_resolved`
+  `{ channelId, outcome: 'accepted' | 'rejected' }`. Çağrı yerleri: `acceptMessageRequest` (accepted),
+  `rejectMessageRequest` (rejected, engelle dahil), `messages.service` C9 örtük kabul dalı (accepted).
+- İstemci (web + mobil): `requests`ten o kanalı düşürür (sayaç dahil); `accepted` ise DM listesini tazeler
+  (web `fetchChannels`, mobil `fetchAll`). İşlemi yapan cihazda zaten yerel olarak düşmüştür: işleyici idempotent.
+- Bildirim/push YOK. İstek sahibine giden olaylar değişmez (§2.6).
+
+### Rev.2 (2026-11-26): giden istek sohbeti boş açılıyordu
+Sunucu PENDING kanalları DM listesinde döndürmez; web `fetchChannels` ve mobil `fetchAll` yerelde açılmış giden
+bekleyen kanalı (mobilde kimliğini) sunucu cevabında yoksa korur; sunucu döndürürse onunki geçerli. Web dm store'u
+oturum kullanıcısı değişince sıfırlanır (hesap değişiminde sızıntı yok).
+
 ### §2.5 Spec'ler
 `getMessageRequests` (mesajsız kanal görünmez), bildirim üretimi (ilk mesajda bir kez, 24 sa sınırı), push gövdesi
 (içeriksiz), actioned işaretleme. `tsc -p tsconfig.build.json` + ilgili jest.
