@@ -11,9 +11,10 @@ import GameLogo from '@/components/shared/GameLogo.vue'
 import PresenceDot from '@/components/shared/PresenceDot.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import FullProfileModal from '@/components/shared/FullProfileModal.vue'
+import ContextMenuShell from '@/components/shared/ContextMenuShell.vue'
 import { usersApi } from '@/api/users'
 import { useToastStore } from '@/stores/toast'
-import type { UserProfileCardDto } from '@/types'
+import type { FriendDto, UserProfileCardDto } from '@/types'
 
 const props = defineProps<{ initialTab?: 'all' | 'pending' | 'blocked' }>()
 const emit = defineEmits<{ addFriend: []; openDm: [channelId: string] }>()
@@ -30,7 +31,36 @@ const hoveredFriendId = ref<string | null>(null)
 
 type Tab = 'all' | 'pending' | 'blocked'
 const activeTab = ref<Tab>(props.initialTab ?? 'all')
-const openMenuId = ref<string | null>(null)
+// Kanka menüsü: ⋯ butonu ve satıra sağ tık aynı menüyü açar (DmList deseni).
+// Paylaşılan kabuk body'ye teleport eder; satır içi menü transform'lu hover kabının
+// katman bağlamına hapsolup kapatma perdesinin altında kalıyordu (tık perdeye gidiyordu).
+const menuFriend = ref<FriendDto | null>(null)
+const menuX = ref(0)
+const menuY = ref(0)
+const openMenuId = computed(() => menuFriend.value?.friendshipId ?? null)
+
+function closeMenu() {
+  menuFriend.value = null
+}
+
+function onRowContext(e: MouseEvent, f: FriendDto) {
+  e.preventDefault()
+  e.stopPropagation()
+  menuX.value = e.clientX
+  menuY.value = e.clientY
+  menuFriend.value = f
+}
+
+function onDotsClick(e: MouseEvent, f: FriendDto) {
+  if (menuFriend.value?.friendshipId === f.friendshipId) {
+    closeMenu()
+    return
+  }
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  menuX.value = r.right - 4
+  menuY.value = r.bottom + 4
+  menuFriend.value = f
+}
 const dmLoading = ref<string | null>(null)
 const confirmState = ref<{ show: boolean; message: string; action: () => Promise<void> }>({
   show: false, message: '', action: async () => {},
@@ -81,7 +111,7 @@ function presenceStatusColor(userId: string): string {
 }
 
 async function openDm(userId: string) {
-  openMenuId.value = null
+  closeMenu()
   dmLoading.value = userId
   try {
     const channel = await dmStore.openChannel(userId)
@@ -95,7 +125,7 @@ async function openDm(userId: string) {
 const profileCard = ref<UserProfileCardDto | null>(null)
 
 async function openProfile(userId: string) {
-  openMenuId.value = null
+  closeMenu()
   try {
     const { data } = await usersApi.getCard(userId)
     profileCard.value = data
@@ -105,9 +135,20 @@ async function openProfile(userId: string) {
 }
 
 function openConfirm(message: string, action: () => Promise<void>) {
-  openMenuId.value = null
+  closeMenu()
   confirmState.value = { show: true, message, action }
   confirmLoading.value = false
+}
+
+// Kullanıcı kimliği burada sabitlenir: openConfirm menüyü kapatıp menuFriend'i boşaltıyor.
+function askRemove(f: FriendDto) {
+  const userId = f.user.id
+  openConfirm(t('friends.confirmRemove'), () => friendsStore.removeFriend(userId))
+}
+
+function askBlock(f: FriendDto) {
+  const userId = f.user.id
+  openConfirm(t('friends.confirmBlock'), () => friendsStore.blockUser(userId))
 }
 
 async function runConfirm() {
@@ -122,9 +163,6 @@ async function runConfirm() {
 </script>
 
 <template>
-  <!-- Dropdown kapatan overlay -->
-  <div v-if="openMenuId" class="fixed inset-0 z-10" @click="openMenuId = null" />
-
   <aside
     class="shrink-0 flex flex-col overflow-hidden relative rounded-none mb-0 mr-0 xl:rounded-[var(--kv-radius-lg)] xl:mb-4 xl:mr-4"
     style="width: var(--kv-friends-panel-width); max-width: 100vw; background-color: var(--kv-bg-sidebar);"
@@ -223,6 +261,7 @@ async function runConfirm() {
               class="group relative flex items-center gap-2.5 px-3 mx-1 py-2.5 rounded-[var(--kv-radius-md)] hover:bg-[var(--kv-bg-elevated)]"
               @mouseenter="hoveredFriendId = f.friendshipId"
               @mouseleave="hoveredFriendId = null"
+              @contextmenu="onRowContext($event, f)"
             >
               <!-- Avatar + presence noktası -->
               <div class="relative shrink-0">
@@ -266,38 +305,15 @@ async function runConfirm() {
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                   </svg>
                 </button>
-                <div class="relative">
-                  <button
-                    class="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer hover:bg-[var(--kv-bg-content)]"
-                    style="color: var(--kv-text-secondary);"
-                    @click.stop="openMenuId = openMenuId === f.friendshipId ? null : f.friendshipId"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
-                    </svg>
-                  </button>
-                  <div
-                    v-if="openMenuId === f.friendshipId"
-                    class="absolute right-0 top-full mt-1 w-44 rounded-[var(--kv-radius-md)] border py-1 z-20"
-                    style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle); box-shadow: 0 4px 16px rgba(0,0,0,0.3);"
-                  >
-                    <button
-                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
-                      style="color: var(--kv-text-primary);"
-                      @click.stop="openDm(f.user.id)"
-                    >{{ t('friends.dm') }}</button>
-                    <button
-                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
-                      style="color: var(--kv-text-primary);"
-                      @click.stop="openConfirm(t('friends.confirmRemove'), () => friendsStore.removeFriend(f.user.id))"
-                    >{{ t('friends.remove') }}</button>
-                    <button
-                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
-                      style="color: var(--kv-danger);"
-                      @click.stop="openConfirm(t('friends.confirmBlock'), () => friendsStore.blockUser(f.user.id))"
-                    >{{ t('friends.block') }}</button>
-                  </div>
-                </div>
+                <button
+                  class="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer hover:bg-[var(--kv-bg-content)]"
+                  style="color: var(--kv-text-secondary);"
+                  @click.stop="onDotsClick($event, f)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
+                  </svg>
+                </button>
               </div>
             </div>
           </template>
@@ -316,6 +332,7 @@ async function runConfirm() {
               class="group relative flex items-center gap-2.5 px-3 mx-1 py-2.5 rounded-[var(--kv-radius-md)] hover:bg-[var(--kv-bg-elevated)]"
               @mouseenter="hoveredFriendId = f.friendshipId"
               @mouseleave="hoveredFriendId = null"
+              @contextmenu="onRowContext($event, f)"
             >
               <!-- Avatar + presence noktası -->
               <div class="relative shrink-0">
@@ -359,38 +376,15 @@ async function runConfirm() {
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                   </svg>
                 </button>
-                <div class="relative">
-                  <button
-                    class="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer hover:bg-[var(--kv-bg-content)]"
-                    style="color: var(--kv-text-secondary);"
-                    @click.stop="openMenuId = openMenuId === f.friendshipId ? null : f.friendshipId"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
-                    </svg>
-                  </button>
-                  <div
-                    v-if="openMenuId === f.friendshipId"
-                    class="absolute right-0 top-full mt-1 w-44 rounded-[var(--kv-radius-md)] border py-1 z-20"
-                    style="background-color: var(--kv-bg-sidebar); border-color: var(--kv-border-subtle); box-shadow: 0 4px 16px rgba(0,0,0,0.3);"
-                  >
-                    <button
-                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
-                      style="color: var(--kv-text-primary);"
-                      @click.stop="openDm(f.user.id)"
-                    >{{ t('friends.dm') }}</button>
-                    <button
-                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
-                      style="color: var(--kv-text-primary);"
-                      @click.stop="openConfirm(t('friends.confirmRemove'), () => friendsStore.removeFriend(f.user.id))"
-                    >{{ t('friends.remove') }}</button>
-                    <button
-                      class="w-full flex items-center px-3 py-2 text-[13px] cursor-pointer text-left hover:bg-[var(--kv-bg-elevated)]"
-                      style="color: var(--kv-danger);"
-                      @click.stop="openConfirm(t('friends.confirmBlock'), () => friendsStore.blockUser(f.user.id))"
-                    >{{ t('friends.block') }}</button>
-                  </div>
-                </div>
+                <button
+                  class="w-7 h-7 rounded-full flex items-center justify-center cursor-pointer hover:bg-[var(--kv-bg-content)]"
+                  style="color: var(--kv-text-secondary);"
+                  @click.stop="onDotsClick($event, f)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>
+                  </svg>
+                </button>
               </div>
             </div>
           </template>
@@ -522,6 +516,32 @@ async function runConfirm() {
       @close="profileCard = null"
       @open-dm="(id: string) => { profileCard = null; emit('openDm', id) }"
     />
+
+    <ContextMenuShell
+      v-if="menuFriend"
+      :x="menuX"
+      :y="menuY"
+      menu-id="friend-row"
+      @close="closeMenu"
+    >
+      <button class="kv-ctx__item" role="menuitem" @click="openDm(menuFriend.user.id)">
+        <span>{{ t('friends.dm') }}</span>
+      </button>
+      <button
+        class="kv-ctx__item"
+        role="menuitem"
+        @click="askRemove(menuFriend)"
+      >
+        <span>{{ t('friends.remove') }}</span>
+      </button>
+      <button
+        class="kv-ctx__item kv-ctx__item--danger"
+        role="menuitem"
+        @click="askBlock(menuFriend)"
+      >
+        <span>{{ t('friends.block') }}</span>
+      </button>
+    </ContextMenuShell>
 
     <ConfirmDialog
       v-if="confirmState.show"
