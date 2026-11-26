@@ -15,9 +15,13 @@ describe('ClientActivityService', () => {
     expect(parseClientKind('ios')).toBe('unknown');
   });
 
-  it('bağlanınca aktif; setActive(false) ve kopunca masaüstü aktif değil', () => {
+  it('web/desktop bağlanınca aktif DEĞİL; client:activity true sonrası aktif; setActive(false) ve kopunca değil', () => {
     const { service } = make();
     service.register('c1', 'u1', 'desktop');
+    service.register('c0', 'u0', 'web');
+    expect(service.isDesktopActive('u1')).toBe(false);
+    expect(service.isDesktopActive('u0')).toBe(false);
+    service.setActive('c1', true);
     expect(service.isDesktopActive('u1')).toBe(true);
     service.setActive('c1', false);
     expect(service.isDesktopActive('u1')).toBe(false);
@@ -37,6 +41,8 @@ describe('ClientActivityService', () => {
     const { service } = make();
     service.register('c1', 'u1', 'web');
     service.register('c2', 'u1', 'desktop');
+    service.setActive('c1', true);
+    service.setActive('c2', true);
     service.setActive('c1', false);
     expect(service.isDesktopActive('u1')).toBe(true);
   });
@@ -85,23 +91,35 @@ describe('ClientActivityService', () => {
     it.each(suppressed)('aktif masaüstünde %s atlanır, boştakine gider', (type) => {
       const { service } = make();
       service.register('c1', 'active', 'desktop');
+      service.setActive('c1', true);
       service.register('c2', 'idle', 'web');
-      service.setActive('c2', false);
       expect(service.filterPushRecipients(['active', 'idle', 'nobody'], type)).toEqual([
         'idle',
         'nobody',
       ]);
     });
 
+    it('mobil ön plandayken masaüstü aktif olsa da push gider', () => {
+      const { service } = make();
+      service.register('c1', 'u1', 'desktop');
+      service.setActive('c1', true);
+      service.register('m1', 'u1', 'mobile');
+      expect(service.filterPushRecipients(['u1'], 'DM_MESSAGE')).toEqual(['u1']);
+      service.setActive('m1', false);
+      expect(service.filterPushRecipients(['u1'], 'DM_MESSAGE')).toEqual([]);
+    });
+
     it.each(['incoming_call', 'E2EE_TRANSFER'])('%s asla atlanmaz', (type) => {
       const { service } = make();
       service.register('c1', 'active', 'desktop');
+      service.setActive('c1', true);
       expect(service.filterPushRecipients(['active'], type)).toEqual(['active']);
     });
 
     it('sınıflandırılmamış tür bastırılmaz', () => {
       const { service } = make();
       service.register('c1', 'active', 'desktop');
+      service.setActive('c1', true);
       expect(service.filterPushRecipients(['active'], 'YENI_TUR')).toEqual(['active']);
     });
 

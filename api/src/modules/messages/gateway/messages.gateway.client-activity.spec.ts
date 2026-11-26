@@ -15,6 +15,8 @@ describe('MessagesGateway client:activity', () => {
     activity.register('s1', 'u1', 'desktop');
     const socket = { id: 's1', data: { userId: 'u1' } } as any;
     expect(gateway.handleClientActivity(socket, { active: 'yes' })).toEqual({ ok: false });
+    expect(activity.isDesktopActive('u1')).toBe(false); // Rev.1: bağlanınca aktif değil
+    expect(gateway.handleClientActivity(socket, { active: true })).toEqual({ ok: true });
     expect(activity.isDesktopActive('u1')).toBe(true);
     expect(gateway.handleClientActivity(socket, { active: false })).toEqual({ ok: true });
     expect(activity.isDesktopActive('u1')).toBe(false);

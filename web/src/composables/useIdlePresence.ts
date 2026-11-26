@@ -1,10 +1,23 @@
-import { watch } from 'vue'
-import { useIdle } from '@vueuse/core'
+import { computed, watch, type Ref } from 'vue'
+import { useIdle, useDocumentVisibility } from '@vueuse/core'
 import { usePresenceStore } from '@/stores/presence'
 import { useSocket, sendClientActivity } from '@/composables/useSocket'
 
 /** Hareketsizlik eşiği: bu süre etkileşim olmazsa "Boşta"ya düş. */
 const IDLE_TIMEOUT_MS = 5 * 60_000 // 5 dk
+
+/**
+ * C76 Rev.1: pencere "aktif" = görünür VE 5 dk içinde hareket (tek hesap, tek `useIdle` kaynağı).
+ * Tepsiye gizlenen/simge durumundaki/arka plandaki pencere hemen pasif olur; görünür olunca idle
+ * değilse hemen aktif. Manuel DND/Boşta seçimi bunu etkilemez. Değer sunucuya her değişimde
+ * (ve ilk çağrıda) gider; bağlanma/yeniden bağlanmada `useSocket` son değeri tekrar yollar.
+ */
+export function useClientActivitySync(idle: Ref<boolean>) {
+  const visibility = useDocumentVisibility()
+  const clientActive = computed(() => visibility.value === 'visible' && !idle.value)
+  watch(clientActive, (active) => sendClientActivity(active), { immediate: true })
+  return clientActive
+}
 
 /**
  * Auto-boşta presence — kullanıcı bir süre hareketsiz kalınca durumu 'away'a düşürür,
@@ -40,9 +53,7 @@ export function useIdlePresence() {
     // `messages.gateway.ts`). Buraya tahmin yazmak, düzeltmek için uğraştığımız yalanın ta kendisi.
   }
 
-  // C76: aynı `idle` kaynağı aktif cihaz kuralına da beslenir (ikinci zamanlayıcı yok). Manuel
-  // DND/Boşta seçimi bunu etkilemez: yalnız gerçek hareketsizlik sayılır.
-  watch(idle, (isIdle) => sendClientActivity(!isIdle))
+  useClientActivitySync(idle)
 
   watch(
     [idle, () => presenceStore.manualStatus],

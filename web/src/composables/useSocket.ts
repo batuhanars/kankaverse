@@ -96,8 +96,9 @@ export function sendActivity(payload: ActivityPayload) {
 }
 
 // C76 §3 — bu penceredeki aktiflik (hareketsizlik algısı `useIdlePresence`'te, tek `useIdle` kaynağı).
-// Son değer saklanır: yeniden bağlanınca tekrar gönderilir. Başlangıç true (sunucu da bağlanınca true sayar).
-let lastClientActive = true
+// Son değer saklanır: yeniden bağlanınca tekrar gönderilir. Rev.1: başlangıç false (sunucu da web/desktop'u pasif başlatır;
+// `useClientActivitySync` ilk çağrıda gerçek değeri yollar).
+let lastClientActive = false
 export function sendClientActivity(active: boolean) {
   lastClientActive = active
   socket?.emit('client:activity', { active })

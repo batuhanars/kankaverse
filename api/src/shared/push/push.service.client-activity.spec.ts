@@ -12,7 +12,10 @@ const configMock = {
 
 function make(desktopActive: boolean) {
   const activity = new ClientActivityService({ emitToUser: jest.fn() } as any);
-  if (desktopActive) activity.register('c1', 'u1', 'desktop');
+  if (desktopActive) {
+    activity.register('c1', 'u1', 'desktop');
+    activity.setActive('c1', true);
+  }
   return new PushService(prismaMock as any, configMock as any, undefined, activity);
 }
 

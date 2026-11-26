@@ -59,6 +59,17 @@ sistem bildirimi çıkıyor. Kullanıcı zaten baktığı cihazdan başka bir ci
 - `AppState` değişiminde `client:activity` gönderilir; yeniden bağlanınca mevcut değer tekrar gönderilir.
 - Başka değişiklik yok (K3 telefon tarafı mevcut).
 
+## §4b Rev.1 (2026-11-26): tepside masaüstü aktif sayılmaz, ön plandaki telefon her zaman alır
+Sahip bulgusu: masaüstü tepsideyken (pencere gizli) ve telefon uygulaması ön plandayken bile telefona hiç push gelmedi.
+Kök: web/desktop bağlantısı bağlanınca `active: true` başlıyor ve yalnız 5 dk hareketsizlikle düşüyordu; gizli
+pencere "aktif" sayılıyordu.
+- **web/desktop aktiflik tanımı:** `document.visibilityState === 'visible'` VE 5 dk içinde hareket. Pencere gizlenince
+  (tepsi, simge durumu, arka plan sekmesi) hemen `client:activity { active: false }`; görünür olunca idle değilse `true`.
+- **Sunucu bağlanma varsayılanı:** web/desktop bağlantı `active: false` başlar; istemci bağlanınca gerçek değeri gönderir
+  (gizli açılan masaüstü yanlışlıkla aktif sayılmasın). Mobil bağlantı `active: true` başlar (ön planda bağlanır).
+- **Bastırma kuralı:** `isDesktopActive(alıcı) && !isMobileForeground(alıcı)` ise atlanır. Telefon ön plandaysa push
+  her durumda gider.
+
 ## §5 Kapsam dışı
 Telefon ön plandayken telefona gelen uygulama içi bildirimler (zaten mevcut kural). Birden çok masaüstü arasında
 bastırma. Kullanıcıya bu kuralı açıp kapatan ayar. Çok instance'lı sunucu (aktiflik Redis'e taşınmaz, presence borcuyla aynı).

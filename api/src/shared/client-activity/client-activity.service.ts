@@ -28,10 +28,13 @@ export class ClientActivityService {
 
   constructor(private realtime: RealtimeService) {}
 
-  /** Bağlanan pencere aktif sayılır. */
+  /**
+   * C76 Rev.1: web/desktop `active: false` başlar (tepsiye gizli açılan pencere aktif sayılmasın;
+   * istemci bağlanınca gerçek değeri yollar). Mobil ön planda bağlanır → `active: true`.
+   */
   register(connectionId: string, userId: string, client: ClientKind): void {
     const before = this.isMobileForeground(userId);
-    this.connections.set(connectionId, { userId, client, active: true });
+    this.connections.set(connectionId, { userId, client, active: client === 'mobile' });
     this.emitMobileTransition(userId, before);
   }
 
@@ -63,7 +66,8 @@ export class ClientActivityService {
 
   /**
    * §2.3 — push alıcı süzgeci (tek yer). `type` = push `data.type`. Aktif masaüstü/web'i olan
-   * alıcılar bastırılan türlerde çıkarılır; arama ve E2EE_TRANSFER her zaman geçer.
+   * VE telefonu ön planda olmayan alıcılar bastırılan türlerde çıkarılır (Rev.1); arama ve
+   * E2EE_TRANSFER her zaman geçer.
    */
   filterPushRecipients(userIds: string[], type: string | undefined): string[] {
     const decision = classifyPushType(type);
@@ -72,7 +76,7 @@ export class ClientActivityService {
       this.logger.warn(`Sınıflandırılmamış push türü '${type}': bastırılmıyor (push-suppression.ts)`);
     }
     if (decision !== 'suppress') return userIds;
-    return userIds.filter((id) => !this.isDesktopActive(id));
+    return userIds.filter((id) => !(this.isDesktopActive(id) && !this.isMobileForeground(id)));
   }
 
   private anyActive(userId: string, kind: (c: ClientKind) => boolean): boolean {
