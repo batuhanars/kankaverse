@@ -6,8 +6,8 @@ import { t } from '@/i18n';
 
 /** C81 §1: tek seferde en çok bu kadar mesaj seçilir (toplu silme tek onayla). */
 export const SELECTION_MAX = 50;
-/** Seçim başlarken kısa titreşim (WhatsApp gibi; kaydırarak yanıttaki `SwipeToReply` ile aynı süre). */
-const HAPTIC_MS = 10;
+/** Seçim başlarken WhatsApp gibi hızlı çift titreşim: [bekle, titret, ara, titret] ms (Android desen biçimi). Tek 10 ms çoğu cihazda hissedilmiyordu. */
+const HAPTIC_PATTERN = [0, 35, 70, 35];
 
 /**
  * C81 — WhatsApp tarzı seçim modu. Yalnız KİMLİKLER tutulur; mesajın güncel hâli (tepki, sabit) her çizimde
@@ -40,7 +40,7 @@ export function useMessageSelection(items: { message: MessageDto }[]) {
 
   function start(message: MessageDto) {
     if (message.localStatus) return;
-    Vibration.vibrate(HAPTIC_MS);
+    Vibration.vibrate(HAPTIC_PATTERN);
     setIds([message.id]);
   }
 

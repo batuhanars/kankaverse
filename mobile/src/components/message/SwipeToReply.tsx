@@ -15,7 +15,8 @@ import { theme } from '@/theme';
 /** C23 §0.3 — balon en fazla bu kadar sağa gider; eşik geçilince alıntı tetiklenir. */
 const MAX_DRAG = 72;
 const TRIGGER = 56;
-const HAPTIC_MS = 10;
+/** Eşik geçilince tek kısa titreşim; 10 ms çoğu cihazda hissedilmiyordu. */
+const HAPTIC_MS = 30;
 
 function buzz() {
   Vibration.vibrate(HAPTIC_MS);
