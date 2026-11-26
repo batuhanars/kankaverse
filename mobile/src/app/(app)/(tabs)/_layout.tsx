@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotificationsStore } from '@/stores/notifications';
+import { useDmStore } from '@/stores/dm';
 import { useTotalPing } from '@/stores/unread';
 import { badgeLabel } from '@/utils/badgeLabel';
 import { t } from '@/i18n';
@@ -13,6 +14,15 @@ import { theme } from '@/theme';
 export default function TabsLayout() {
   const refreshUnreadCount = useNotificationsStore((s) => s.refreshUnreadCount);
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const fetchFirstPage = useNotificationsStore((s) => s.fetchFirstPage);
+  // C75 Rev.4: rozet = okunmamış bildirimler (MESSAGE_REQUEST hariç) + bekleyen istek sayısı. Sunucu
+  // sayısı istek bildirimlerini de içerir; yüklü listeden sayılıp düşülür (liste yüklenmeden önce çift
+  // sayım olmasın diye aşağıda açılışta ilk sayfa çekilir). Fark negatife düşmez.
+  const unreadRequestNotifs = useNotificationsStore(
+    (s) => s.items.filter((n) => n.type === 'MESSAGE_REQUEST' && !n.readAt).length,
+  );
+  const requestCount = useDmStore((s) => s.requestCount);
+  const bellBadge = Math.max(0, unreadCount - unreadRequestNotifs) + requestCount;
   // Sprint M2a §4.3 — Ana Sayfa sekmesi rozeti: toplam ping (Σ ortam bahsetmeleri + okunmamış
   // DM/grup DM adedi). Bildirimler sekmesinin rozeti (`unreadCount`, yukarıda) AYRI bir sayı
   // (mention + kanka isteği + davet, `GET /notifications/unread-count`'tan) — bilinçli olarak
@@ -21,7 +31,8 @@ export default function TabsLayout() {
 
   useEffect(() => {
     refreshUnreadCount();
-  }, [refreshUnreadCount]);
+    void fetchFirstPage();
+  }, [refreshUnreadCount, fetchFirstPage]);
 
   return (
     <Tabs
@@ -46,7 +57,7 @@ export default function TabsLayout() {
         name="notifications"
         options={{
           title: t('notification.title'),
-          tabBarBadge: unreadCount > 0 ? badgeLabel(unreadCount) : undefined,
+          tabBarBadge: bellBadge > 0 ? badgeLabel(bellBadge) : undefined,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={22} color={color} />
           ),

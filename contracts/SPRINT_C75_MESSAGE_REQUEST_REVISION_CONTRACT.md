@@ -68,6 +68,17 @@ Sahip bulgusu: masaüstünde reddedilen istek mobilde (ve tersi) istek ekranınd
   (web `fetchChannels`, mobil `fetchAll`). İşlemi yapan cihazda zaten yerel olarak düşmüştür: işleyici idempotent.
 - Bildirim/push YOK. İstek sahibine giden olaylar değişmez (§2.6).
 
+### Rev.4 (2026-11-26): istek rozeti 24 saat sınırından bağımsız, mobil kısayol, şerit boşluğu
+Sahip bulgusu: tekrarlanan isteklerde zil rozeti hiç çıkmıyor; masaüstü açılır listede yalnız "Mesaj istekleri (n)"
+kısayolu var, mobilde o da yok. Kök: rozet = okunmamış bildirim sayısı; 24 sa sınırı yüzünden yeni MESSAGE_REQUEST kaydı
+üretilmeyince bekleyen istek rozete hiç yansımıyor (§3.2 kararının boşluğu).
+- **Rozet kuralı (web + mobil):** zil rozeti = okunmamış bildirimler (MESSAGE_REQUEST türü HARİÇ) + bekleyen gelen istek
+  sayısı (`requestCount`). Böylece istek her durumda bir kez sayılır, çift sayım olmaz, 24 sa sınırı yalnız push/kaydı etkiler.
+- **Mobil bildirim listesi:** web'deki "Mesaj istekleri (n)" kısayol satırının karşılığı listenin başında (istek varsa);
+  dokununca `/dm-requests`.
+- **Mobil şerit:** `composeHint` şeridi ile mesaj kutusu arasında boşluk (tema ölçüsünden, sabit sayı gömülmez).
+- api değişmez.
+
 ### Rev.2 (2026-11-26): giden istek sohbeti boş açılıyordu
 Sunucu PENDING kanalları DM listesinde döndürmez; web `fetchChannels` ve mobil `fetchAll` yerelde açılmış giden
 bekleyen kanalı (mobilde kimliğini) sunucu cevabında yoksa korur; sunucu döndürürse onunki geçerli. Web dm store'u

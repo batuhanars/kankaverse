@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { notificationsApi } from '@/api/notifications'
 import type { NotificationDto } from '@/types'
 
@@ -20,6 +20,16 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const loadingMore = ref(false)
   // İlk loadMore'a kadar REST'ten cursor alınmadı → snapshot sonrası daha eski sayfa var olabilir
   const initialFetched = ref(false)
+
+  // Okunmamış MESSAGE_REQUEST bildirimi sayısı (zil rozetinde istek `requestCount` ile sayıldığı için
+  // `unreadCount`tan düşülür). `unreadCount` sunucudan gelir ve TÜM okunmamışları kapsar; bu türev
+  // yalnız YÜKLÜ `items`tan sayılır (snapshot 50 okunmamış, sonra REST sayfaları). Yüklü olmayan
+  // okunmamış istek bildirimi varsa az sayılır, rozet en fazla o kadar fazla gösterir; kabul edilen
+  // sınır, istek nadiren 50'den fazla birikir. Alan işlemlerde (markRead/markAllRead/clearAll/ws)
+  // `items` güncellendiği için ayrıca elle tutulmaz.
+  const unreadRequestNotifCount = computed(
+    () => items.value.filter((n) => n.type === 'MESSAGE_REQUEST' && !n.readAt).length,
+  )
 
   // handshake `notification:snapshot` → okunmamışlar (take 50) + toplam okunmamış sayısı
   function applySnapshot(payload: { notifications: NotificationDto[]; unreadCount: number }) {
@@ -96,6 +106,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
   return {
     items,
     unreadCount,
+    unreadRequestNotifCount,
     nextCursor,
     loadingMore,
     applySnapshot,

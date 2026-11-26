@@ -13,6 +13,7 @@ import { getMuteDurationOptions, muteMinutesFromValue } from '@/utils/notifPrefU
 import { ChannelDetailsHeader } from '@/components/guild/ChannelDetailsHeader';
 import { PinnedMessagesList } from '@/components/guild/PinnedMessagesList';
 import { ChannelMembersTab } from '@/components/guild/ChannelMembersTab';
+import { ProfileSheet } from '@/components/profile/ProfileSheet';
 import { ChannelMediaTab } from '@/components/guild/ChannelMediaTab';
 import { ChannelLinksTab } from '@/components/guild/ChannelLinksTab';
 import { ChannelFilesTab } from '@/components/guild/ChannelFilesTab';
@@ -20,8 +21,14 @@ import { ChannelDetailsTabBar, type ChannelDetailsTab } from '@/components/guild
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
+interface ProfileTarget {
+  id: string;
+  username: string;
+  avatarUrl: string | null;
+}
+
 /**
- * Sprint M2c contract §4 — kanal detay ekranı. Sohbet başlığında kanal adına dokununca açılır (§3),
+ * Sprint M2c contract §4— kanal detay ekranı. Sohbet başlığında kanal adına dokununca açılır (§3),
  * yalnız ORTAM kanallarında (DM/grup DM başlığı kendi mevcut davranışını korur).
  *
  * Route parametreleri BİLİNÇLİ olarak yalnız `{ channelId, guildId }` (contract §3, "sapamaz") —
@@ -49,6 +56,7 @@ export default function ChannelDetailsScreen() {
 
   const [tab, setTab] = useState<ChannelDetailsTab>('members');
   const [muteSheetOpen, setMuteSheetOpen] = useState(false);
+  const [profileTarget, setProfileTarget] = useState<ProfileTarget | null>(null);
 
   const loadChannel = useCallback(() => {
     if (!guildId || !channelId) return;
@@ -225,8 +233,8 @@ export default function ChannelDetailsScreen() {
                 onRetry={loadMembers}
                 canInvite={canManage}
                 onInvite={() => router.push({ pathname: '/guild-invite', params: { id: guildId } })}
-                onOpenMember={(userId, username) =>
-                  router.push({ pathname: '/guild-member', params: { guildId, userId, name: username } })
+                onOpenMember={(userId, username, avatarUrl) =>
+                  setProfileTarget({ id: userId, username, avatarUrl })
                 }
               />
             )}
@@ -241,6 +249,16 @@ export default function ChannelDetailsScreen() {
             {tab === 'files' && <ChannelFilesTab channelId={channelId} onOpenMessage={openMessage} />}
           </View>
         </>
+      )}
+
+      {profileTarget && (
+        <ProfileSheet
+          userId={profileTarget.id}
+          username={profileTarget.username}
+          avatarUrl={profileTarget.avatarUrl}
+          guildId={guildId}
+          onClose={() => setProfileTarget(null)}
+        />
       )}
 
       {muteSheetOpen && (

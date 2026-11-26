@@ -3,6 +3,9 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { usersApi, type UserCardDto } from '@/api/users';
+import { guildsApi } from '@/api/guilds';
+import { useAuthStore } from '@/stores/auth';
+import { useGuildPermission } from '@/hooks/useGuildPermission';
 import { useDmStore } from '@/stores/dm';
 import { useFriendsStore } from '@/stores/friends';
 import { useReportStore } from '@/stores/report';
@@ -164,6 +167,33 @@ export function ProfileSheet({ userId, username, avatarUrl, guildId, onClose, on
 
   const isSelf = card?.friendStatus === 'self';
 
+  // C78 "Üyeyi yönet": koşul `/guild-member` ekranındakinin AYNISI (KICK/BAN izni ya da sahiplik
+  // devri; hedef OWNER ya da ben değilsem). Yeni kural yok, yalnız görünürlük; kapı sunucuda.
+  const canKickPermission = useGuildPermission(guildId, 'KICK_MEMBERS');
+  const canBanPermission = useGuildPermission(guildId, 'BAN_MEMBERS');
+  const [ownerId, setOwnerId] = useState<string | null>(null);
+  const myUserId = useAuthStore((s) => s.user?.id ?? null);
+  // Sahiplik, üye olduğum ortamlar listesinden (`useGuildPermission`ın da kullandığı kaynak);
+  // tüm üye listesi çekilmez. Ortam listede yoksa satır çizilmez.
+  useEffect(() => {
+    if (!guildId) return;
+    let cancelled = false;
+    guildsApi
+      .list()
+      .then((list) => {
+        if (!cancelled) setOwnerId(list.find((g) => g.id === guildId)?.ownerId ?? null);
+      })
+      .catch(() => {
+        /* yetki bilinemiyorsa satır çizilmez (kısıtlayıcı) */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [guildId]);
+  const iAmOwner = !!ownerId && ownerId === myUserId;
+  const showManage =
+    !!guildId && !isSelf && !!card && !!ownerId && ownerId !== userId && (canKickPermission || canBanPermission || iAmOwner);
+
   // Kanka Ekle: yalnız `none`. `pending_in` (karşı taraf istek atmış) için düğme yok — kabul akışı
   // istekler ekranında, burada ikinci bir kabul yüzeyi uydurulmaz. Engelliyken de gösterilmez;
   // ret zaten jenerik, sebep sızdırılmaz.
@@ -270,6 +300,21 @@ export function ProfileSheet({ userId, username, avatarUrl, guildId, onClose, on
                   </>
                 }
               />
+
+              {showManage && guildId ? (
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.manageRow}
+                  onPress={() => {
+                    onClose();
+                    router.push({ pathname: '/guild-member', params: { guildId, userId, name: username } });
+                  }}
+                >
+                  <Ionicons name="shield-outline" size={18} color={theme.colors.textPrimary} />
+                  <Text style={styles.manageText}>{t('mobile.profileSheet.manageMember')}</Text>
+                  <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+                </Pressable>
+              ) : null}
 
               {!card && !loadError && (
                 <ActivityIndicator color={theme.colors.accent500} style={styles.spinner} />
@@ -399,6 +444,23 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  manageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: theme.layout.inputMinHeight,
+    marginHorizontal: theme.layout.panelGap * 1.5,
+    marginTop: theme.layout.panelGap,
+    paddingHorizontal: theme.layout.panelGap,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.bgElevated,
+  },
+  manageText: {
+    flex: 1,
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.base,
+    fontWeight: '600',
   },
   spinner: {
     marginTop: theme.layout.panelGap,

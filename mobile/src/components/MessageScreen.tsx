@@ -746,6 +746,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     marginHorizontal: theme.layout.panelGap,
     marginTop: 6,
+    marginBottom: theme.layout.panelGap,
     paddingHorizontal: theme.layout.panelGap,
     paddingVertical: 8,
   },

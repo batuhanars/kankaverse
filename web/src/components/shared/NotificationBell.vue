@@ -11,6 +11,7 @@ import { useMessageJump } from '@/composables/useMessageJump'
 import { useAiVideoViewer } from '@/composables/useAiVideoViewer'
 import AiVideoDialog from '@/components/shared/AiVideoDialog.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import { bellBadgeCount } from '@/utils/bellBadge'
 import { reactionEmoji, reactionPreviewText } from '@/utils/reactionNotification'
 import type { NotificationDto } from '@/types'
 
@@ -25,10 +26,11 @@ const { requestJump } = useMessageJump()
 const { viewId: aiVideoViewId, openView, closeView } = useAiVideoViewer()
 
 // C9 — bekleyen mesaj istekleri çanda panelde üstte kısayol satırı olarak görünür.
-// C75: rozet YALNIZ `unreadCount`. İstek artık kalıcı `MESSAGE_REQUEST` bildirimiyle de sayılıyor;
-// `requestCount`u da eklemek aynı isteği iki kez sayardı.
+// C75 Rev.4: rozet = okunmamış bildirimler (MESSAGE_REQUEST HARİÇ) + bekleyen istek sayısı.
+// İstek `requestCount` ile sayılır; kalıcı MESSAGE_REQUEST bildirimi düşülür ki çift sayılmasın ve
+// 24 sa sınırı yüzünden yeni kayıt üretilmese de bekleyen istek rozette görünsün.
 const requestCount = computed(() => dmStore.requestCount)
-const bellBadge = computed(() => notificationsStore.unreadCount)
+const bellBadge = computed(() => bellBadgeCount(notificationsStore.unreadCount, notificationsStore.unreadRequestNotifCount, requestCount.value))
 
 function openRequests() {
   showNotifications.value = false

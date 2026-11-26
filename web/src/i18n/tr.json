@@ -2759,6 +2759,9 @@
       "muteLabel": "{name} ortamını sustur",
       "muteDesc": "Ortam susturulduğunda, senden bahsedilmediği sürece okunmamış göstergesi görünmez ve bildirim gelmez."
     },
+    "profileSheet": {
+      "manageMember": "Üyeyi yönet"
+    },
     "channelDetails": {
       "tabMembers": "Üyeler",
       "tabMedia": "Medya",

@@ -74,7 +74,7 @@ interface Props {
   /** Davet Et satırı yalnız davet üretebilenlere (mevcut `canManage` mantığı, contract §4.3). */
   canInvite: boolean;
   onInvite: () => void;
-  onOpenMember: (userId: string, username: string) => void;
+  onOpenMember: (userId: string, username: string, avatarUrl: string | null) => void;
 }
 
 export function ChannelMembersTab({
@@ -121,7 +121,7 @@ export function ChannelMembersTab({
               ? (gameByUser[item.userId]?.name ?? null)
               : null
           }
-          onPress={() => onOpenMember(item.userId, item.username)}
+          onPress={() => onOpenMember(item.userId, item.username, item.avatarUrl)}
         />
       )}
       ListEmptyComponent={<Text style={styles.empty}>{t('mobile.channelDetails.membersEmpty')}</Text>}

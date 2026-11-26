@@ -12,6 +12,7 @@ import {
   type ReactionNotifyPayload,
 } from '@/utils/reactionNotification'
 import { i18n } from '@/i18n'
+import { bellBadgeCount } from '@/utils/bellBadge'
 import { playNotificationTone } from '@/utils/notificationTone'
 import { osNotificationsSuppressed, trackOsNotification } from '@/utils/activeDevice'
 import type { NotificationDto } from '@/types'
@@ -119,11 +120,16 @@ export function useNativeNotifications() {
   )
 
   // Simge rozeti = "sana yönelik" okunmamışlar: bildirim sayısı (bahsetme + arkadaş
-  // isteği + davet) + okunmamış DM sayısı. Genel kanal mesajları BİLİNÇLİ olarak dahil
+  // isteği + davet; mesaj isteği bekleyen istek sayısıyla, çift sayılmadan) + okunmamış DM sayısı. Genel kanal mesajları BİLİNÇLİ olarak dahil
   // değil — aktif toplulukta rozetin sürekli yanıp anlamsızlaşmasını önler (Discord/Slack
   // modeli). Kanal okunmamışlığı uygulama içi rail rozetlerinde kalır.
   const badgeCount = computed(
-    () => notificationsStore.unreadCount + dmStore.channels.filter((c) => c.unread).length,
+    () =>
+      bellBadgeCount(
+        notificationsStore.unreadCount,
+        notificationsStore.unreadRequestNotifCount,
+        dmStore.requestCount,
+      ) + dmStore.channels.filter((c) => c.unread).length,
   )
   watch(
     badgeCount,

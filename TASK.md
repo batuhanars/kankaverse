@@ -4615,3 +4615,11 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Doğrulama komutları (§4)
 - [x] Sahip diff onayı (R7) → commit → deploy (2026-11-26)
 - [ ] Sahip cihaz turu (§4)
+
+## Sprint C78 — Mobilde ortam üyesine dokununca profil kartı — 2026-11-26
+
+> Sözleşme: `contracts/SPRINT_C78_MOBILE_MEMBER_PROFILE_CONTRACT.md`. Yalnız mobile. Dev checkbox işaretler, item EKLEMEZ.
+
+- [x] Üye satırı giriş noktaları ProfileSheet açar; ortam rolleri; yetkiliye "Üyeyi yönet" (§1)
+- [x] Doğrulama (§3: typecheck, eslint)
+- [ ] Sahip cihaz turu (§3, 5 adım)

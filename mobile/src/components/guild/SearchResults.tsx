@@ -31,7 +31,7 @@ interface Props {
   onOpenChannel: (channelId: string, name: string) => void;
   onOpenMessage: (channelId: string, name: string, messageId: string) => void;
   onOpenPins: (channelId: string, name: string) => void;
-  onOpenMember: (userId: string, username: string) => void;
+  onOpenMember: (userId: string, username: string, avatarUrl: string | null) => void;
 }
 
 export function SearchResults({
@@ -67,9 +67,11 @@ export function SearchResults({
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={<Text style={styles.empty}>{t('guildSearch.noMembers')}</Text>}
         renderItem={({ item }) => (
-          // Üye satırı ortam üyesi ekranına gider — o ekran zaten var (M1e) ve rol/aksiyonları
-          // gösteriyor; ikinci bir profil yüzeyi açılmıyor.
-          <Pressable onPress={() => onOpenMember(item.userId, item.username)} style={styles.row}>
+          // C78: üye satırı sohbetteki avatarla aynı profil panelini açar (ortam bağlamıyla).
+          <Pressable
+            onPress={() => onOpenMember(item.userId, item.username, item.avatarUrl)}
+            style={styles.row}
+          >
             {item.avatarUrl ? (
               <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
             ) : (

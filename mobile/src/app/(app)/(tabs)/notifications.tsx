@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import { useNotificationsStore } from '@/stores/notifications';
+import { useDmStore } from '@/stores/dm';
 import { useAiVideoViewerStore } from '@/stores/aiVideoViewer';
 import type { NotificationDto } from '@/api/notifications';
 import { t } from '@/i18n';
@@ -123,6 +124,7 @@ export default function NotificationsScreen() {
   const clearAll = useNotificationsStore((s) => s.clearAll);
 
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const requestCount = useDmStore((s) => s.requestCount);
   const hasUnread = unreadCount > 0 || items.some((n) => !n.readAt);
 
   // Liste her ODAKLANMADA tazelenir (sekme ekranları oturum boyunca mount'lu kalır, M1d-0 dersi).
@@ -255,13 +257,28 @@ export default function NotificationsScreen() {
       </View>
       <NotificationPermissionBanner />
 
+      {/* C75 Rev.4 — bekleyen mesaj istekleri kısayolu (web çanındaki satırın karşılığı) */}
+      {requestCount > 0 && (
+        <Pressable
+          style={styles.requestRow}
+          onPress={() => router.push('/dm-requests')}
+          accessibilityRole="button"
+        >
+          <Ionicons name="chatbubble-outline" size={18} color={theme.colors.accent500} />
+          <Text style={styles.requestRowText}>{t('notification.messageRequests', { n: requestCount })}</Text>
+          <View style={styles.requestRowBadge}>
+            <Text style={styles.requestRowBadgeText}>{requestCount}</Text>
+          </View>
+        </Pressable>
+      )}
+
       {loading && items.length === 0 && (
         <View style={styles.center}>
           <ActivityIndicator color={theme.colors.accent500} />
         </View>
       )}
 
-      {!loading && items.length === 0 && (
+      {!loading && items.length === 0 && requestCount === 0 && (
         <View style={styles.center}>
           <Text style={styles.empty}>{t('notification.empty')}</Text>
         </View>
@@ -395,6 +412,37 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xs,
     fontWeight: '700',
     textDecorationLine: 'underline',
+  },
+  requestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: theme.layout.panelGap,
+    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.accentSubtle,
+  },
+  requestRowText: {
+    flex: 1,
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.sm,
+    fontWeight: '600',
+  },
+  requestRowBadge: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    backgroundColor: theme.colors.accent500,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  requestRowBadgeText: {
+    color: theme.colors.textPrimary,
+    fontSize: theme.fontSize.xs,
+    fontWeight: '700',
   },
   center: {
     flex: 1,

@@ -10,6 +10,7 @@ import { SearchFilterMenu, type FilterKind } from '@/components/guild/SearchFilt
 import { FilterValueSheet } from '@/components/guild/FilterValueSheet';
 import { SearchTabs, type SearchTab } from '@/components/guild/SearchTabs';
 import { SearchResults } from '@/components/guild/SearchResults';
+import { ProfileSheet } from '@/components/profile/ProfileSheet';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -53,6 +54,11 @@ export default function GuildSearchScreen() {
   const [tokens, setTokens] = useState<SearchToken[]>(() =>
     channelId ? [{ kind: 'in', value: channelId, label: channelName ?? '' }] : [],
   );
+  const [profileTarget, setProfileTarget] = useState<{
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+  } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pickKind, setPickKind] = useState<FilterKind | null>(null);
 
@@ -216,10 +222,18 @@ export default function GuildSearchScreen() {
         onOpenPins={(channelId, name) =>
           router.push({ pathname: '/pins', params: { channelId, name } })
         }
-        onOpenMember={(userId, username) =>
-          router.push({ pathname: '/guild-member', params: { guildId, userId, name: username } })
-        }
+        onOpenMember={(userId, username, avatarUrl) => setProfileTarget({ id: userId, username, avatarUrl })}
       />
+
+      {profileTarget ? (
+        <ProfileSheet
+          userId={profileTarget.id}
+          username={profileTarget.username}
+          avatarUrl={profileTarget.avatarUrl}
+          guildId={guildId}
+          onClose={() => setProfileTarget(null)}
+        />
+      ) : null}
 
       {menuOpen ? (
         <SearchFilterMenu
