@@ -68,6 +68,12 @@ Sahip bulgusu: masaüstünde reddedilen istek mobilde (ve tersi) istek ekranınd
   (web `fetchChannels`, mobil `fetchAll`). İşlemi yapan cihazda zaten yerel olarak düşmüştür: işleyici idempotent.
 - Bildirim/push YOK. İstek sahibine giden olaylar değişmez (§2.6).
 
+### Rev.5 (2026-11-26): uygulama açıkken istek bildirimi yok
+Sahip kuralı: herhangi bir istemcide uygulama açıkken mesaj isteği sistem bildirimi üretmez. Masaüstü görünürken
+(OS toast yalnız `document.hidden` iken) ve masaüstü aktifken telefona push gitmez (C76) zaten sağlanıyordu; telefon
+ön plandayken masaüstü susuyordu (C76 K2). Eksik: telefon ön plandayken gelen istek push'u bildirim çekmecesine
+düşüyordu. Mobil `setNotificationHandler`: `MESSAGE_REQUEST` ön planda banner/liste/ses yok. 24 sa push sınırı aynen.
+
 ### Rev.4 (2026-11-26): istek rozeti 24 saat sınırından bağımsız, mobil kısayol, şerit boşluğu
 Sahip bulgusu: tekrarlanan isteklerde zil rozeti hiç çıkmıyor; masaüstü açılır listede yalnız "Mesaj istekleri (n)"
 kısayolu var, mobilde o da yok. Kök: rozet = okunmamış bildirim sayısı; 24 sa sınırı yüzünden yeni MESSAGE_REQUEST kaydı

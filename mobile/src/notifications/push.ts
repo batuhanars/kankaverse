@@ -202,6 +202,12 @@ Notifications.setNotificationHandler({
       return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false };
     }
 
+    // C75 Rev.5 (sahip kararı 2026-11-26): mesaj isteği uygulama açıkken hiçbir sistem bildirimi üretmez;
+    // istek kenar sayacı + zil rozeti + bildirim listesiyle zaten anında görünür. Arka plan/kapalı: sistem çizer.
+    if (data?.type === 'MESSAGE_REQUEST') {
+      return { shouldShowBanner: false, shouldShowList: false, shouldPlaySound: false, shouldSetBadge: false };
+    }
+
     const isMessage = isMessageType(data?.type);
     const messageChannelId = typeof data?.channelId === 'string' ? data.channelId : null;
     // "Aktif sohbet": açık DM ya da açık ortam kanalı. Kullanıcı o kanalı okurken bildirim gösterilmez.
