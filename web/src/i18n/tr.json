@@ -2587,9 +2587,22 @@
       "openFile": "Dosyayı aç",
       "showInChat": "Mesajda göster"
     },
+    "select": {
+      "count": "{n} seçili",
+      "close": "Seçimi kapat",
+      "more": "Diğer seçenekler",
+      "limit": "En fazla {n} mesaj seçebilirsin.",
+      "deleteConfirm": "{n} mesaj silinsin mi? Bu işlem geri alınamaz.",
+      "deletedPartial": "{n} mesajdan {ok} tanesi silindi.",
+      "copied": "Kopyalandı.",
+      "forwardCount": "{n} mesaj iletilecek.",
+      "forwardLimit": "Bir seferde en fazla {n} mesaj iletebilirsin."
+    },
     "attach": {
       "open": "Ek ekle",
       "files": "Dosyalar",
+      "clipboard": "Panodaki görseli ekle",
+      "clipboardEmpty": "Panoda görsel bulunamadı.",
       "title": "Ek Gönder",
       "gallery": "Galeriden Seç",
       "allAlbums": "Tüm Albümler",
@@ -2641,7 +2654,14 @@
       "uploadGif": "GIF yükle",
       "uploadGifHint": "Galerinden bir GIF seç",
       "onlyGif": "Yalnız GIF seçebilirsin",
-      "recent": "Sık kullanılanlar"
+      "recent": "Sık kullanılanlar",
+      "defaults": "Varsayılan tepkiler",
+      "defaultsEdit": "Düzenle",
+      "defaultsDone": "Bitti",
+      "defaultsHint": "Değiştirmek istediğin tepkiye dokun, sonra listeden yeni emojiyi seç.",
+      "search": "Emoji ara (İngilizce: heart, smile…)",
+      "openSearch": "Emoji ara",
+      "noResults": "Eşleşen emoji yok."
     },
     "quickReactions": {
       "title": "Hızlı tepkiler",

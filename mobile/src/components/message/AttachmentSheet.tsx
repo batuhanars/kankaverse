@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -18,6 +18,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import type * as MediaLibrary from 'expo-media-library';
 import { useMediaLibrary } from './useMediaLibrary';
 import { buildDraftAttachment, type PickedFile } from './attachmentDraft';
+import { clipboardHasImage, readClipboardImage } from './clipboardImage';
 import { sheetBottomPadding } from '../home/sheetInsets';
 import { formatClock } from '@/utils/formatClock';
 import { MAX_VIDEO_MS } from '@/utils/videoPrepare';
@@ -73,6 +74,17 @@ export function AttachmentSheet({ visible, onClose, existingCount, existingVideo
   const [selected, setSelected] = useState<MediaLibrary.Asset[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  /** C80: panoda görsel varsa satır görünür (yoksa boş düğme konmaz). Panel her açılışta yeniden sorar. */
+  const [clipImage, setClipImage] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    let alive = true;
+    void clipboardHasImage().then((has) => alive && setClipImage(has));
+    return () => {
+      alive = false;
+    };
+  }, [visible]);
 
   const remaining = MAX_ATTACHMENTS_PER_MESSAGE - existingCount - selected.length;
   const cellSize = (width - GRID_GAP * (COLUMNS - 1)) / COLUMNS;
@@ -220,6 +232,18 @@ export function AttachmentSheet({ visible, onClose, existingCount, existingVideo
     );
   }
 
+  /** C80: panodaki görsel (ekran görüntüsü vb.) aynı huniden geçer: sayı, tür ve boyut süzgeci tek yerde. */
+  async function addClipboardImage() {
+    setError('');
+    const file = await readClipboardImage().catch(() => null);
+    if (!file) {
+      setClipImage(false);
+      setError(t('mobile.attach.clipboardEmpty'));
+      return;
+    }
+    await confirmFiles([file]);
+  }
+
   /**
    * Kamera: foto ya da video (M6c §3.3.b). 🔴 İki ayrı giriş şart: `expo-image-picker` Android'de
    * karışık `mediaTypes` verilince yalnız FOTO kamerasını açıyor (`ACTION_IMAGE_CAPTURE`).
@@ -335,6 +359,19 @@ export function AttachmentSheet({ visible, onClose, existingCount, existingVideo
                  **Galeriden Seç** sistem foto seçicisini açar. Discord'daki "Anketler" maddesi
                  KONMADI: bizde anket/forum kavramı yok. */
               <View style={styles.rowGroup}>
+                {clipImage && (
+                  <Pressable
+                    onPress={() => void addClipboardImage()}
+                    disabled={busy}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('mobile.attach.clipboard')}
+                    style={styles.filesRow}
+                  >
+                    <Ionicons name="clipboard-outline" size={20} color={theme.colors.accent500} />
+                    <Text style={styles.filesRowText}>{t('mobile.attach.clipboard')}</Text>
+                    <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+                  </Pressable>
+                )}
                 <Pressable
                   onPress={openDocumentPicker}
                   accessibilityRole="button"

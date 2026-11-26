@@ -2,42 +2,29 @@ import { useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { messagesApi, type MessageDto } from '@/api/messages';
 import { extractErrorMessage } from '@/api/errors';
-import { useAuthStore } from '@/stores/auth';
 import { forgetE2eeMessage } from '@/stores/e2ee';
+import { showToast } from '@/stores/toast';
+import { t } from '@/i18n';
 
 /**
- * Mesaj panelinin akışı (M1d-C §2.4): hangi mesaja uzun basıldı, tepki aç/kapa, kopyala, sil.
+ * Mesaj eylemlerinin akışı: tepki aç/kapa, kopyala, ilet, sil, sabitle.
  *
- * `MessageScreen`den ayrı çünkü o dosya 300 satır eşiğinde duruyor ve bu akış kendi içinde kapalı.
+ * C81: eskiden tek bir "uzun basılan mesaj" (`target`) üzerinden çalışıyordu (alt panel). Artık seçim modu
+ * var: eylemler mesajı (ya da mesaj listesini) PARAMETRE olarak alır; hangi mesajların seçili olduğu
+ * `useMessageSelection`ın işi.
  *
- * 🔴 **İyimser güncelleme YOK.** Tepki eklendiğinde/kaldırıldığında yerel sayaç elle
- * değiştirilmiyor; tek yazma yolu WS `reaction.added`/`reaction.removed` olayı (bkz.
- * `realtime/socket.ts`). Sebep M1a'daki `message.created` echo dersi: hem yerel hem olaydan yazılırsa
- * aynı tepki iki kez sayılır. Silme de aynı: `message.deleted` olayı listeden düşürür.
+ * 🔴 **İyimser güncelleme YOK.** Tepki ve silme yalnız WS olayından yazılır (`reaction.added`,
+ * `message.deleted`); hem yerel hem olaydan yazılırsa aynı tepki iki kez sayılırdı (M1a echo dersi).
  */
 export function useMessageActions(channelId: string) {
-  const myId = useAuthStore((s) => s.user?.id);
-  const [target, setTarget] = useState<MessageDto | null>(null);
-  /** Panel kapandıktan sonra oluşan hatalar (sabitleme sınırı, yetki) — ekranda gösterilir. */
+  /** Eylemden sonra oluşan hatalar (sabitleme sınırı, yetki) ekranda gösterilir. */
   const [actionError, setActionError] = useState('');
-  const [deleteTarget, setDeleteTarget] = useState<MessageDto | null>(null);
+  const [deleteTargets, setDeleteTargets] = useState<MessageDto[]>([]);
   const [deleting, setDeleting] = useState(false);
-  // Tam emoji listesi ayrı bir modal; panel KAPANIP açılıyor (iç içe modal Android'de güvenilmez).
-  // Hedef mesaj bu yüzden ayrı tutulur: panel kapanınca `target` sıfırlanıyor.
+  // Tam emoji listesi, Tepkileri gör ve İlet ayrı modallar (iç içe modal Android'de güvenilmez).
   const [pickerTarget, setPickerTarget] = useState<MessageDto | null>(null);
-  // İletme de ayrı modal, aynı sebeple ayrı hedef.
-  const [forwardTarget, setForwardTarget] = useState<MessageDto | null>(null);
-
-  // C46: "Tepkileri gör" paneli de ayrı modal (iç içe modal güvenilmez); hedef ayrı tutulur.
+  const [forwardTargets, setForwardTargets] = useState<MessageDto[]>([]);
   const [reactionsTarget, setReactionsTarget] = useState<MessageDto | null>(null);
-
-  function open(message: MessageDto) {
-    setTarget(message);
-  }
-
-  function close() {
-    setTarget(null);
-  }
 
   /** Verdiğim tepkiyi kaldırır, vermediğime katılır. Hata sessiz: tepki kritik bir işlem değil. */
   function toggleReaction(message: MessageDto, emoji: string) {
@@ -49,10 +36,8 @@ export function useMessageActions(channelId: string) {
   }
 
   /**
-   * C46 §6.1 — çift dokunma. YALNIZ EKLER: kişinin bu mesajda zaten herhangi bir tepkisi varsa
-   * hiçbir şey olmaz (yanlışlıkla değiştirme/silme yok; kişi başı tek tepki). Karar mesajın
-   * `reactedByMe` bilgisiyle verilir; yazma yine yalnız WS olayından (iyimser güncelleme yok).
-   * Yerel/gönderilmemiş mesajda çağıran taraf zaten bağlamaz.
+   * C46 §6.1 — çift dokunma. YALNIZ EKLER: kişinin bu mesajda zaten tepkisi varsa hiçbir şey olmaz
+   * (kişi başı tek tepki, yanlışlıkla değiştirme yok).
    */
   function quickReact(message: MessageDto, emoji: string | undefined) {
     if (!emoji || message.localStatus) return;
@@ -60,16 +45,9 @@ export function useMessageActions(channelId: string) {
     void messagesApi.addReaction(channelId, message.id, emoji).catch(() => {});
   }
 
-  /** Panelden tam listeye geç: paneli kapat, hedefi picker'a devret. */
-  function openPicker() {
-    setPickerTarget(target);
-    setTarget(null);
-  }
-
   /**
-   * Picker'dan seçilen emoji **EKLENİR, toggle edilmez** (web `MessageItem.addReaction` ile aynı):
-   * listeden bilinçle emoji seçen kullanıcı tepki vermek istiyordur; zaten vermişse sunucu
-   * idempotent davranır. Toggle yalnız baloncuktaki pill'e dokununca çalışır.
+   * Picker'dan seçilen emoji **EKLENİR, toggle edilmez** (web `MessageItem.addReaction` ile aynı): listeden
+   * bilinçle emoji seçen kullanıcı tepki vermek istiyordur; sunucu idempotent.
    */
   function pickEmoji(emoji: string) {
     const message = pickerTarget;
@@ -78,30 +56,50 @@ export function useMessageActions(channelId: string) {
     void messagesApi.addReaction(channelId, message.id, emoji).catch(() => {});
   }
 
-  async function copyText(message: MessageDto) {
-    await Clipboard.setStringAsync(message.content);
+  /** C81 §3: tek mesajda yalnız metin; çokta kronolojik "ad: metin" satırları (metinsiz mesaj atlanır). */
+  async function copyMessages(messages: MessageDto[]) {
+    const text =
+      messages.length === 1
+        ? messages[0].content
+        : messages
+            .filter((m) => m.content.trim())
+            .map((m) => `${m.author.username}: ${m.content}`)
+            .join('\n');
+    if (!text) return;
+    await Clipboard.setStringAsync(text);
+    showToast(t('mobile.select.copied'));
   }
 
+  /**
+   * C81 §3: sırayla mevcut silme ucu; sunucu her mesajda yetkiyi yeniden denetler. Kısmi hatada
+   * başarılılar zaten `message.deleted` olayıyla düşer, kullanıcıya kaçının silindiği söylenir.
+   */
   async function confirmDelete() {
-    if (!deleteTarget) return;
+    const targets = deleteTargets;
+    if (targets.length === 0) return;
     setDeleting(true);
+    let ok = 0;
     try {
-      await messagesApi.remove(channelId, deleteTarget.id);
-      void forgetE2eeMessage(channelId, deleteTarget.id); // E5a §4.1
-      setDeleteTarget(null);
+      for (const m of targets) {
+        try {
+          await messagesApi.remove(channelId, m.id);
+          void forgetE2eeMessage(channelId, m.id); // E5a §4.1
+          ok += 1;
+        } catch {
+          // devam: diğerleri silinsin
+        }
+      }
     } finally {
       setDeleting(false);
+      setDeleteTargets([]);
     }
+    if (ok < targets.length) showToast(t('mobile.select.deletedPartial', { ok, n: targets.length }));
   }
 
   return {
-    target,
-    isMine: !!target && target.author.id === myId,
-    isPinned: !!target?.pinnedAt,
     /**
-     * Sprint M1h — sabitle/kaldır. Sunucu **idempotent** ve kanal başına **50 sınırı** koyuyor;
-     * sınır aşılırsa Türkçe mesajıyla 409 döner ve o mesaj kullanıcıya gösterilir.
-     * İyimser güncelleme YOK: sonuç zaten sokete düşüyor, iki kaynak birbiriyle yarışmasın.
+     * Sprint M1h — sabitle/kaldır. Sunucu idempotent ve kanal başına 50 sınırı koyuyor; aşılırsa
+     * Türkçe mesajıyla 409 döner ve gösterilir. İyimser güncelleme yok, sonuç sokete düşüyor.
      */
     async togglePin(message: MessageDto) {
       try {
@@ -113,30 +111,21 @@ export function useMessageActions(channelId: string) {
     },
     actionError,
     clearActionError: () => setActionError(''),
-    myEmojis: target?.reactions?.filter((r) => r.reactedByMe).map((r) => r.emoji) ?? [],
-    open,
-    close,
     toggleReaction,
     quickReact,
     reactionsTarget,
-    openReactions: (message: MessageDto) => {
-      setReactionsTarget(message);
-      setTarget(null);
-    },
+    openReactions: (message: MessageDto) => setReactionsTarget(message),
     closeReactions: () => setReactionsTarget(null),
     pickerOpen: !!pickerTarget,
-    openPicker,
+    openPicker: (message: MessageDto) => setPickerTarget(message),
     closePicker: () => setPickerTarget(null),
     pickEmoji,
-    forwardTarget,
-    openForward: () => {
-      setForwardTarget(target);
-      setTarget(null);
-    },
-    closeForward: () => setForwardTarget(null),
-    copyText,
-    deleteTarget,
-    setDeleteTarget,
+    forwardTargets,
+    openForward: (messages: MessageDto[]) => setForwardTargets(messages),
+    closeForward: () => setForwardTargets([]),
+    copyMessages,
+    deleteTargets,
+    setDeleteTargets,
     deleting,
     confirmDelete,
   };

@@ -58,11 +58,12 @@ interface TargetSection {
 const MAX_TARGETS = 5;
 
 interface Props {
-  message: MessageDto;
+  /** C81: seçim modundan birden fazla mesaj gelebilir (kronolojik); her hedefe bu sırayla gider. */
+  messages: MessageDto[];
   onClose: () => void;
 }
 
-export function ForwardMessageModal({ message, onClose }: Props) {
+export function ForwardMessageModal({ messages, onClose }: Props) {
   const bottomInset = useSheetInsets();
   const channels = useDmStore((s) => s.channels);
 
@@ -74,11 +75,13 @@ export function ForwardMessageModal({ message, onClose }: Props) {
   const [sentIds, setSentIds] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
 
+  const many = messages.length > 1;
+  const message = messages[0];
   const forwardText = message.content.trim();
   const attachments = message.attachments ?? [];
   const first = attachments[0] ?? null;
   // Metin de ek de yoksa iletilecek bir sey yok (bugunku bos durum).
-  const hasContent = !!forwardText || attachments.length > 0;
+  const hasContent = messages.some((m) => !!m.content.trim() || (m.attachments?.length ?? 0) > 0);
 
   // Onizleme kucuk resmi: video icin mesajdaki kare, gorsel icin sunucudan kisa omurlu adres.
   const previewUri = useAttachmentThumb(first);
@@ -129,15 +132,22 @@ export function ForwardMessageModal({ message, onClose }: Props) {
 
   // Bir hedefe gonderim: bugunku mantik (her ek icin sunucuda kopya, sonra normal/E2EE gonderim).
   // Biri reddedilirse hedef "gonderildi" isaretlenmez.
+  /** C81: mesajlar kronolojik sırayla tek tek gider (sıra korunur); boş mesaj atlanır. */
   async function forwardTo(channelId: string) {
-    const copies = await Promise.all(attachments.map((a) => attachmentsApi.forward(a.id)));
-    await sendMessage(
-      channelId,
-      forwardText,
-      undefined,
-      copies.map((c) => c.attachmentId),
-    );
+    for (const m of messages) {
+      const text = m.content.trim();
+      const files = m.attachments ?? [];
+      if (!text && files.length === 0) continue;
+      const copies = await Promise.all(files.map((a) => attachmentsApi.forward(a.id)));
+      await sendMessage(
+        channelId,
+        text,
+        undefined,
+        copies.map((c) => c.attachmentId),
+      );
+    }
   }
+
 
   // C68 §3: kaynak ekran bir DM sohbetiyse (`/dm/<id>`) replace, degilse push; hedef = kaynak ise yalniz kapat.
   // Hedef ortam kanalıysa paylaşım listesinin kanal rotası kullanılır.
@@ -190,12 +200,15 @@ export function ForwardMessageModal({ message, onClose }: Props) {
           <View style={styles.content}>
             <Text style={styles.title}>{t('message.forwardTitle')}</Text>
 
-            {forwardText ? (
+            {many ? (
+              <Text style={styles.preview}>{t('mobile.select.forwardCount', { n: messages.length })}</Text>
+            ) : null}
+            {!many && forwardText ? (
               <Text style={styles.preview} numberOfLines={2}>
                 {forwardText}
               </Text>
             ) : null}
-            {first ? (
+            {!many && first ? (
               <View style={styles.attachmentPreview}>
                 {previewUri ? (
                   <Image source={{ uri: previewUri }} style={styles.thumb} />

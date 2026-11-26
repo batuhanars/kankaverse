@@ -8,6 +8,7 @@ import { AttachmentSheet } from './AttachmentSheet';
 import { EmojiGifSheet } from './EmojiGifSheet';
 import { useEmojiInsert } from './useEmojiInsert';
 import { useVoiceRecorder } from './useVoiceRecorder';
+import { useImagePaste } from './useImagePaste';
 import type { useMessageComposer } from './useMessageComposer';
 import type { MentionCandidate, useMentionCompose } from './useMentionCompose';
 
@@ -57,6 +58,8 @@ export function ComposerHost({
   const emoji = useEmojiInsert(composer.input, handleChangeText);
   const recorder = useVoiceRecorder(channelId);
   const inputRef = useRef<TextInput>(null);
+  // C80 Rev.1: klavye panosundan görsel yapıştırma → taslak şeridi (gönderilmez).
+  useImagePaste(inputRef, composer.attachments.length, composer.addAttachments);
 
   // D95 — Bahset: `@ad ` metnin sonuna eklenir (otomatik tamamlamayla aynı kayıt), kutu odaklanır,
   // imleç sonda. Metin önce yazılır, imleç SONRA kurulur (useEmojiInsert sıra notu).

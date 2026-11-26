@@ -4648,3 +4648,22 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] web: çıkarma toast'u, sınır uyarısı, etiketli cihaz listesi (§4)
 - [x] mobile: aynı üçü (§5)
 - [x] Doğrulama (§7) + sahip turu + R7 diff onayı → deploy → AAB (yerel tur 2026-11-26: çıkarma, sınır uyarısı, etiketli liste geçti; tur bulgusu: sınırda bir kez bildirim eksikti, eklendi)
+
+## Sprint C80 — Mobilde panodaki görseli gönderme — 2026-11-26
+
+> Sözleşme: `contracts/SPRINT_C80_MOBILE_CLIPBOARD_IMAGE_CONTRACT.md`. Yalnız mobile.
+
+- [x] `+` panelinde "Panodaki görseli ekle" satırı, aynı huniden ek taslağı
+- [x] Doğrulama (typecheck, eslint)
+- [x] Sahip cihaz turu (DM + ortam kanalı, panoda metin varken satır yok) (2026-11-26 geçti: klavye Pano'dan yapıştırma çalışıyor)
+- [x] Rev.1: klavye panosundan yapıştırma, `modules/rich-paste` + `useImagePaste` (tur bulgusu: Gboard sistem panosunu kullanmıyor)
+
+## Sprint C81 — Mobilde mesaj seçimi (WhatsApp tarzı seçim çubuğu, çoklu seçim) — 2026-11-26
+
+> Sözleşme: `contracts/SPRINT_C81_MOBILE_MESSAGE_SELECTION_CONTRACT.md`. Yalnız mobile.
+
+- [x] Seçim modu (`useMessageSelection`), seçim çubuğu + ⋮ menü + hızlı tepki şeridi; alt panel kaldırıldı (§1-§2, §4)
+- [x] Toplu Sil / İlet / Kopyala (§3)
+- [x] Doğrulama (typecheck, eslint)
+- [x] Sahip cihaz turu (§6: DM, grup DM, ortam kanalı, salt okunur geçmiş) (2026-11-26 geçti; Rev.2: başlık gizlenmez, şerit baloncuğa bitişik, seçimde titreşim, arama ikonla + boşken tüm emojiler)
+- [x] Rev.1: şerit mesajın üstünde, Düzenle başlıkta / Kopyala menüde, emoji listesinde Varsayılan tepkiler

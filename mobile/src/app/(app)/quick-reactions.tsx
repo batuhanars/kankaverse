@@ -2,10 +2,8 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { EmojiGifSheet } from '@/components/message/EmojiGifSheet';
-import { useAuthStore } from '@/stores/auth';
-import { usersApi } from '@/api/users';
 import { extractErrorMessage } from '@/api/errors';
-import { useQuickReactions } from '@/utils/quickReactions';
+import { replaceSlot, saveQuickReactions, useQuickReactions } from '@/utils/quickReactions';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
@@ -24,8 +22,7 @@ export default function QuickReactionsScreen() {
     setSaving(true);
     setError('');
     try {
-      const updated = await usersApi.updateProfile({ quickReactions: next });
-      useAuthStore.getState().updateUser(updated);
+      await saveQuickReactions(next);
     } catch (e) {
       setError(extractErrorMessage(e));
     } finally {
@@ -36,13 +33,10 @@ export default function QuickReactionsScreen() {
   function pick(emoji: string) {
     const index = slot;
     setSlot(null);
-    if (index === null || reactions[index] === emoji) return;
-    const next = [...reactions];
+    if (index === null) return;
     // Başka yuvada zaten varsa iki yuva yer değiştirir (asla tekrar yollanmaz).
-    const other = next.indexOf(emoji);
-    if (other !== -1) next[other] = reactions[index];
-    next[index] = emoji;
-    void save(next);
+    const next = replaceSlot(reactions, index, emoji);
+    if (next) void save(next);
   }
 
   return (

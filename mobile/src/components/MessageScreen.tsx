@@ -39,9 +39,11 @@ import { discardOptimistic, retryOptimistic } from './message/useOptimisticSend'
 import { useMentionCompose, type MentionCandidate } from './message/useMentionCompose';
 import { useMessageListController } from './message/useMessageListController';
 import { MessageEmpty, MessageError, MessageLoading } from './message/MessageStates';
-import { MessageActionHost } from './message/MessageActionHost';
+import { MessageActionHost, SelectionReactions, useSelectionHeader } from './message/MessageActionHost';
 import { ScrollToBottomButton } from './message/ScrollToBottomButton';
 import { useMessageActions } from './message/useMessageActions';
+import { useMessageSelection } from './message/useMessageSelection';
+import { useReactionAnchor } from './message/useReactionAnchor';
 import { useQuickReactions } from '@/utils/quickReactions';
 import { useMessagesStore } from '@/stores/messages';
 import { useE2eeStore } from '@/stores/e2ee';
@@ -118,6 +120,13 @@ interface Props {
   // headerRight'ına eklenir — tek `<Stack.Screen>` headerRight sahibi bu bileşen (birden fazla
   // bileşenin aynı route için headerRight yazması güvenilmez sırayla ezilir).
   headerActions?: ReactNode;
+  /**
+   * C81 Rev.2 — başlığın solu ve ortası (geri/rozet, sohbet adı). Ekran bunları KENDİSİ ayarlar ki seçim modunda
+   * aynı native başlığın içeriği değişsin (başlık gizlenmez, ekran yeniden yerleşmez). Çağıran `Stack.Screen`de
+   * bu iki seçeneği vermez; vermesi, hangi ayarın kazanacağını efekt sırasına bırakırdı.
+   */
+  headerLeft?: () => ReactNode;
+  headerTitle?: () => ReactNode;
   /** M4a-1 — mesaj listesinin ÜSTÜNDE, başlığın altında sabit bir şerit (ör. "Sesli arama sürüyor").
    *  Genel isimlendirildi (voice'e özel değil): ekran veriyorsa çizilir, vermezse hiçbir şey. */
   topBanner?: ReactNode;
@@ -187,6 +196,8 @@ export function MessageScreen({
   disabledAction,
   readOnly = false,
   headerActions,
+  headerLeft,
+  headerTitle,
   topBanner,
   searchable = true,
   showIdentity = true,
@@ -412,6 +423,10 @@ export function MessageScreen({
   }, [items]);
   // Mesaj paneli akışı (uzun basış · tepki · kopyala · sil) — M1d-C §2.4.
   const actions = useMessageActions(channelId);
+  // C81: uzun basış = WhatsApp tarzı seçim modu (alt panel kalktı).
+  const selection = useMessageSelection(items);
+  // C81: hızlı tepki şeridi seçili tek mesajın üstünde (uzun basılan nokta).
+  const anchor = useReactionAnchor(selection.selected.length === 1 ? selection.selected[0].id : null);
   // C46: çift dokunma = etkin hızlı tepki listesinin ilki.
   const quickEmojis = useQuickReactions();
 
@@ -483,14 +498,29 @@ export function MessageScreen({
   const replyTo = (m: MessageDto) => composer.startReply(m);
   // C27 — düzenleme kendi katmanında (kutudan bağımsız); sola kaydırma ve eylem paneli aynı girişi kullanır.
   const [editTarget, setEditTarget] = useState<MessageDto | null>(null);
+  // C81 Rev.2 — seçim modunun başlık parçaları (aynı native başlıkta).
+  const selHeader = useSelectionHeader({
+    actions,
+    selection,
+    readOnly,
+    canPin,
+    canDeleteOthers,
+    onReply: disabledNotice ? undefined : replyTo,
+    onEdit: setEditTarget,
+  });
   const keyboardPad = keyboardVisible ? kbGeom.h + insets.bottom : 0;
   const bottomInset = keyboardVisible ? 0 : insets.bottom;
 
   return (
     <GestureHandlerRootView style={[styles.flex, { paddingBottom: keyboardPad }]}>
+      {/* C81: ekran kabının pencere konumu (tepki şeridi bu kaba göre konumlanır). */}
+      <View ref={anchor.marker} style={styles.anchorMarker} pointerEvents="none" collapsable={false} />
       <Stack.Screen
         options={{
-          headerRight: () => (
+          // C81 §2 Rev.2: seçim modunda aynı native başlığın içeriği değişir (✕ · sayı · eylemler).
+          headerLeft: selection.active ? selHeader.left : headerLeft,
+          headerTitle: selection.active ? selHeader.title : headerTitle,
+          headerRight: selection.active ? selHeader.right : () => (
             <View style={styles.headerActionsRow}>
               {e2eeView.encrypted && (
                 // E7 §4.7: kilit güvenlik kodunu açar (kimlik bayrağı kapalıysa yalnız simge).
@@ -557,7 +587,10 @@ export function MessageScreen({
           // C67 §4: yeni (alttaki) hücreler üstte çizilir; avatar eski konumdan kayarken aradaki balonların altında kalmaz.
           CellRendererComponent={StackedCell}
           contentContainerStyle={styles.list}
-          onScroll={list.onListScroll}
+          onScroll={(e) => {
+            list.onListScroll(e);
+            if (anchor.top !== null) anchor.hide();
+          }}
           scrollEventThrottle={16}
           onEndReachedThreshold={0.4}
           onEndReached={() => list.onEndReached(loadState === 'ready')}
@@ -593,7 +626,9 @@ export function MessageScreen({
             // yüzden hücrenin DOĞRUDAN çocukları ekranda TERS sırada çizilir; fragment
             // kullanılsaydı ayraç mesajın ALTINDA görünürdü. Araya bir View girince iç düzen
             // normal sütun olur ve iki çevirme sadeleşir: ayraç mesajın üstünde.
-            <View onLayout={(e) => cellHeights.current.set(item.message.id, e.nativeEvent.layout.height)}>
+            <View
+              onLayout={(e) => cellHeights.current.set(item.message.id, e.nativeEvent.layout.height)}
+            >
               {item.isDayStart && <DateSeparator iso={item.message.createdAt} />}
               {item.message.id === e2eeView.dividerBeforeId && <E2eeDivider />}
               {renderNotices(items.length - 1 - index)}
@@ -602,15 +637,19 @@ export function MessageScreen({
                 // C29: gecici/basarisiz mesajda kaydirarak yanit/duzenle kapali (iki islev de yok = jest kapali).
                 // C57: mesaj kutusu kapalıysa (salt okunur kanal, yazılamayan DM) yanıt da yok.
                 onReply={
-                  item.message.localStatus || disabledNotice ? undefined : () => replyTo(item.message)
+                  item.message.localStatus || disabledNotice || selection.active
+                    ? undefined
+                    : () => replyTo(item.message)
                 }
                 // Düzenle yalnız kendi mesajımda: eylem panelindeki `isMine` koşuluyla aynı (yazar = ben).
                 onEdit={
-                  !readOnly && !item.message.localStatus && item.message.author.id === authUser?.id
+                  !readOnly && !selection.active && !item.message.localStatus && item.message.author.id === authUser?.id
                     ? () => setEditTarget(item.message)
                     : undefined
                 }
               >
+              {/* C81 Rev.2: tepki şeridi bu kabın (baloncuğun) hemen üstüne konumlanır. */}
+              <View ref={anchor.bubbleRef(item.message.id)} collapsable={false}>
               <MessageBubble
                 message={item.message}
                 showAuthor={item.showAuthor}
@@ -620,7 +659,7 @@ export function MessageScreen({
                 resolveMention={(id) => resolveUsername(channelId, id)}
                 resolveRole={resolveRole}
                 highlighted={item.message.id === list.highlightId}
-                onLongPress={() => actions.open(item.message)}
+                onLongPress={() => (selection.active ? selection.toggle : selection.start)(item.message)}
                 onPressAuthor={() => setProfileTarget(item.message.author)}
                 onToggleReaction={readOnly ? undefined : (emoji) => actions.toggleReaction(item.message, emoji)}
                 onShowReactions={readOnly ? undefined : () => actions.openReactions(item.message)}
@@ -633,6 +672,19 @@ export function MessageScreen({
                   if (item.message.replyToId) list.requestJump(item.message.replyToId);
                 }}
               />
+              {/* C81 §1: seçim modunda baloncuk satırına dokunuş seçimi açar/kapar; mesajın kendi dokunuşları
+                  (görsel, bağlantı, yazar, çift dokunma) bu katmanın altında kalır. Vurgu yalnız mesaj satırını
+                  kaplar (tarih ayracını değil). */}
+              {selection.active && (
+                <Pressable
+                  style={[StyleSheet.absoluteFill, selection.isSelected(item.message.id) && styles.selectedRow]}
+                  onPress={() => selection.toggle(item.message)}
+                  onLongPress={() => selection.toggle(item.message)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selection.isSelected(item.message.id) }}
+                />
+              )}
+              </View>
               </SwipeToReply>
               {seenByMessage.has(item.message.id) ? <SeenAvatars readers={seenByMessage.get(item.message.id)!} /> : null}
             </View>
@@ -663,27 +715,8 @@ export function MessageScreen({
         mentionRequest={mentionRequest}
       />
 
-      <MessageActionHost
-        canPin={canPin}
-        canDeleteOthers={canDeleteOthers}
-        copyOnly={readOnly}
-        actions={actions}
-        onOpenProfile={setProfileTarget}
-        onReply={
-          disabledNotice
-            ? undefined
-            : () => {
-                const m = actions.target;
-                actions.close();
-                if (m) replyTo(m);
-              }
-        }
-        onEdit={() => {
-          const m = actions.target;
-          actions.close();
-          if (m) setEditTarget(m);
-        }}
-      />
+      <SelectionReactions actions={actions} selection={selection} top={anchor.top} readOnly={readOnly} />
+      <MessageActionHost actions={actions} onOpenProfile={setProfileTarget} />
 
       {editTarget && (
         <EditMessageOverlay
@@ -775,5 +808,10 @@ const styles = StyleSheet.create({
   },
   listWrap: {
     flex: 1,
+  },
+  anchorMarker: { position: 'absolute', top: 0, left: 0, width: 1, height: 1 },
+  // C81: seçili satır tam genişlikte Kor tonuyla vurgulanır (WhatsApp gibi).
+  selectedRow: {
+    backgroundColor: theme.colors.accentSubtle,
   },
 });

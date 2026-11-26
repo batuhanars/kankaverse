@@ -1,18 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { channelsApi } from '@/api/channels';
-import { guildsApi, type GuildMemberDto } from '@/api/guilds';
-import { rolesApi, type RoleDto } from '@/api/roles';
-import { MessageScreen } from '@/components/MessageScreen';
-import { ChatBackButton } from '@/components/ChatBackButton';
-import { useGuildPermission } from '@/hooks/useGuildPermission';
-import { useAuthStore } from '@/stores/auth';
-import { saveTextChannel } from '@/utils/resumeLastScreen';
-import { useUnreadStore } from '@/stores/unread';
-import { t } from '@/i18n';
-import { theme } from '@/theme';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text } from "react-native";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { channelsApi } from "@/api/channels";
+import { guildsApi, type GuildMemberDto } from "@/api/guilds";
+import { rolesApi, type RoleDto } from "@/api/roles";
+import { MessageScreen } from "@/components/MessageScreen";
+import { ChatBackButton } from "@/components/ChatBackButton";
+import { useGuildPermission } from "@/hooks/useGuildPermission";
+import { useAuthStore } from "@/stores/auth";
+import { saveTextChannel } from "@/utils/resumeLastScreen";
+import { useUnreadStore } from "@/stores/unread";
+import { t } from "@/i18n";
+import { theme } from "@/theme";
 
 // Sprint M1a contract §5 ekran 2 — Kanal mesaj ekranı, AYRI TAM EKRAN (üstte geri oku — Stack
 // varsayılanı). `name` sidebar'dan router param olarak taşınır (ayrı bir GET gerekmez).
@@ -31,9 +31,9 @@ export default function ChannelScreen() {
    * göstermemek.
    */
   // Aynı izin başkasının mesajını silmeyi de açar (web `MessageArea.canManageMessages` ile aynı).
-  const canManageMessages = useGuildPermission(guildId, 'MANAGE_MESSAGES');
+  const canManageMessages = useGuildPermission(guildId, "MANAGE_MESSAGES");
   // C57: salt okunur kanal. Yazamayan üye kutu yerine bilgi satırı görür (sunucu otorite).
-  const canManageChannels = useGuildPermission(guildId, 'MANAGE_CHANNELS');
+  const canManageChannels = useGuildPermission(guildId, "MANAGE_CHANNELS");
   const [readOnly, setReadOnly] = useState(false);
 
   /**
@@ -114,7 +114,12 @@ export default function ChannelScreen() {
     () =>
       roles
         .filter((r) => !r.isEveryone && r.mentionable)
-        .map((r) => ({ id: r.id, username: r.name, isRole: true, color: r.color })),
+        .map((r) => ({
+          id: r.id,
+          username: r.name,
+          isRole: true,
+          color: r.color,
+        })),
     [roles],
   );
 
@@ -122,7 +127,11 @@ export default function ChannelScreen() {
     () =>
       members
         .filter((m) => m.userId !== myUserId)
-        .map((m) => ({ id: m.userId, username: m.username, avatarUrl: m.avatarUrl })),
+        .map((m) => ({
+          id: m.userId,
+          username: m.username,
+          avatarUrl: m.avatarUrl,
+        })),
     [members, myUserId],
   );
 
@@ -137,13 +146,16 @@ export default function ChannelScreen() {
   // kaydedilmez). guildId yoksa (bildirim/arama yolu) ortam haritası kurulamaz, kayıt atlanır.
   useEffect(() => {
     if (id && guildId && myUserId) void saveTextChannel(myUserId, guildId, id);
-    else console.log(`[resume] save skipped id=${!!id} guildId=${!!guildId} user=${!!myUserId}`);
+    else
+      console.log(
+        `[resume] save skipped id=${!!id} guildId=${!!guildId} user=${!!myUserId}`,
+      );
   }, [id, guildId, myUserId]);
 
   if (!id) return null;
   // KUSUR 2 — `name` yoksa (push/bildirim yolu) yukarıdaki `resolvedName`'e düş; o da yoksa (henüz
   // çekilmedi ya da `guildId` hiç yok) boş kalır — mevcut "yanlış göstermektense göstermeme" kuralı.
-  const channelName = name || resolvedName || '';
+  const channelName = name || resolvedName || "";
 
   // Sprint M2c contract §3 — başlık dokunulabilir + chevron, `channel-details` rotasına gider.
   // 🔴 Yalnız `guildId` param'ı DOLUYSA: bu ekran bazı girişlerden (bildirimler/arama/sabitlemeler)
@@ -152,7 +164,10 @@ export default function ChannelScreen() {
   // (kanal listesi → `home.tsx`) her zaman `guildId` taşıyor, DoD orada doğrulanır.
   function onTitlePress() {
     if (!guildId) return;
-    router.push({ pathname: '/channel-details', params: { channelId: id, guildId } });
+    router.push({
+      pathname: "/channel-details",
+      params: { channelId: id, guildId },
+    });
   }
 
   return (
@@ -162,33 +177,45 @@ export default function ChannelScreen() {
           // Sprint M2a §4.4 — native geri ok gizlenir, yerine toplam ping rozeti taşıyan
           // `ChatBackButton` konur. Dokunuş davranışı değişmez.
           headerBackVisible: false,
-          headerLeft: () => <ChatBackButton />,
-          headerTitle: () =>
-            guildId ? (
-              <Pressable onPress={onTitlePress} style={styles.headerTitle} accessibilityRole="button">
-                <Text style={styles.headerTitleText} numberOfLines={1}>
-                  {channelName ? `#${channelName}` : ''}
-                </Text>
-                <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
-              </Pressable>
-            ) : (
-              <Text style={styles.headerTitleText} numberOfLines={1}>
-                {channelName ? `#${channelName}` : ''}
-              </Text>
-            ),
         }}
       />
       <MessageScreen
         channelId={id}
+        // C81 Rev.2: başlığın solu/ortası ekrana verilir; seçim modunda aynı başlığın içeriği değişir.
+        headerLeft={() => <ChatBackButton />}
+        headerTitle={() =>
+          guildId ? (
+            <Pressable
+              onPress={onTitlePress}
+              style={styles.headerTitle}
+              accessibilityRole="button"
+            >
+              <Text style={styles.headerTitleText} numberOfLines={1}>
+                {channelName ? `#${channelName}` : ""}
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={theme.colors.textMuted}
+              />
+            </Pressable>
+          ) : (
+            <Text style={styles.headerTitleText} numberOfLines={1}>
+              {channelName ? `#${channelName}` : ""}
+            </Text>
+          )
+        }
         // Kısa placeholder — gerekçe DM ekranındaki notla aynı (uzun metin dar ekranda sarıyor,
         // boş kutu iki satır yükseliyor). Kanal adı zaten başlıkta.
-        placeholder={t('mobile.message.placeholder')}
+        placeholder={t("mobile.message.placeholder")}
         markRead={channelsApi.markRead}
         typingMode="named"
         jumpToMessageId={jumpTo}
         canPin={canManageMessages}
         canDeleteOthers={() => canManageMessages}
-        disabledNotice={readOnly && !canManageChannels ? t('channel.readOnlyNotice') : null}
+        disabledNotice={
+          readOnly && !canManageChannels ? t("channel.readOnlyNotice") : null
+        }
         // M3b §3.2 — profil alt-panelinin rol rozetleri için ortam bağlamı. Bu ekran `guildId`
         // olmadan da açılabiliyor (bildirim/arama yolu); o durumda panel Roller bölümünü çizmez.
         guildId={guildId}
@@ -197,7 +224,10 @@ export default function ChannelScreen() {
         everyoneRoleId={everyoneRoleId}
         resolveRole={resolveRole}
         onOpenPins={() =>
-          router.push({ pathname: '/pins', params: { channelId: id, name: name ?? '' } })
+          router.push({
+            pathname: "/pins",
+            params: { channelId: id, name: name ?? "" },
+          })
         }
       />
     </>
@@ -206,13 +236,13 @@ export default function ChannelScreen() {
 
 const styles = StyleSheet.create({
   headerTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   headerTitleText: {
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.lg,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

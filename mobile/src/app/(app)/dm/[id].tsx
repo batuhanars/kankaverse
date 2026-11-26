@@ -1,31 +1,46 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { dmApi } from '@/api/dm';
-import { canModerateGroupTarget, groupRoleOf } from '@/utils/groupRoles';
-import type { MessageDto } from '@/api/messages';
-import { useAuthStore } from '@/stores/auth';
-import { clearLast } from '@/utils/resumeLastScreen';
-import { useDmStore } from '@/stores/dm';
-import { useVoiceStore } from '@/stores/voice';
-import { useVoicePresenceStore, type VoicePresenceParticipant } from '@/stores/voicePresence';
-import { usePresenceStore, selectStatus } from '@/stores/presence';
-import { PRESENCE_COLOR } from '@/components/PresenceDot';
-import { OngoingCallBanner } from '@/components/call/OngoingCallBanner';
-import { MessageScreen } from '@/components/MessageScreen';
-import type { SeenReader } from '@/components/message/SeenAvatars';
-import { DeleteDepartedDialog } from '@/components/dm/DeleteDepartedDialog';
-import { ChatBackButton } from '@/components/ChatBackButton';
-import { channelTitle } from '@/utils/channelTitle';
-import { clearChannelNotifications } from '@/notifications/push';
-import { t } from '@/i18n';
-import { theme } from '@/theme';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  Image,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  Stack,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { dmApi } from "@/api/dm";
+import { canModerateGroupTarget, groupRoleOf } from "@/utils/groupRoles";
+import type { MessageDto } from "@/api/messages";
+import { useAuthStore } from "@/stores/auth";
+import { clearLast } from "@/utils/resumeLastScreen";
+import { useDmStore } from "@/stores/dm";
+import { useVoiceStore } from "@/stores/voice";
+import {
+  useVoicePresenceStore,
+  type VoicePresenceParticipant,
+} from "@/stores/voicePresence";
+import { usePresenceStore, selectStatus } from "@/stores/presence";
+import { PRESENCE_COLOR } from "@/components/PresenceDot";
+import { OngoingCallBanner } from "@/components/call/OngoingCallBanner";
+import { MessageScreen } from "@/components/MessageScreen";
+import type { SeenReader } from "@/components/message/SeenAvatars";
+import { DeleteDepartedDialog } from "@/components/dm/DeleteDepartedDialog";
+import { ChatBackButton } from "@/components/ChatBackButton";
+import { channelTitle } from "@/utils/channelTitle";
+import { clearChannelNotifications } from "@/notifications/push";
+import { t } from "@/i18n";
+import { theme } from "@/theme";
 
 const EMPTY_PRESENCE: VoicePresenceParticipant[] = [];
 // C62: eski grupta okundu çağrısı 403 olurdu; MessageScreen'e boş bir işlev verilir.
 const noopMarkRead = () => Promise.resolve(null);
-
 
 // Sprint M1a contract §5 ekran 3 — DM mesaj ekranı: kanal ekranıyla "aynısı" (MessageScreen ortak
 // gövde) + başlıkta karşı tarafın adı/avatarı (dokunuş → salt okunur profil kartı, yalnız 1-1 DM'de
@@ -43,7 +58,7 @@ export default function DmScreen() {
     title?: string;
     avatarUrl?: string;
     otherUserId?: string;
-    kind?: 'dm' | 'group';
+    kind?: "dm" | "group";
     canMessage?: string;
     selfBlocked?: string;
     /** M1h — sabitlenenler ekranından "mesaja git" (kanal ekranındaki `jumpTo` ile aynı yol). */
@@ -58,10 +73,14 @@ export default function DmScreen() {
   // oradan kaldırınca yerel bir tazeleme çalışıyordu. İkinci yol açılınca kusur ortaya çıktı.
   // Doğru kaynak store: `dm` store'u sunucudan gelen `canMessage`/`selfBlocked`'ı taşıyor ve her
   // `fetchAll` ile tazeleniyor. Route parametresi yalnız store'da kanal yokken (derin link) yedek.
-  const storeChannel = useDmStore((s) => s.channels.find((c) => c.id === params.id));
+  const storeChannel = useDmStore((s) =>
+    s.channels.find((c) => c.id === params.id),
+  );
   const myUserId = useAuthStore((s) => s.user?.id);
   // C75 §3.1: kabul bekleyen GİDEN istek (bu kanal normal listede görünmez, kimlik ayrı tutulur).
-  const outgoingRequest = useDmStore((s) => s.outgoingPendingIds.includes(params.id));
+  const outgoingRequest = useDmStore((s) =>
+    s.outgoingPendingIds.includes(params.id),
+  );
 
   // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-08-03, cihaz turu — push'tan açılan DM): `kind` route
   // param'ı yalnız listeden gelişte var; push yolu yalnız `{ id }` taşıyor (bkz. `pushNavigation.ts`
@@ -70,18 +89,23 @@ export default function DmScreen() {
   // hook'u zaten reaktif — soğuk açılışta liste sonradan gelince ekran kendiliğinden güncellenir)
   // gerçek tipi buradan oku; store'da yoksa (soğuk açılış anı / derin link) route param'ına düş —
   // listeden gelişte ikisi zaten aynı.
-  const isDm = storeChannel ? storeChannel.type === 'DM' : params.kind !== 'group';
+  const isDm = storeChannel
+    ? storeChannel.type === "DM"
+    : params.kind !== "group";
   // 🔴 M4b sözleşme §1/§4 — grup DM sesli. `isDm` YALNIZ 1-1'i ayırt eder (yukarıdaki tarihçe
   // korunuyor, değiştirilmedi); bu ayrı bayrak grup DM'i ayırt eder. `voiceEligible` ikisinin
   // birleşimi — bu ekran zaten yalnız DM/GROUP_DM kanallarını çiziyor (guild `channel/[id].tsx`'te),
   // yani pratikte "her zaman true" ama açık tutuluyor: gelecekte bu ekrana üçüncü bir tür eklenirse
   // (yok bugün) sessizce ses özelliği kazanmasın.
-  const isGroupDm = storeChannel ? storeChannel.type === 'GROUP_DM' : params.kind === 'group';
+  const isGroupDm = storeChannel
+    ? storeChannel.type === "GROUP_DM"
+    : params.kind === "group";
   // Grup DM: kurucu/yönetici başkasının mesajını silebilir (hiyerarşi utils/groupRoles; kapı sunucuda).
   // 1-1 DM'de hiç: başkasının mesajı silinemez.
   const canDeleteOthers = (m: MessageDto) => {
     if (departed) return false;
-    if (storeChannel?.type !== 'GROUP_DM' || m.author.id === myUserId) return false;
+    if (storeChannel?.type !== "GROUP_DM" || m.author.id === myUserId)
+      return false;
     return canModerateGroupTarget(
       groupRoleOf(storeChannel, myUserId),
       groupRoleOf(storeChannel, m.author.id),
@@ -90,7 +114,8 @@ export default function DmScreen() {
   // C62 — gruptan ayrılan/çıkarılan: salt okunur geçmiş. Sunucu bütün kapıları zaten 403'ler; istemci
   // bu kanalda okundu/yazıyor/tepki/arama/sabitleme ÇAĞIRMAZ. Kaynak store (soket `dm.group_departed`
   // anında günceller, açık ekran yenilemeden kilitlenir).
-  const departed = storeChannel?.type === 'GROUP_DM' ? (storeChannel.departed ?? null) : null;
+  const departed =
+    storeChannel?.type === "GROUP_DM" ? (storeChannel.departed ?? null) : null;
   const [deleteOpen, setDeleteOpen] = useState(false);
   const voiceEligible = (isDm || isGroupDm) && !departed;
 
@@ -101,7 +126,7 @@ export default function DmScreen() {
    * sunucudan zaten "ben hariç" gelmiyor, o yüzden burada süzülmez — 1-1'de zaten karşı taraf tek.
    */
   const mentionCandidates = useMemo(() => {
-    if (storeChannel?.type === 'GROUP_DM') {
+    if (storeChannel?.type === "GROUP_DM") {
       // Kendin listede yok — sunucu kendi bahsetmeni yok sayıyor (kanal ekranındaki not).
       return storeChannel.members
         .filter((m) => m.id !== myUserId)
@@ -111,15 +136,27 @@ export default function DmScreen() {
           avatarUrl: m.avatarUrl,
         }));
     }
-    if (storeChannel?.type === 'DM') {
+    if (storeChannel?.type === "DM") {
       const u = storeChannel.otherUser;
       return [{ id: u.id, username: u.username, avatarUrl: u.avatarUrl }];
     }
     if (params.otherUserId && params.title) {
-      return [{ id: params.otherUserId, username: params.title, avatarUrl: params.avatarUrl ?? null }];
+      return [
+        {
+          id: params.otherUserId,
+          username: params.title,
+          avatarUrl: params.avatarUrl ?? null,
+        },
+      ];
     }
     return [];
-  }, [storeChannel, myUserId, params.otherUserId, params.title, params.avatarUrl]);
+  }, [
+    storeChannel,
+    myUserId,
+    params.otherUserId,
+    params.title,
+    params.avatarUrl,
+  ]);
 
   // M1d-0 R1 (sahip kararı 2026-07-31) — başlıktaki kanka ekle ikonu **KALDIRILDI**. 2026-07-30'da
   // eklenmişti çünkü o gün profil kartında ekleme yoktu; R1-d kartı eklemeyi getirince başlık ikonu
@@ -168,7 +205,9 @@ export default function DmScreen() {
       store.clearUnread(channelId);
       void clearChannelNotifications(channelId);
       if (!store.channels.some((c) => c.id === channelId)) {
-        void store.fetchAll().then(() => useDmStore.getState().clearUnread(channelId));
+        void store
+          .fetchAll()
+          .then(() => useDmStore.getState().clearUnread(channelId));
       }
       return () => useDmStore.getState().setActiveDm(null);
     }, [channelId]),
@@ -190,9 +229,13 @@ export default function DmScreen() {
   }, [channelId, voiceEligible]);
 
   const presenceParticipants = useVoicePresenceStore((s) =>
-    voiceEligible && channelId ? (s.byChannel[channelId] ?? EMPTY_PRESENCE) : EMPTY_PRESENCE,
+    voiceEligible && channelId
+      ? (s.byChannel[channelId] ?? EMPTY_PRESENCE)
+      : EMPTY_PRESENCE,
   );
-  const isConnectedHere = useVoiceStore((s) => s.connectedChannelId === channelId);
+  const isConnectedHere = useVoiceStore(
+    (s) => s.connectedChannelId === channelId,
+  );
   const [callBusy, setCallBusy] = useState(false);
 
   // Başlıkta karşı tarafın durumu (sahip isteği 2026-08-11, WhatsApp deseni). Aktif olan HER durum
@@ -202,10 +245,14 @@ export default function DmScreen() {
   // Grup DM'de yok: tek bir "karşı taraf" olmadığı için neyin durumu yazılacağı tanımsız.
   // Kimin görülebildiğine SUNUCU karar veriyor (`PresenceService.canSeePresence`, R7): engellenen
   // taraf ve arkadaş olmayan minör zaten hiç gelmez, burada ek bir kapı kurulmuyor.
-  const otherUserId = storeChannel?.type === 'DM' ? storeChannel.otherUser.id : params.otherUserId;
+  const otherUserId =
+    storeChannel?.type === "DM"
+      ? storeChannel.otherUser.id
+      : params.otherUserId;
   const otherStatus = usePresenceStore(selectStatus(isDm ? otherUserId : null));
   // Çevrimdışıda başlıkta durum yazısı yok (null).
-  const presenceColor = isDm && otherStatus !== 'offline' ? PRESENCE_COLOR[otherStatus] : null;
+  const presenceColor =
+    isDm && otherStatus !== "offline" ? PRESENCE_COLOR[otherStatus] : null;
 
   /**
    * C12 §4.2 — okundu göstergesi. null dönerse tik HİÇ çizilmez.
@@ -221,17 +268,19 @@ export default function DmScreen() {
   // C67 revize: çift tik yalnız 1-1 DM'de (C12 aynen): `receiptsEnabled` ve `createdAt <= otherReadAt` ise okundu,
   // değilse tek tik "gönderildi". Grup DM'de çift tik yok (okuyucular avatarla gösterilir). Kaynak `storeChannel`
   // (reaktif abonelik): `dm:read` gelince yeni kanal nesnesi üretilir, tik yeniden çizilir.
-  const receiptsEnabled = storeChannel?.type === 'DM' && storeChannel.receiptsEnabled === true;
-  const otherReadAt = storeChannel?.type === 'DM' ? (storeChannel.otherReadAt ?? null) : null;
+  const receiptsEnabled =
+    storeChannel?.type === "DM" && storeChannel.receiptsEnabled === true;
+  const otherReadAt =
+    storeChannel?.type === "DM" ? (storeChannel.otherReadAt ?? null) : null;
 
   const receiptFor = useCallback(
-    (m: MessageDto): 'sent' | 'seen' | null => {
+    (m: MessageDto): "sent" | "seen" | null => {
       if (!myUserId || m.author.id !== myUserId) return null;
       // C29 iyimser gönderim: henüz sunucuya ulaşmamış mesajda tik yok (soluk görünüm yeterli).
-      if (m.id.startsWith('pending:')) return null;
+      if (m.id.startsWith("pending:")) return null;
       // Gizlilik kapısı kapalıysa gösterge gizlenmez, tek tik kalır; okuma bilgisi sızmaz (otherReadAt sunucudan null).
-      if (!receiptsEnabled || !otherReadAt) return 'sent';
-      return m.createdAt <= otherReadAt ? 'seen' : 'sent';
+      if (!receiptsEnabled || !otherReadAt) return "sent";
+      return m.createdAt <= otherReadAt ? "seen" : "sent";
     },
     [myUserId, receiptsEnabled, otherReadAt],
   );
@@ -240,12 +289,24 @@ export default function DmScreen() {
   const seenBy = storeChannel?.seenBy;
   const seenReaders = useMemo<SeenReader[]>(() => {
     // C67 revize: avatarlar yalnız grup DM'de; 1-1'de boş.
-    if (!storeChannel || storeChannel.type !== 'GROUP_DM' || !seenBy || departed) return [];
+    if (
+      !storeChannel ||
+      storeChannel.type !== "GROUP_DM" ||
+      !seenBy ||
+      departed
+    )
+      return [];
     const people = storeChannel.members;
     const out: SeenReader[] = [];
     for (const r of seenBy) {
       const p = people.find((x) => x.id === r.userId);
-      if (p && p.id !== myUserId) out.push({ userId: p.id, name: p.username, avatarUrl: p.avatarUrl, readAt: r.readAt });
+      if (p && p.id !== myUserId)
+        out.push({
+          userId: p.id,
+          name: p.username,
+          avatarUrl: p.avatarUrl,
+          readAt: r.readAt,
+        });
     }
     return out;
   }, [storeChannel, seenBy, departed, myUserId]);
@@ -259,34 +320,50 @@ export default function DmScreen() {
   // AYNI kaynak); store soğuk açılışta sonradan dolduğu için `useDmStore` hook'u zaten reaktif,
   // tek seferlik okuma değil. Store'da kayıt yoksa (derin link / soğuk açılış anı) route
   // param'ına düşülür — listeden gelişte ikisi zaten aynı değeri taşıyor.
-  const title = storeChannel ? channelTitle(storeChannel) : (params.title ?? '');
-  const avatarUrl = storeChannel?.type === 'DM' ? storeChannel.otherUser.avatarUrl : (params.avatarUrl ?? null);
+  const title = storeChannel
+    ? channelTitle(storeChannel)
+    : (params.title ?? "");
+  const avatarUrl =
+    storeChannel?.type === "DM"
+      ? storeChannel.otherUser.avatarUrl
+      : (params.avatarUrl ?? null);
 
   // 🔴 `canMessage`/`selfBlocked` store'dan okunur, yerel override YOK — profil paneli engelleme
   // mutasyonunu `useFriendsStore` üzerinden yapıyor, o da dm store'unu tazeliyor; ekran yeni
   // bayrakları kendiliğinden görür (T&S disiplini: karar backend otoritesinde).
   const canMessage =
-    storeChannel && storeChannel.type === 'DM' ? storeChannel.canMessage : params.canMessage !== 'false';
+    storeChannel && storeChannel.type === "DM"
+      ? storeChannel.canMessage
+      : params.canMessage !== "false";
   const selfBlocked =
-    storeChannel && storeChannel.type === 'DM' ? storeChannel.selfBlocked : params.selfBlocked === 'true';
+    storeChannel && storeChannel.type === "DM"
+      ? storeChannel.selfBlocked
+      : params.selfBlocked === "true";
 
   // C62: eski grupta tek band (E2EE "çıkarıldı" bandı MessageScreen'de bastırılır); yanında "Sohbeti sil".
   const disabledNotice = departed
-    ? t(departed.reason === 'REMOVED' ? 'mobile.dm.departedRemoved' : 'mobile.dm.departedLeft')
+    ? t(
+        departed.reason === "REMOVED"
+          ? "mobile.dm.departedRemoved"
+          : "mobile.dm.departedLeft",
+      )
     : isDm && !canMessage
       ? selfBlocked
-        ? t('dm.selfBlocked')
-        : t('dm.cannotMessage')
+        ? t("dm.selfBlocked")
+        : t("dm.cannotMessage")
       : null;
   const disabledAction = departed
-    ? { label: t('mobile.dm.departedDelete'), onPress: () => setDeleteOpen(true) }
+    ? {
+        label: t("mobile.dm.departedDelete"),
+        onPress: () => setDeleteOpen(true),
+      }
     : undefined;
 
   // Placeholder kısa tutuluyor (sahip bulgusu 2026-08-11): web'in "{ad} kullanıcısına mesaj yaz"
   // metni dar ekranda iki satıra sarıyor, boş kutu iki satır yükseliyor ve sağdaki emoji ikonu
   // (son satıra yaslı, bilinçli) havada asılı duruyor. Ad zaten başlıkta yazıyor; kutuda tekrar
   // etmesi bilgi katmıyor. Uzun kullanıcı adlarında da sarmaz — ad hiç girmiyor.
-  const placeholder = t('mobile.message.placeholder');
+  const placeholder = t("mobile.message.placeholder");
 
   // §3.1 — başlıktaki telefon düğmesi: kimse yoksa BAŞLATIR (davet + katıl), biri varsa KATILIR
   // (davet gönderilmez — §3.1 "tekrar çaldırmak spam olur"), biz zaten bağlıysak arama ekranına döner.
@@ -303,23 +380,34 @@ export default function DmScreen() {
   // birebir aynı gövdeyi ikinci kez yazmak olurdu).
   async function startCall(startWithCamera: boolean) {
     if (isConnectedHere) {
-      router.push({ pathname: '/call', params: { channelId } });
+      router.push({ pathname: "/call", params: { channelId } });
       return;
     }
     if (callBusy) return;
     setCallBusy(true);
     const res = await useVoiceStore
       .getState()
-      .startOrJoin(channelId, title, isGroupDm ? { kind: 'group' } : startWithCamera ? { startWithCamera: true } : undefined);
+      .startOrJoin(
+        channelId,
+        title,
+        isGroupDm
+          ? { kind: "group" }
+          : startWithCamera
+            ? { startWithCamera: true }
+            : undefined,
+      );
     setCallBusy(false);
     if (res.ok) {
-      router.push({ pathname: '/call', params: { channelId } });
+      router.push({ pathname: "/call", params: { channelId } });
       return;
     }
-    if (res.reason === 'mic_denied') {
-      Alert.alert(res.message ?? t('common.error'), undefined, [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('mobile.call.micPermissionSettings'), onPress: () => Linking.openSettings() },
+    if (res.reason === "mic_denied") {
+      Alert.alert(res.message ?? t("common.error"), undefined, [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: t("mobile.call.micPermissionSettings"),
+          onPress: () => Linking.openSettings(),
+        },
       ]);
       return;
     }
@@ -344,7 +432,7 @@ export default function DmScreen() {
    */
   function onTitlePress() {
     if (departed) return; // C62: eski grupta detay/üye yönetimi kapalı
-    router.push({ pathname: '/dm-details', params: { id: channelId } });
+    router.push({ pathname: "/dm-details", params: { id: channelId } });
   }
 
   return (
@@ -355,35 +443,38 @@ export default function DmScreen() {
           // toplam ping rozetini taşır. 1-1 DM ve grup DM'nin ikisi de bu ekrandan açılıyor
           // (`kind` param'ı), rozet ikisinde de aynı.
           headerBackVisible: false,
-          headerLeft: () => <ChatBackButton />,
-          headerTitle: () => (
-            <Pressable onPress={onTitlePress} style={styles.headerTitle}>
-              {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.headerAvatar} />
-              ) : (
-                <View style={[styles.headerAvatar, styles.headerAvatarFallback]}>
-                  <Text style={styles.headerAvatarText}>{title.charAt(0).toUpperCase()}</Text>
-                </View>
-              )}
-              <View style={styles.headerTextWrap}>
-                <Text style={styles.headerName} numberOfLines={1}>
-                  {title}
-                </Text>
-                {presenceColor && (
-                  <Text
-                    style={[styles.headerPresence, { color: presenceColor }]}
-                    numberOfLines={1}
-                  >
-                    {t(`presence.${otherStatus}`)}
-                  </Text>
-                )}
-              </View>
-            </Pressable>
-          ),
         }}
       />
       <MessageScreen
         channelId={params.id}
+        // C81 Rev.2: başlığın solu/ortası ekrana verilir; seçim modunda aynı başlığın içeriği değişir.
+        headerLeft={() => <ChatBackButton />}
+        headerTitle={() => (
+          <Pressable onPress={onTitlePress} style={styles.headerTitle}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.headerAvatar} />
+            ) : (
+              <View style={[styles.headerAvatar, styles.headerAvatarFallback]}>
+                <Text style={styles.headerAvatarText}>
+                  {title.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.headerName} numberOfLines={1}>
+                {title}
+              </Text>
+              {presenceColor && (
+                <Text
+                  style={[styles.headerPresence, { color: presenceColor }]}
+                  numberOfLines={1}
+                >
+                  {t(`presence.${otherStatus}`)}
+                </Text>
+              )}
+            </View>
+          </Pressable>
+        )}
         placeholder={placeholder}
         // Sprint M2d §3.2 — bahsetme kaynağı: 1-1 DM'de karşı taraf, grup DM'de grup üyeleri.
         // Ekstra istek YOK, ikisi de zaten elde. `@everyone` verilmez (guild yok).
@@ -414,12 +505,12 @@ export default function DmScreen() {
                 // dokunmuyorum (kapsam dışı), yeni düğmemi göz kararıyla bırakmıyorum.
                 hitSlop={12}
                 accessibilityRole="button"
-                accessibilityLabel={t('mobile.call.startAction')}
+                accessibilityLabel={t("mobile.call.startAction")}
               >
                 {/* Grup DM'de hoparlör, 1-1'de telefon (sahip isteği 2026-08-08): grup sesli bir
                     ÇAĞRI değil, girilen bir oda — Discord mobil ve bizim web'imiz de öyle ayırıyor. */}
                 <Ionicons
-                  name={isDm ? 'call' : 'volume-medium-outline'}
+                  name={isDm ? "call" : "volume-medium-outline"}
                   size={isDm ? 20 : 22}
                   color={theme.colors.textSecondary}
                 />
@@ -433,9 +524,13 @@ export default function DmScreen() {
                   disabled={callBusy}
                   hitSlop={12}
                   accessibilityRole="button"
-                  accessibilityLabel={t('mobile.call.startVideoAction')}
+                  accessibilityLabel={t("mobile.call.startVideoAction")}
                 >
-                  <Ionicons name="videocam-outline" size={20} color={theme.colors.textSecondary} />
+                  <Ionicons
+                    name="videocam-outline"
+                    size={20}
+                    color={theme.colors.textSecondary}
+                  />
                 </Pressable>
               )}
             </>
@@ -463,8 +558,8 @@ export default function DmScreen() {
             ? undefined
             : () =>
                 router.push({
-                  pathname: '/pins',
-                  params: { channelId: params.id, name: title, origin: 'dm' },
+                  pathname: "/pins",
+                  params: { channelId: params.id, name: title, origin: "dm" },
                 })
         }
       />
@@ -476,7 +571,7 @@ export default function DmScreen() {
             setDeleteOpen(false);
             // Sohbet listeden düştü; ölü kanala geri dönülmesin (D34 deseni).
             router.dismissAll();
-            router.replace('/home');
+            router.replace("/home");
           }}
         />
       )}
@@ -486,8 +581,8 @@ export default function DmScreen() {
 
 const styles = StyleSheet.create({
   headerTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   headerAvatar: {
@@ -497,18 +592,18 @@ const styles = StyleSheet.create({
   },
   headerAvatarFallback: {
     backgroundColor: theme.colors.accentSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerAvatarText: {
     color: theme.colors.accent500,
     fontSize: theme.fontSize.xs,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   headerName: {
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.lg,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   // Ad + durum dikey; `flexShrink` olmadan uzun ad geri okunu ve sağdaki arama düğmelerini iterdi.
   headerTextWrap: {
@@ -519,11 +614,11 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   clearErrorBar: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 90,
     left: 0,
     right: 0,
-    alignItems: 'center',
+    alignItems: "center",
   },
   clearErrorText: {
     backgroundColor: theme.colors.bgElevated,
