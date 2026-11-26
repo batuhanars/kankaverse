@@ -52,6 +52,9 @@ export function resolvePushTarget(data: Record<string, unknown>): Href | null {
       return '/friends-add';
     case 'FRIEND_ACCEPT':
       return '/friends-list';
+    case 'MESSAGE_REQUEST':
+      // C75: içeriksiz istek bildirimi; kanal kimliğiyle istek seçili açılır.
+      return channelId ? { pathname: '/dm-requests', params: { channel: channelId } } : '/dm-requests';
     case 'E2EE_TRANSFER':
       // E5b §4.5: "Bu sen değilsen hemen şifreni değiştir" bildirimi: oturumlar ekranı (tanımadığın cihazı kapat).
       return '/security-sessions';

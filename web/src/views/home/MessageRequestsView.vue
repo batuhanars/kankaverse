@@ -5,10 +5,11 @@
  * Kabul → mesajlaşma başlar (DM'e geçer). Reddet/Engelle → istek kutusundan düşer.
  * Kanka isteğinden AYRIDIR (kankalar paneli "Bekleyen" ile karıştırılmaz).
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useDmStore } from '@/stores/dm'
+import { useRequestPreviews } from '@/composables/useRequestPreviews'
 import { useToastStore } from '@/stores/toast'
 import KvButton from '@/components/ui/KvButton.vue'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
@@ -16,6 +17,7 @@ import HomeTopBar from './components/HomeTopBar.vue'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const dmStore = useDmStore()
 const toast = useToastStore()
 
@@ -26,18 +28,30 @@ const showBlockConfirm = ref(false)
 
 const requests = computed(() => dmStore.requests)
 const selected = computed(() => requests.value.find((r) => r.channelId === selectedChannelId.value) ?? null)
+// C75 §3.3: şifreli ilk mesaj burada çözülür; çözülemezse genel "Şifreli mesaj" metni kalır.
+const { textOf } = useRequestPreviews(() => requests.value, () => t('e2ee.preview'))
 
 onMounted(async () => {
   try {
     await dmStore.fetchRequests()
   } finally {
     loading.value = false
-    // İlk isteği otomatik seç (varsa)
+    // C75 §3.2: bildirimden gelindiyse (?channel=) o istek seçili açılır; yoksa ilki
+    const wanted = typeof route.query.channel === 'string' ? route.query.channel : null
     if (!selectedChannelId.value && requests.value.length > 0) {
-      selectedChannelId.value = requests.value[0].channelId
+      selectedChannelId.value =
+        requests.value.find((r) => r.channelId === wanted)?.channelId ?? requests.value[0].channelId
     }
   }
 })
+
+// Sayfadayken zilden başka bir isteğe tıklanırsa (aynı rota, yeni sorgu) seçim o isteğe geçer.
+watch(
+  () => route.query.channel,
+  (id) => {
+    if (typeof id === 'string' && requests.value.some((r) => r.channelId === id)) selectedChannelId.value = id
+  },
+)
 
 function formatTime(iso: string): string {
   const d = new Date(iso)
@@ -137,7 +151,7 @@ async function reject(block: boolean) {
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">{{ req.requester?.username ?? '—' }}</p>
-            <p class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ req.encrypted ? t('e2ee.preview') : req.preview }}</p>
+            <p class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ textOf(req) }}</p>
           </div>
         </button>
       </div>
@@ -161,7 +175,7 @@ async function reject(block: boolean) {
         <!-- Mesaj detayı -->
         <div class="rounded-[var(--kv-radius-md)] border px-4 py-3 mb-6" style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated);">
           <p class="text-[11px] font-semibold uppercase tracking-widest mb-1.5" style="color: var(--kv-text-muted);">{{ t('messageRequests.messageLabel') }}</p>
-          <p class="text-[14px] whitespace-pre-wrap break-words" style="color: var(--kv-text-primary);">{{ selected.encrypted ? t('e2ee.preview') : selected.preview }}</p>
+          <p class="text-[14px] whitespace-pre-wrap break-words" style="color: var(--kv-text-primary);">{{ textOf(selected) }}</p>
         </div>
 
         <!-- Aksiyonlar -->

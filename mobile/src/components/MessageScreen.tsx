@@ -165,6 +165,12 @@ interface Props {
   guildId?: string;
   /** M6a §2 — baloncukta avatar + yazar adı gösterilsin mi. Varsayılan AÇIK; 1-1 DM `false` verir. */
   showIdentity?: boolean;
+  /**
+   * C75 §3.1 (K1): gönderen tarafında kabul bekleyen mesaj isteği. Mesaj yokken kutunun üstünde şerit
+   * (`composeHint`); ilk mesaj gidince kutu tamamen kilitlenir (`lockedComposer`, hiçbir gönderim yolu açık
+   * kalmaz) ve mesajın altında durum satırı çıkar. Başarısız yerel mesaj "gitti" sayılmaz (yeniden denenebilsin).
+   */
+  outgoingRequest?: boolean;
 }
 
 // Sprint M1a — kanal VE DM mesaj ekranı için TEK gövde (contract §5 ekran 3: "aynısı"). İkisi de
@@ -177,7 +183,7 @@ export function MessageScreen({
   receiptFor,
   seenReaders,
   typingMode,
-  disabledNotice,
+  disabledNotice: baseDisabledNotice,
   disabledAction,
   readOnly = false,
   headerActions,
@@ -193,6 +199,7 @@ export function MessageScreen({
   resolveRole,
   mentionRoles,
   guildId,
+  outgoingRequest = false,
 }: Props) {
   const authUser = useAuthStore((s) => s.user);
   const emailUnverified = authUser?.emailVerified === false;
@@ -211,7 +218,7 @@ export function MessageScreen({
   const [mentionRequest, setMentionRequest] = useState<{ candidate: MentionCandidate } | null>(null);
   // Kısayol yalnız yazılabilen çok kişili sohbette: 1-1 DM (`showIdentity` false) ve yazma kutusu
   // kapalıyken (`disabledNotice`: salt okunur/engelli) ya da öneri kaynağı yokken sunulmaz.
-  const canMentionShortcut = showIdentity && !disabledNotice && (mentionCandidates?.length ?? 0) > 0;
+  const canMentionShortcut = showIdentity && !baseDisabledNotice && (mentionCandidates?.length ?? 0) > 0;
 
   // "Yazıyor" yayını + etiketi kendi kancasında (M1d-C §2.1).
   const typing = useTypingEmitter(channelId, typingMode);
@@ -308,6 +315,10 @@ export function MessageScreen({
 
   // Liste verisi + kaydırma davranışı (gruplama · dibe yapışma · yeni mesaj sayacı · zıplama).
   const list = useMessageListController(channelId, authUser?.id, jumpToMessageId);
+  // C75 §3.1: istek gönderildi mi? Kabul bekleyen kanalda yalnız gönderen yazabilir ve tek mesaj; listede
+  // başarısız olmayan herhangi bir mesaj varsa "gitti" sayılır. Kutu o andan itibaren kilitli.
+  const requestSent = outgoingRequest && list.items.some((i) => i.message.localStatus !== 'failed');
+  const disabledNotice = baseDisabledNotice ?? (requestSent ? t('messageRequests.lockedComposer') : null);
   /**
    * C12 §4.3 — ekran AÇIKKEN gelen mesaj da anında okundu işaretlenir.
    *
@@ -562,6 +573,7 @@ export function MessageScreen({
             <View>
               {e2eeView.dividerAtEnd && <E2eeDivider />}
               {renderNotices(items.length)}
+              {requestSent ? <Text style={styles.requestStatus}>{t('messageRequests.pendingStatus')}</Text> : null}
             </View>
           }
           ListFooterComponent={
@@ -636,6 +648,9 @@ export function MessageScreen({
 
       {/* Sprint M3c — kutu + ek paneli + emoji seçici tek yerleşimde (`ComposerHost`); ekran yalnız
           bağlamı geçirir. Kutunun kendi iç akışı (taslak ekler, imleç, seçiciler) ekranın işi değil. */}
+      {outgoingRequest && !requestSent && !baseDisabledNotice ? (
+        <Text style={styles.requestHint}>{t('messageRequests.composeHint')}</Text>
+      ) : null}
       <ComposerHost
         composer={composer}
         mention={mention}
@@ -717,6 +732,23 @@ export function MessageScreen({
 }
 
 const styles = StyleSheet.create({
+  requestStatus: {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.xs,
+    textAlign: 'right',
+    paddingHorizontal: theme.layout.panelGap,
+    paddingTop: 4,
+  },
+  requestHint: {
+    color: theme.colors.textSecondary,
+    fontSize: theme.fontSize.sm,
+    backgroundColor: theme.colors.bgElevated,
+    borderRadius: theme.radius.md,
+    marginHorizontal: theme.layout.panelGap,
+    marginTop: 6,
+    paddingHorizontal: theme.layout.panelGap,
+    paddingVertical: 8,
+  },
   hiddenNote: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.sm,

@@ -90,6 +90,7 @@ enum NotificationType {
   AI_VIDEO_READY // C49 — yapay zeka video arka planda tamamlandı
   AI_VIDEO_FAILED // C49 — yapay zeka video arka planda başarısız oldu (kredi düşülmedi)
   E2EE_TRANSFER // E5b — şifreli mesaj geçmişi yeni bir cihaza aktarıldı (güvenlik bildirimi, kapatılamaz)
+  MESSAGE_REQUEST // C75 — ilk mesajla doğan mesaj isteği (içeriksiz bildirim)
 }
 
 enum NotificationLevel {

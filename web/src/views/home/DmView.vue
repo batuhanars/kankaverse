@@ -34,14 +34,6 @@ const { rightPanelVisible, toggleRightPanel, closeRightPanel } = useAppShellNav(
 
 const activeDmChannel = computed(() => dmStore.activeChannel())
 
-// C9 — gönderen tarafı: giden mesaj isteği kabul bekliyor (tek mesaj bilgisi bandı)
-const outgoingPending = computed(
-  () =>
-    activeDmChannel.value?.type === 'DM' &&
-    activeDmChannel.value.requestStatus === 'PENDING' &&
-    activeDmChannel.value.requestOutgoing === true,
-)
-
 async function sync(channelId: string) {
   if (!channelId) {
     await router.replace({ name: 'app' })
@@ -68,6 +60,12 @@ async function sync(channelId: string) {
   if (prev) leaveChannel(prev)
   channelsStore.setActiveChannel(null)
   dmStore.setActiveChannel(channelId)
+  // C75 §3.1: bekleyen giden istekte kabul gönderene ayrı olayla gelmez; sohbeti açınca durum tazelenir
+  // (kabul edildiyse kutunun kilidi kalkar). Başarısızlık sessiz: yerel durum kalır.
+  const cur = dmStore.activeChannel()
+  if (cur?.type === 'DM' && cur.requestStatus === 'PENDING' && cur.requestOutgoing === true) {
+    void dmStore.fetchChannels().catch(() => {})
+  }
 }
 
 watch(() => props.channelId, (id) => sync(id), { immediate: true })
@@ -76,14 +74,6 @@ watch(() => props.channelId, (id) => sync(id), { immediate: true })
 <template>
   <div class="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
     <HomeTopBar @select-dm="(id: string) => router.push({ name: 'dm', params: { channelId: id } })" />
-    <!-- C9 — giden istek kabul bekliyor bandı -->
-    <div
-      v-if="outgoingPending"
-      class="shrink-0 mx-4 mt-2 px-4 py-2.5 rounded-[var(--kv-radius-md)] text-[13px]"
-      style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
-    >
-      {{ t('messageRequests.sentBanner') }}
-    </div>
     <div v-if="activeDmChannel" class="flex flex-1 min-w-0 overflow-hidden gap-4 relative">
       <!-- `cleared` KALKTI: sohbeti temizleme DM satırı menüsüne taşındı (SPRINT_DM_MENU §4),
            aktif DM temizlenince ana sayfaya dönüşü `DmList` yapıyor. Aynı desen `left` için de

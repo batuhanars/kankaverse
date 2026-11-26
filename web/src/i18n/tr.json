@@ -1506,7 +1506,9 @@
     "privacyNote": "Reddettiğinde karşı taraf bilgilendirilmez.",
     "blockConfirmTitle": "Reddet ve engelle?",
     "blockConfirmMessage": "{name} adlı kişinin isteği reddedilecek ve engellenecek. Sana tekrar mesaj isteği gönderemez.",
-    "sentBanner": "Mesaj isteğin gönderildi. Karşı taraf kabul edene kadar tek mesaj gönderebilirsin.",
+    "composeHint": "Kankan değil. İlk mesajın bir mesaj isteği olarak gider; kabul edilene kadar yalnız bir mesaj gönderebilirsin.",
+    "pendingStatus": "İstek gönderildi · kabul bekleniyor",
+    "lockedComposer": "Mesaj isteğin kabul edilince yazışmaya devam edebilirsin.",
     "pendingError": "Mesaj isteğin kabul edilene kadar tek mesaj gönderebilirsin."
   },
   "sidebar": {
@@ -1775,6 +1777,7 @@
     "friendRequest": "{actor} sana kanka isteği gönderdi.",
     "friendAccept": "{actor} kanka isteğini kabul etti.",
     "messageRequests": "{n} yeni mesaj isteğin var.",
+    "messageRequest": "{actor} sana mesaj isteği gönderdi.",
     "friendRequests": "{n} yeni kankalık isteğin var.",
     "guildInvite": "{actor} seni {guild} ortamına davet etti.",
     "eventCreated": "{actor} yeni bir etkinlik oluşturdu: {event}",

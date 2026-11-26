@@ -3,7 +3,7 @@ import { NotificationType } from '@prisma/client';
 /** §5 — NotificationDto: istemciye dönen bildirim şekli. */
 export interface NotificationDto {
   id: string;
-  type: NotificationType; // MENTION | FRIEND_REQUEST | FRIEND_ACCEPT | GUILD_INVITE
+  type: NotificationType; // MENTION | FRIEND_REQUEST | FRIEND_ACCEPT | GUILD_INVITE | EVENT_CREATED | REACTION | AI_VIDEO_READY | AI_VIDEO_FAILED | E2EE_TRANSFER | MESSAGE_REQUEST
   actor: { id: string; username: string; avatarUrl: string | null } | null; // read-time User join (taze); SetNull → null
   guildId: string | null;
   guildName?: string | null; // GUILD_INVITE (ve guildId taşıyan bildirimler) için read-time guild.name çözümü

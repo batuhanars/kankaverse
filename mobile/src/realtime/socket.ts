@@ -363,6 +363,11 @@ function ensureSocket(): Socket {
     useDmStore.getState().refreshRequests();
   });
 
+  // C75 §2.6 — giden mesaj isteğim kabul edildi (alıcı yazmasa bile): gönderen kutusunun kilidi kalkar.
+  socket.on('dm.request_accepted', (data: { channelId: string }) => {
+    useDmStore.getState().applyRequestAccepted(data.channelId);
+  });
+
   // Sprint M2a §6 — ortam kanallarında rail/kanal listesi rozetlerinin canlı kaynağı. Bugüne kadar
   // (M1a-M1j) bu olay hiç dinlenmiyordu; Home sekmesi oturum boyunca mount'lu kaldığı için kullanıcı
   // ana ekranda otururken rozetler hiç artmıyordu — yalnız ekran odaklanınca REST'ten geliyordu.

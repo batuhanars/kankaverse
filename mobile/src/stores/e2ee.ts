@@ -86,8 +86,14 @@ export async function wipeE2ee(): Promise<void> {
 /** Şifrelenebilen sohbet: 1-1 DM ya da grup DM (E2 §3.1); liste yüklü değilse (soğuk açılış, bildirim) önce yüklenir. */
 async function isEncryptableDm(channelId: string): Promise<boolean> {
   const dm = useDmStore.getState();
-  if (dm.channels.length === 0) await dm.fetchAll().catch(() => undefined);
-  return useDmStore.getState().channels.some((c) => c.id === channelId && (c.type === 'DM' || c.type === 'GROUP_DM'));
+  if (dm.channels.length === 0 && dm.requests.length === 0) await dm.fetchAll().catch(() => undefined);
+  const st = useDmStore.getState();
+  // C75 §3.3: bana gelen bekleyen mesaj istekleri DM listesinde YOKTUR ama 1-1 DM'dir; motor ilk mesajı
+  // istek ekranında da çözebilsin. Çözme yereldir: okundu/kabul göndermez.
+  return (
+    st.channels.some((c) => c.id === channelId && (c.type === 'DM' || c.type === 'GROUP_DM')) ||
+    st.requests.some((r) => r.channelId === channelId)
+  );
 }
 
 /** C62: gruptan ayrılmış/çıkarılmış sohbet. Motor orada Welcome/senkron/açma ağ çağrısı yapmaz (üyelik yok,

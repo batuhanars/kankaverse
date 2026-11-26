@@ -98,6 +98,8 @@ const moderationMock = {
 
 // E1: şifresiz plan (mevcut davranış testleri değişmez); E2EE kuralları e2ee-message.service.spec.ts'te
 const e2eeMock = { planSend: jest.fn(), planEdit: jest.fn() };
+// C75: örtük kabulde mesaj isteği bildirimi okundu işaretlenir
+const notificationsActionedMock = { markMessageRequestActioned: jest.fn() };
 
 function makeService() {
   return new MessagesService(
@@ -108,6 +110,7 @@ function makeService() {
     configMock as any,
     moderationMock as any,
     e2eeMock as any,
+    notificationsActionedMock as any,
   );
 }
 
@@ -3536,6 +3539,21 @@ describe('MessagesService.create — C9 mesaj isteği kapısı', () => {
       expect.objectContaining({ where: { id: PENDING_CH }, data: { dmRequestStatus: 'ACCEPTED' } }),
     );
     expect(prismaMock.message.create).toHaveBeenCalledTimes(1);
+    // C75: alıcının elindeki MESSAGE_REQUEST bildirimi okundu işaretlenir
+    expect(notificationsActionedMock.markMessageRequestActioned).toHaveBeenCalledWith(
+      RECIPIENT,
+      PENDING_CH,
+    );
+  });
+
+  it('istek sahibi ilk mesaj → bildirimi okundu işaretleme çağrılmaz (örtük kabul değil)', async () => {
+    membershipMock.requireChannelAccess.mockResolvedValue(PENDING_AS_REQUESTER);
+    prismaMock.message.count.mockResolvedValue(0);
+    prismaMock.message.create.mockResolvedValue(CREATED);
+
+    await service.create(REQUESTER, PENDING_CH, DTO);
+
+    expect(notificationsActionedMock.markMessageRequestActioned).not.toHaveBeenCalled();
   });
 });
 

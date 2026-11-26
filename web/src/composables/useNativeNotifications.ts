@@ -195,6 +195,9 @@ export function useNativeNotifications() {
       case 'AI_VIDEO_FAILED':
         body = t('notification.aiVideoFailed')
         break
+      case 'MESSAGE_REQUEST':
+        body = t('notification.messageRequest', { actor }) // C75: içerik yok (K2)
+        break
       default:
         body = actor
     }
@@ -234,6 +237,11 @@ export function useNativeNotifications() {
       if (dto.messageId) requestJump(dto.channelId, dto.messageId)
     } else if (dto.type === 'FRIEND_REQUEST' || dto.type === 'FRIEND_ACCEPT') {
       void router.push({ name: 'app' }) // HomeView → kankaları göster
+    } else if (dto.type === 'MESSAGE_REQUEST') {
+      void router.push({
+        name: 'dm-requests',
+        query: dto.channelId ? { channel: dto.channelId } : {},
+      })
     } else if (dto.type === 'GUILD_INVITE' && dto.guildId) {
       void router.push({ name: 'app' }) // davet; invite akışı ayrı
     } else if ((dto.type === 'AI_VIDEO_READY' || dto.type === 'AI_VIDEO_FAILED') && dto.aiVideoId) {

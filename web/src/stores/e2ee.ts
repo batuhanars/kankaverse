@@ -96,10 +96,16 @@ export const useE2eeStore = defineStore('e2ee', () => {
 
   /** Şifrelenebilen sohbet: 1-1 DM ya da grup DM (E2 §3.1). Ortam kanalları şifrelenmez. */
   // C62: ayrıldığım/çıkarıldığım grup şifrelenebilir sayılmaz → Welcome/senkron tetiklenmez, mesajlar yalnız yerel depodan okunur.
-  const isEncryptableDm = (channelId: string) =>
-    useDmStore().channels.some(
-      (c) => c.id === channelId && (c.type === 'DM' || (c.type === 'GROUP_DM' && !c.departed)),
+  // C75 §3.3: bana gelen bekleyen mesaj istekleri (`dmStore.requests`) alıcının DM listesinde YOKTUR ama 1-1 DM'dir;
+  // motor ilk mesajı (ve Welcome'ı) istek ekranında da işleyebilsin. Çözme yerel işlemdir: okundu/kabul göndermez.
+  const isEncryptableDm = (channelId: string) => {
+    const dm = useDmStore()
+    return (
+      dm.channels.some(
+        (c) => c.id === channelId && (c.type === 'DM' || (c.type === 'GROUP_DM' && !c.departed)),
+      ) || dm.requests.some((r) => r.channelId === channelId)
     )
+  }
 
   /** C62: eski grupta çözme yalnız yerel depodan; kanal durumu istenmez (eski üyeye 403, tüm sayfa gizlenirdi). */
   const hydrateOpts = (channelId: string) => ({

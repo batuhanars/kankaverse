@@ -5,6 +5,7 @@ import {
   type DmLastReactionDto,
   type DmParticipantDto,
   type GroupDmEventDto,
+  type MessageRequestDto,
 } from '@/api/dm';
 import { extractErrorMessage } from '@/api/errors';
 import { playMessageTone } from '@/audio/messageTone';
@@ -33,6 +34,10 @@ interface DmActivity {
 interface DmState {
   channels: DmChannelDto[];
   requestCount: number;
+  /** C75 §3.3: bana gelen bekleyen mesaj istekleri; E2EE motoru istek kanalının ilk mesajını da çözebilsin diye saklanır. */
+  requests: MessageRequestDto[];
+  /** C75 §3.1: benim gönderdiğim, kabul bekleyen istek kanalları (normal listede görünmez, DM ekranı bunu okur). */
+  outgoingPendingIds: string[];
   state: LoadState;
   errorMessage: string;
   /** Açık DM ekranı — o kanala gelen mesaj listede "okunmadı" olarak işaretlenmez (web ile aynı). */
@@ -43,6 +48,8 @@ interface DmState {
 
   fetchAll: () => Promise<void>;
   refreshRequests: () => Promise<void>;
+  /** C75 §2.6: `dm.request_accepted` — giden isteğim kabul edildi, kutunun kilidi kalkar. */
+  applyRequestAccepted: (channelId: string) => void;
   /**
    * Sprint M3b R6 — mesaj isteğini reddet; `block: true` ise sunucu aynı işlemde **engeller**.
    *
@@ -114,9 +121,22 @@ function visibleChannels(list: DmChannelDto[]): DmChannelDto[] {
   return list.filter((c) => !(c.type === 'DM' && c.requestStatus === 'PENDING'));
 }
 
+/** C75: kanal listesinden benim gönderdiğim bekleyen istek kimlikleri (visibleChannels'in süzdükleri). */
+function outgoingPending(list: DmChannelDto[]): string[] {
+  return list.filter((c) => c.type === 'DM' && c.requestStatus === 'PENDING' && c.requestOutgoing === true).map((c) => c.id);
+}
+
+/** C75: tek kanal için giden-bekleyen kimlik listesini günceller (istek ise ekle, değilse çıkar). */
+function syncOutgoing(ids: string[], channel: DmChannelDto): string[] {
+  const rest = ids.filter((id) => id !== channel.id);
+  return outgoingPending([channel]).length > 0 ? [...rest, channel.id] : rest;
+}
+
 export const useDmStore = create<DmState>((set, get) => ({
   channels: [],
   requestCount: 0,
+  requests: [],
+  outgoingPendingIds: [],
   state: 'loading',
   errorMessage: '',
   activeDmChannelId: null,
@@ -138,6 +158,8 @@ export const useDmStore = create<DmState>((set, get) => ({
           c.id === s.activeDmChannelId ? ({ ...c, unread: false, lastReaction: null } as DmChannelDto) : c,
         ),
         requestCount: requests.length,
+        requests,
+        outgoingPendingIds: outgoingPending(list),
         state: 'ready' as LoadState,
         errorMessage: '',
       }));
@@ -149,10 +171,18 @@ export const useDmStore = create<DmState>((set, get) => ({
   async refreshRequests() {
     try {
       const requests = await dmApi.listRequests();
-      set({ requestCount: requests.length });
+      set({ requestCount: requests.length, requests });
     } catch {
       // sessizce yut — rozet güncellenmeden kalır, liste yine çalışır
     }
+  },
+
+  applyRequestAccepted(channelId) {
+    set((s) =>
+      s.outgoingPendingIds.includes(channelId)
+        ? { outgoingPendingIds: s.outgoingPendingIds.filter((id) => id !== channelId) }
+        : s,
+    );
   },
 
   async rejectRequest(channelId, block) {
@@ -173,6 +203,8 @@ export const useDmStore = create<DmState>((set, get) => ({
 
   async applyActivity(payload) {
     const { channels, activeDmChannelId, myId } = get();
+    // C75 §3.1: bekleyen giden isteğime karşı taraftan mesaj geldi = örtük kabul (kilit kalkar).
+    if (payload.senderId !== myId) get().applyRequestAccepted(payload.channelId);
     const idx = channels.findIndex((c) => c.id === payload.channelId);
 
     if (idx === -1) {
@@ -315,7 +347,10 @@ export const useDmStore = create<DmState>((set, get) => ({
     const idx = get().channels.findIndex((c) => c.id === channel.id);
     set((s) => {
       const rest = idx === -1 ? s.channels : s.channels.filter((_, i) => i !== idx);
-      return { channels: visibleChannels([channel, ...rest]) };
+      return {
+        channels: visibleChannels([channel, ...rest]),
+        outgoingPendingIds: syncOutgoing(s.outgoingPendingIds, channel),
+      };
     });
     return channel;
   },
@@ -331,7 +366,10 @@ export const useDmStore = create<DmState>((set, get) => ({
     // o kanalın kendisi. Dönen kanal listede zaten olabilir; körü körüne başa eklemek kopya
     // satır açardı. `createChannel` ile aynı eşleştirme deseni (visibleChannels PENDING isteği
     // listeden süzer, ekran yine sohbete gider).
-    set((s) => ({ channels: visibleChannels([channel, ...withoutChannel(s.channels, channel.id)]) }));
+    set((s) => ({
+      channels: visibleChannels([channel, ...withoutChannel(s.channels, channel.id)]),
+      outgoingPendingIds: syncOutgoing(s.outgoingPendingIds, channel),
+    }));
     return channel;
   },
 
@@ -454,6 +492,8 @@ export const useDmStore = create<DmState>((set, get) => ({
       set({
         channels: [],
         requestCount: 0,
+        requests: [],
+        outgoingPendingIds: [],
         state: 'loading',
         errorMessage: '',
         activeDmChannelId: null,

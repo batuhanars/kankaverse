@@ -23,6 +23,7 @@ import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { PushService } from '../../shared/push/push.service';
 import { E2eeMembershipService } from '../e2ee/e2ee-membership.service';
 import { VoiceService } from '../voice/voice.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   GroupVisibility,
   isHiddenBeforeJoin,
@@ -150,6 +151,8 @@ export class DmService {
     private e2ee?: E2eeMembershipService,
     // C62 §2.3.d: ayrılan/çıkarılan kullanıcıyı grup aramasından (LiveKit odası = groupId) düşürür.
     private voice?: VoiceService,
+    // C75: istek sonuçlanınca (kabul/ret) mesaj isteği bildirimini okundu işaretler.
+    private notifications?: NotificationsService,
   ) {}
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -1370,6 +1373,8 @@ export class DmService {
         dmRequestStatus: 'PENDING',
         dmRequesterId: { not: userId }, // bana gelen (ben başlatan değilim)
         members: { some: { userId } }, // ben üyeyim
+        // C75 K1: istek ilk mesajla doğar; mesajsız (yalnız "Mesaj at" ile açılmış) kanal alıcıya görünmez.
+        messages: { some: { deletedAt: null } },
       },
       include: {
         dmRequester: { select: { id: true, username: true, avatarUrl: true } },
@@ -1435,12 +1440,15 @@ export class DmService {
       where: { id: channelId },
       data: { dmRequestStatus: 'ACCEPTED' },
     });
+    await this.notifications?.markMessageRequestActioned(userId, channelId);
     const other = await this.prisma.user.findUnique({
       where: { id: channel.dmRequesterId! },
       select: { id: true, username: true, avatarUrl: true, avatarAnimatedUrl: true },
     });
     if (!other)
       throw new NotFoundException({ message: 'Kullanıcı bulunamadı.', error: 'USER_NOT_FOUND' });
+    // C75 §2.6: gönderenin kilitli kutusu açılsın (yalnız durum senkronu; bildirim/push yok).
+    this.realtime.emitToUser(channel.dmRequesterId!, 'dm.request_accepted', { channelId });
     return this.toDmChannelDto(channelId, other, userId);
   }
 
@@ -1464,6 +1472,7 @@ export class DmService {
         });
       }
     });
+    await this.notifications?.markMessageRequestActioned(userId, channelId);
     return null;
   }
 }

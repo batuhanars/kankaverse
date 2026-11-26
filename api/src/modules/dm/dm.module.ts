@@ -5,9 +5,10 @@ import { DmGroupEventsService } from './dm-group-events.service';
 import { SharedModule } from '../../shared/shared.module';
 import { E2eeModule } from '../e2ee/e2ee.module';
 import { VoiceModule } from '../voice/voice.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [SharedModule, E2eeModule, VoiceModule], // C62 §2.3.d: ayrılan/çıkarılan LiveKit'ten düşürülür
+  imports: [SharedModule, E2eeModule, VoiceModule, NotificationsModule], // C62 §2.3.d: LiveKit düşürme · C75: istek bildirimi okundu
   controllers: [DmController],
   providers: [DmService, DmGroupEventsService],
 })

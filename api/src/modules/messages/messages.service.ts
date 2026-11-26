@@ -24,6 +24,7 @@ import {
 } from '../../common/utils/pre-join.util';
 import { E2eeMessageService, E2eeSendPlan } from '../e2ee/e2ee-message.service';
 import { toB64 } from '../e2ee/e2ee.util';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { Attachment, Message, MessageReaction, Prisma, ScanStatus, User } from '@prisma/client';
@@ -281,6 +282,8 @@ export class MessagesService {
     private config: ConfigService,
     private moderation: ModerationService,
     private e2ee: E2eeMessageService,
+    // C75: alıcının cevabıyla örtük kabulde mesaj isteği bildirimi okundu işaretlenir.
+    private notifications?: NotificationsService,
   ) {
     this.scanEnabled = config.get<boolean>('attachmentScanEnabled') ?? false;
   }
@@ -750,6 +753,7 @@ export class MessagesService {
           where: { id: channelId },
           data: { dmRequestStatus: 'ACCEPTED' },
         });
+        await this.notifications?.markMessageRequestActioned(userId, channelId);
       }
     }
 

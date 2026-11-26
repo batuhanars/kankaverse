@@ -43,6 +43,8 @@ function notificationText(n: NotificationDto): string {
       return t('notification.friendRequest', { actor });
     case 'FRIEND_ACCEPT':
       return t('notification.friendAccept', { actor });
+    case 'MESSAGE_REQUEST':
+      return t('notification.messageRequest', { actor }); // C75: içerik yok (K2)
     case 'GUILD_INVITE':
       return t('notification.guildInvite', { actor, guild: n.guildName ?? t('invite.unknownGuild') });
     case 'AI_VIDEO_READY':
@@ -164,6 +166,11 @@ export default function NotificationsScreen() {
       router.push('/friends-add');
       return;
     }
+    // C75: mesaj isteği bildirimi → istek ekranı, o istek seçili (kanal kimliğiyle).
+    if (n.type === 'MESSAGE_REQUEST') {
+      router.push(n.channelId ? { pathname: '/dm-requests', params: { channel: n.channelId } } : '/dm-requests');
+      return;
+    }
     // E5b §4.5: "bu sen değilsen" bildirimi → oturumlar (push dokunuşuyla aynı hedef, sahip turu 2026-11-12).
     if (n.type === 'E2EE_TRANSFER') {
       router.push('/security-sessions');
@@ -276,6 +283,7 @@ export default function NotificationsScreen() {
             const clickable =
               item.type === 'FRIEND_REQUEST' ||
               item.type === 'FRIEND_ACCEPT' ||
+              item.type === 'MESSAGE_REQUEST' ||
               item.type === 'E2EE_TRANSFER' ||
               (item.type === 'GUILD_INVITE' && !!item.preview) ||
               (item.type === 'EVENT_CREATED' && !!item.guildId) ||

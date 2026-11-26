@@ -312,7 +312,8 @@ const { groupPanelVisible: showGroupPanel, toggleGroupPanel, closeGroupPanel } =
 
 // Sprint 5 R1 — modal akışı
 const composeFile = ref<File | null>(null)
-const intake = useComposerFileIntake({ composeFile, disabled: () => !!editState.value })
+// C75: kilitli kutuda (istek gönderildi) sürükle-bırak / yapıştır da dosya almaz (`requestSent` aşağıda tanımlı, çağrı anında okunur)
+const intake = useComposerFileIntake({ composeFile, disabled: () => !!editState.value || requestSent.value })
 const onFileSelected = intake.onFileSelected
 
 function openReportMessage(msgId: string) {
@@ -571,6 +572,7 @@ function openGifPicker() {
 
 async function onAttachmentSent({ attachmentId, caption }: { attachmentId: string; caption: string }) {
   composeFile.value = null
+  if (requestSent.value) return // C75: kilitli kutu (yedek; modal zaten açılamaz)
   const replyId = replyingTo.value?.id
   replyingTo.value = null
   try {
@@ -585,7 +587,7 @@ async function onAttachmentSent({ attachmentId, caption }: { attachmentId: strin
 function send() {
   const hasText = content.value.trim()
   // Grup kanallarında canMessage kontrolü yok (backend kontrol eder)
-  const canSend = !isDeparted.value && (isGroup.value || dmChannel.value?.canMessage)
+  const canSend = !isDeparted.value && !requestSent.value && (isGroup.value || dmChannel.value?.canMessage)
   if (!hasText || !canSend) return
   stopTyping()
   sendError.value = ''
@@ -806,6 +808,21 @@ const canMessage = computed(
   () => !isDeparted.value && (isGroup.value || (dmChannel.value?.canMessage ?? false)),
 )
 const selfBlocked = computed(() => dmChannel.value?.selfBlocked ?? false)
+
+// C75 §3.1 (K1) — gönderen tarafı: giden mesaj isteği kabul bekliyor.
+//   mesaj yokken  → kutunun üstünde `composeHint` şeridi (ilk mesaj istek olarak gider)
+//   mesaj gittikten sonra → kutu TAMAMEN kilitli (ek/GIF/emoji/ses/YZ dahil), mesajın altında durum satırı.
+// "Gitti" sayılan: kanalda sunucudan gelen son mesaj ya da gönderilmekte olan yerel mesaj; başarısızlar
+// saymaz (yeniden denenebilsin). Sunucunun MESSAGE_REQUEST_PENDING hatası yedek olarak durur.
+const outgoingRequest = computed(
+  () => dmChannel.value?.requestStatus === 'PENDING' && dmChannel.value.requestOutgoing === true,
+)
+const requestSent = computed(
+  () =>
+    outgoingRequest.value &&
+    (!!dmChannel.value?.lastMessage || messages.value.some((m) => m.localStatus !== 'failed')),
+)
+const requestComposeHint = computed(() => outgoingRequest.value && !requestSent.value)
 
 // C62: ayrılma bandı metni + "Sohbeti sil" (onaylı). Silince store'dan düşer, ana DM ekranına dönülür.
 const departedNotice = computed(() =>
@@ -1254,6 +1271,14 @@ const dayLabels = computed<(string | null)[]>(() =>
         <E2eeDivider v-if="e2eeView.dividerIndex.value === messages.length" />
         <E2eeDeviceNotice v-for="n in e2eeView.deviceNotices.value.get(messages.length)" :key="`${n.userId}-${n.at}`" :name="noticeName(n.userId)" :kind="n.kind" />
         <GroupEventNotice v-for="ev in groupEventSlotMap.get(messages.length)" :key="ev.id" :event="ev" />
+        <!-- C75 §3.1: gönderilen istek mesajının altında durum satırı -->
+        <p
+          v-if="requestSent"
+          class="px-4 pt-1 text-[12px]"
+          style="color: var(--kv-text-muted);"
+        >
+          {{ t('messageRequests.pendingStatus') }}
+        </p>
       </div>
 
       <!-- En alta in: yukarı kaydırınca görünür; yukarıdayken gelen mesaj sayısı rozette (REV-9) -->
@@ -1318,8 +1343,25 @@ const dayLabels = computed<(string | null)[]>(() =>
           </button>
         </div>
 
+        <!-- C75 §3.1: istek gönderildi, kabul bekleniyor: kutu tamamen kilitli (hiçbir gönderim yolu açık değil) -->
+        <div
+          v-else-if="requestSent"
+          class="flex items-center justify-center gap-3 py-3 px-4 rounded-[var(--kv-radius-md)] text-[13px] text-center"
+          style="background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
+        >
+          {{ t('messageRequests.lockedComposer') }}
+        </div>
+
         <!-- Normal input -->
         <div v-else>
+          <!-- C75 §3.1: mesaj yokken, kutunun hemen üstünde şerit -->
+          <p
+            v-if="requestComposeHint"
+            class="mb-2 px-4 py-2.5 rounded-[var(--kv-radius-md)] text-[13px]"
+            style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
+          >
+            {{ t('messageRequests.composeHint') }}
+          </p>
           <!-- Gizli dosya input -->
           <input
             ref="fileInputEl"

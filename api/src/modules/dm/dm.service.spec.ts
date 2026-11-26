@@ -62,8 +62,19 @@ const realtimeMock = {
   emitToUser: jest.fn(),
 };
 
+// C75: istek sonuçlanınca mesaj isteği bildirimi okundu işaretlenir
+const notificationsMock = { markMessageRequestActioned: jest.fn() };
+
 function makeService() {
-  return new DmService(prismaMock as any, dmPermissionMock as any, realtimeMock as any);
+  return new DmService(
+    prismaMock as any,
+    dmPermissionMock as any,
+    realtimeMock as any,
+    undefined,
+    undefined,
+    undefined,
+    notificationsMock as any,
+  );
 }
 
 function resetMocks() {
@@ -846,6 +857,12 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     expect(prismaMock.channel.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: CH }, data: { dmRequestStatus: 'ACCEPTED' } }),
     );
+    // C75: alıcının MESSAGE_REQUEST bildirimi okundu işaretlenir
+    expect(notificationsMock.markMessageRequestActioned).toHaveBeenCalledWith(SENDER, CH);
+    // C75 §2.6: istek sahibine (TARGET) durum senkron olayı gider
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(TARGET, 'dm.request_accepted', {
+      channelId: CH,
+    });
   });
 
   it('acceptMessageRequest: istek SAHİBİ kendi isteğini kabul edemez → FORBIDDEN', async () => {
@@ -923,6 +940,14 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     );
 
     await service.rejectMessageRequest(SENDER, CH, false);
+    // C75 §2.6: ret için olay YOK
+    expect(realtimeMock.emitToUser).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'dm.request_accepted',
+      expect.anything(),
+    );
+    // C75: reddedilen isteğin bildirimi de okundu işaretlenir
+    expect(notificationsMock.markMessageRequestActioned).toHaveBeenCalledWith(SENDER, CH);
 
     expect(prismaMock.channel.update).toHaveBeenCalled();
     expect(prismaMock.userBlock.upsert).not.toHaveBeenCalled();
@@ -1185,6 +1210,20 @@ describe('DmService — C9 Mesaj İstekleri', () => {
           dmRequestStatus: 'PENDING',
           dmRequesterId: { not: SENDER },
         }),
+      }),
+    );
+  });
+
+  it('getMessageRequests: mesajsız PENDING kanal görünmez (C75 K1), sorgu silinmemiş mesaj şartı taşır', async () => {
+    resetMocks();
+    const service = makeService();
+    prismaMock.channel.findMany.mockResolvedValue([]);
+
+    await service.getMessageRequests(SENDER);
+
+    expect(prismaMock.channel.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ messages: { some: { deletedAt: null } } }),
       }),
     );
   });

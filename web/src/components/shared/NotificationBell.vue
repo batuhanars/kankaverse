@@ -24,9 +24,11 @@ const { requestJump } = useMessageJump()
 // C49 — bildirimden açılan yapay zeka video görüntüleyicisi (durum modül düzeyinde; tek host burası)
 const { viewId: aiVideoViewId, openView, closeView } = useAiVideoViewer()
 
-// C9 — bekleyen mesaj istekleri çanda da görünür (rozete dahil + panelde üstte satır).
+// C9 — bekleyen mesaj istekleri çanda panelde üstte kısayol satırı olarak görünür.
+// C75: rozet YALNIZ `unreadCount`. İstek artık kalıcı `MESSAGE_REQUEST` bildirimiyle de sayılıyor;
+// `requestCount`u da eklemek aynı isteği iki kez sayardı.
 const requestCount = computed(() => dmStore.requestCount)
-const bellBadge = computed(() => notificationsStore.unreadCount + requestCount.value)
+const bellBadge = computed(() => notificationsStore.unreadCount)
 
 function openRequests() {
   showNotifications.value = false
@@ -112,6 +114,8 @@ function notificationText(n: NotificationDto): string {
       return t('notification.aiVideoReady')
     case 'AI_VIDEO_FAILED':
       return t('notification.aiVideoFailed')
+    case 'MESSAGE_REQUEST':
+      return t('notification.messageRequest', { actor }) // C75: içerik yok (K2)
     case 'E2EE_TRANSFER':
       // E5b §4.5: preview = yeni cihazın adı. Metnin tamamı burada; alt satır tekrar etmez.
       return n.preview
@@ -189,6 +193,9 @@ async function onItemClick(n: NotificationDto) {
   } else if ((n.type === 'AI_VIDEO_READY' || n.type === 'AI_VIDEO_FAILED') && n.aiVideoId) {
     // C49 — sonuç açık gelsin: görüntüleme kipinde diyalog (aşağıda mount edilir)
     openView(n.aiVideoId)
+  } else if (n.type === 'MESSAGE_REQUEST') {
+    // C75: istek ekranı, bu istek seçili açılır
+    void router.push({ name: 'dm-requests', query: n.channelId ? { channel: n.channelId } : {} })
   } else if (n.type === 'E2EE_TRANSFER') {
     // E5b §4.5: "bu sen değilsen" bildirimi → oturumlar (tanımadığın cihazı kapat). Push ile aynı hedef.
     router.push({ name: 'settings-security' })

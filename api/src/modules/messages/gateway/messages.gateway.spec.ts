@@ -75,6 +75,7 @@ const notificationsShouldNotifyMock = jest.fn();
 const notificationsMock = {
   create: notificationsCreateMock,
   shouldNotifyChannel: notificationsShouldNotifyMock,
+  notifyMessageRequest: jest.fn(),
   snapshot: jest.fn().mockResolvedValue({ notifications: [], unreadCount: 0 }),
 };
 
@@ -116,6 +117,8 @@ function resetMocks() {
   presenceMock.audienceFor.mockResolvedValue([]);
   presenceMock.visibleOnlineFor.mockResolvedValue([]);
   notificationsMock.snapshot.mockResolvedValue({ notifications: [], unreadCount: 0 });
+  // C75 — varsayılan: istek bildirimi üretilmedi (24 sa sınırı); testler override eder.
+  notificationsMock.notifyMessageRequest.mockResolvedValue(false);
   // R12 — varsayılan: suppression yok (bildirim üretilir); süzme testleri override eder.
   notificationsShouldNotifyMock.mockResolvedValue(true);
   // R14 — varsayılan: @everyone bastırma kaydı yok
@@ -634,6 +637,53 @@ describe('MessagesGateway.notifyDmActivity — push (M3 §2.6)', () => {
     await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
 
     expect(pushSendToUsersMock).not.toHaveBeenCalled();
+  });
+
+  it('bekleyen mesaj isteği (PENDING) → dm.request + içeriksiz MESSAGE_REQUEST bildirimi (alıcıya, istek sahibi actor)', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: null,
+      dmRequestStatus: 'PENDING',
+      dmRequesterId: AUTHOR_ID,
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+    ]);
+    notificationsMock.notifyMessageRequest.mockResolvedValue(true);
+
+    await gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto());
+
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(DM_MEMBER_ID, 'dm.request', {
+      channelId: DM_CHANNEL_ID,
+    });
+    expect(notificationsMock.notifyMessageRequest).toHaveBeenCalledWith(
+      DM_MEMBER_ID,
+      AUTHOR_ID,
+      DM_CHANNEL_ID,
+    );
+    // içerik taşıyan normal DM push'u gitmez
+    expect(pushSendToUsersMock).not.toHaveBeenCalled();
+  });
+
+  it('MESSAGE_REQUEST bildirimi hata verse bile dm.request yine gider', async () => {
+    prismaMock.channel.findUnique.mockResolvedValue({
+      guildId: null,
+      dmRequestStatus: 'PENDING',
+      dmRequesterId: AUTHOR_ID,
+    });
+    prismaMock.channelMember.findMany.mockResolvedValue([
+      { userId: AUTHOR_ID },
+      { userId: DM_MEMBER_ID },
+    ]);
+    notificationsMock.notifyMessageRequest.mockRejectedValue(new Error('db'));
+
+    await expect(
+      gateway.notifyDmActivity(DM_CHANNEL_ID, makeDmMessageDto()),
+    ).resolves.toBeUndefined();
+
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(DM_MEMBER_ID, 'dm.request', {
+      channelId: DM_CHANNEL_ID,
+    });
   });
 
   it('guild kanalı (guildId dolu) → push gönderilmez', async () => {

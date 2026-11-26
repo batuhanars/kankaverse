@@ -851,10 +851,20 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     // C9: PENDING mesaj isteği → normal dm.message YOK (sessiz: liste/masaüstü bildirimi tetiklemez).
     // Alıcıya (istek sahibi olmayan) yalnız sessiz 'dm.request' → "Mesaj İstekleri" rozeti güncellensin.
-    // Push de gönderilmez (bu satırdan sonrası hiç çalışmıyor) — istek onaylanmadan bildirim yok.
+    // Normal DM push'u gönderilmez (bu satırdan sonrası çalışmıyor). C75: bunun yerine içeriksiz
+    // MESSAGE_REQUEST bildirimi (kalıcı kayıt + push) üretilir.
     if (channel.dmRequestStatus === 'PENDING') {
       const recipient = members.find((m) => m.userId !== channel.dmRequesterId);
-      if (recipient) this.realtime.emitToUser(recipient.userId, 'dm.request', { channelId });
+      if (recipient) {
+        this.realtime.emitToUser(recipient.userId, 'dm.request', { channelId });
+        // C75: kalıcı bildirim + push (içeriksiz, 24 sa sınırı serviste). Hata mesaj akışını bozmaz;
+        // `dm.request` yukarıda zaten gitti.
+        if (channel.dmRequesterId) {
+          await this.notifications
+            .notifyMessageRequest(recipient.userId, channel.dmRequesterId, channelId)
+            .catch(() => {});
+        }
+      }
       return;
     }
 

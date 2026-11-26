@@ -60,6 +60,8 @@ export default function DmScreen() {
   // `fetchAll` ile tazeleniyor. Route parametresi yalnız store'da kanal yokken (derin link) yedek.
   const storeChannel = useDmStore((s) => s.channels.find((c) => c.id === params.id));
   const myUserId = useAuthStore((s) => s.user?.id);
+  // C75 §3.1: kabul bekleyen GİDEN istek (bu kanal normal listede görünmez, kimlik ayrı tutulur).
+  const outgoingRequest = useDmStore((s) => s.outgoingPendingIds.includes(params.id));
 
   // 🔴 Kusur düzeltmesi (sahip bulgusu 2026-08-03, cihaz turu — push'tan açılan DM): `kind` route
   // param'ı yalnız listeden gelişte var; push yolu yalnız `{ id }` taşıyor (bkz. `pushNavigation.ts`
@@ -394,6 +396,7 @@ export default function DmScreen() {
         // M6a §2 — 1-1 DM'de avatar/ad yok (karşıdaki tek kişi belli); grup DM'de var.
         showIdentity={isGroupDm}
         typingMode="simple"
+        outgoingRequest={outgoingRequest}
         disabledNotice={disabledNotice}
         disabledAction={disabledAction}
         // M4a-1 sözleşme §3.1/§4 — telefon düğmesi + "sesli arama sürüyor" şeridi. M4b'den beri

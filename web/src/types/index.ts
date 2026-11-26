@@ -623,6 +623,7 @@ export const NotificationType = {
   AI_VIDEO_READY: 'AI_VIDEO_READY',
   AI_VIDEO_FAILED: 'AI_VIDEO_FAILED',
   E2EE_TRANSFER: 'E2EE_TRANSFER', // E5b: şifreli geçmiş yeni cihaza aktarıldı (güvenlik bildirimi)
+  MESSAGE_REQUEST: 'MESSAGE_REQUEST', // C75: ilk mesajla doğan mesaj isteği (içerik yok, channelId var)
 } as const
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType]
 

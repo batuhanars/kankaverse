@@ -369,6 +369,11 @@ export function useSocket() {
       dmStore.fetchRequests().catch(() => {})
     })
 
+    // C75 §2.6 — giden mesaj isteğim kabul edildi (alıcı yazmasa bile): gönderen kutusunun kilidi kalkar
+    socket.on('dm.request_accepted', (data: { channelId: string }) => {
+      dmStore.applyRequestAccepted(data.channelId)
+    })
+
     // friend.* event'leri YALNIZ friends store senkronu için kalır (arkadaş listesi).
     // Bell artık bunlardan beslenmiyor → kalıcı `notification` event'i kullanır (Sprint C1).
     socket.on('friend.request', (request: FriendRequestDto) => {

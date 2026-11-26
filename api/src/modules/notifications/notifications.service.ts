@@ -19,6 +19,8 @@ import {
 } from '../../common/utils/reaction-notification.util';
 
 const MAX_LIMIT = 50;
+/** C75 §2.3: aynı kişiden gelen mesaj isteği bildirimi için yeniden üretim aralığı. */
+const MESSAGE_REQUEST_NOTIFY_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**
  * R12/M2b — "Aktif mute" tek kaynak: süresiz (mutedUntil null) veya süresi henüz geçmemiş.
@@ -239,6 +241,45 @@ export class NotificationsService {
       where: { userId: recipientId, actorId: requesterId, type: 'FRIEND_REQUEST', readAt: null },
       data: { readAt: new Date() },
     });
+  }
+
+  /**
+   * C75 — Mesaj isteği bildirimi: kanal başına okunmamış `MESSAGE_REQUEST` kayıtlarını okundu
+   * işaretler (`markFriendRequestActioned` deseni, silme değil). İstek kabul/ret/örtük kabulle
+   * sonuçlandığında çağrılır; aksi halde rozet artık var olmayan bir isteği bekler.
+   */
+  async markMessageRequestActioned(recipientId: string, channelId: string): Promise<void> {
+    await this.prisma.notification.updateMany({
+      where: { userId: recipientId, channelId, type: 'MESSAGE_REQUEST', readAt: null },
+      data: { readAt: new Date() },
+    });
+  }
+
+  /**
+   * C75 §2.3 — İstek sahibinin ilk mesajında alıcıya kalıcı bildirim + push (içeriksiz, K2).
+   *
+   * Kötüye kullanım sınırı: aynı `actorId → userId` çifti için son 24 saatte `MESSAGE_REQUEST`
+   * kaydı varsa YENİSİ üretilmez (kayıt da push da yok). Aksi halde reddet → yeniden "Mesaj at"
+   * döngüsü alıcıya sınırsız push yağdırırdı. Dönüş: üretildiyse true.
+   */
+  async notifyMessageRequest(
+    recipientId: string,
+    requesterId: string,
+    channelId: string,
+  ): Promise<boolean> {
+    const since = new Date(Date.now() - MESSAGE_REQUEST_NOTIFY_WINDOW_MS);
+    const recent = await this.prisma.notification.findFirst({
+      where: {
+        userId: recipientId,
+        actorId: requesterId,
+        type: 'MESSAGE_REQUEST',
+        createdAt: { gte: since },
+      },
+      select: { id: true },
+    });
+    if (recent) return false;
+    await this.create(recipientId, { type: 'MESSAGE_REQUEST', actorId: requesterId, channelId });
+    return true;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -565,6 +606,10 @@ export class NotificationsService {
         break;
       case 'FRIEND_ACCEPT':
         body = `${actor} kanka isteğini kabul etti.`;
+        break;
+      case 'MESSAGE_REQUEST':
+        // C75 K2: içerik/E2EE önizleme yok; yabancı içeriği kabulden önce bildirim yüzeyine basılmaz.
+        body = `${actor} sana mesaj isteği gönderdi.`;
         break;
       case 'GUILD_INVITE':
         body = `${actor} seni ${dto.guildName ?? 'bir ortama'} davet etti.`;

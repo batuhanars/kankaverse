@@ -19,6 +19,7 @@ export const NotificationType = {
   // C49 — yapay zeka video arka planda bitti / üretilemedi (`preview` = istem, `aiVideoId` dolu)
   AI_VIDEO_READY: 'AI_VIDEO_READY',
   AI_VIDEO_FAILED: 'AI_VIDEO_FAILED',
+  MESSAGE_REQUEST: 'MESSAGE_REQUEST', // C75: ilk mesajla doğan DM isteği (içerik yok, `channelId` dolu)
   E2EE_TRANSFER: 'E2EE_TRANSFER', // E5b: şifreli geçmiş yeni cihaza aktarıldı (güvenlik bildirimi)
 } as const;
 // eslint-disable-next-line @typescript-eslint/no-redeclare -- enum-like const+type deseni, bkz. api/channels.ts

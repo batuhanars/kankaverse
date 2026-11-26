@@ -4578,3 +4578,18 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Web: köprü varsa toast yerine `showIncomingCall`, `onCallAction` → kabul/ret, tip dosyası (§1, §3)
 - [x] Doğrulama: vue-tsc -b, eslint, vite build, node --check; desktop sürüm 1.3.0 (§6)
 - [x] Sahip cihaz turu (§6): tepsideyken orta pencere, birincil ekran, zil, bildirim sesi, DM-açık mesaj sesi onaylandı (2026-11-25). Ret, arayan iptali, 30 sn ve grup araması ayrıca denenmedi.
+
+## Sprint C75 — Mesaj isteği revizyonu (ilk mesajla doğan istek, anlık bildirim + push, şifreli önizleme) — 2026-11-26
+
+> Sözleşme: `contracts/SPRINT_C75_MESSAGE_REQUEST_REVISION_CONTRACT.md`. api + web + mobile. R7: dev commit ETMEZ, diff sahibe. Dev checkbox işaretler, item EKLEMEZ.
+
+- [x] api: `getMessageRequests` mesajsız PENDING kanalı göstermez (§2.1)
+- [x] api: `MESSAGE_REQUEST` enum + migration, ilk mesajda bildirim, 24 sa sınırı, içeriksiz push, actioned işaretleme, spec'ler (§2.2-§2.5)
+- [x] web: gönderen şeridi / kilitli kutu / durum satırı, üst bant kaldırıldı (§3.1)
+- [x] web: zil satırı + rozet kuralı + OS bildirimi (§3.2)
+- [x] web: istek ekranında şifreli önizleme çözümü (§3.3)
+- [x] mobile: parite (§4)
+- [ ] Kabul sonrası boş DM: kök neden + düzeltme, teşhis notu (§5) (web teşhisi: kod okumasıyla kesin kök bulunamadı; olası mekanizma `engine.apply` çözülemeyen mesajı `undecryptable` yapıp `visibleMessages`ın gizlemesi, kabule dek hiçbir yerde Welcome/çözme çalışmıyordu; §3.3 bunu öne alır, cihazda doğrulanacak, o yüzden işaretlenmedi)
+- [x] Doğrulama komutları (§7)
+- [x] Sahip diff onayı (R7) → commit → deploy (2026-11-26)
+- [ ] Sahip cihaz turu (§7, 5 adım)

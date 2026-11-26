@@ -68,6 +68,12 @@ export const useDmStore = defineStore('dm', () => {
     return channel
   }
 
+  /** C75 §2.6 — WS `dm.request_accepted`: giden isteğim kabul edildi, kutunun kilidi kalkar. Kanal yoksa no-op. */
+  function applyRequestAccepted(channelId: string) {
+    const ch = channels.value.find((c) => c.id === channelId)
+    if (ch?.type === 'DM' && ch.requestStatus === 'PENDING') ch.requestStatus = 'ACCEPTED'
+  }
+
   /** C62 — ayrıldığım/çıkarıldığım grup: sunucu bu kanalda okundu/gönderme/tepki kapılarını kapatır (403). */
   function isDeparted(channelId: string): boolean {
     const ch = channels.value.find((c) => c.id === channelId)
@@ -282,6 +288,18 @@ export const useDmStore = defineStore('dm', () => {
       if (isDeparted(ch.id)) return // C62: eski üyeye mesaj akmaz; yine de listeyi kirletme
       // Yeni mesaj tepki göstergesinin yerini alır (§4b.5)
       ch.lastReaction = null
+      // C75 §3.1: bekleyen giden isteğime karşı taraftan mesaj geldiyse istek kabul edilmiştir (sunucuda
+      // yalnız alıcı kabul edip yazabilir; cevap = örtük kabul). Yeni sunucu olayı yok: mevcut `dm.message`
+      // akışı kilidi kaldırır. Açıkça "Kabul Et"le kabulde mesaj gelmez; o durumda kanal listesi tazelenince
+      // (sayfa açılışı / `DmView.sync`) durum ACCEPTED görünür.
+      if (
+        ch.type === 'DM' &&
+        ch.requestStatus === 'PENDING' &&
+        ch.requestOutgoing === true &&
+        payload.senderId !== authStore.user?.id
+      ) {
+        ch.requestStatus = 'ACCEPTED'
+      }
       // lastMessage alanlarını güncelle (MessageDto uyumlu — eksik alanlar korunur)
       if (ch.lastMessage) {
         if (payload.lastMessage.id) ch.lastMessage.id = payload.lastMessage.id // E3: önizleme depo anahtarı
@@ -408,6 +426,7 @@ export const useDmStore = defineStore('dm', () => {
     acceptRequest,
     rejectRequest,
     fetchChannels,
+    applyRequestAccepted,
     openChannel,
     markRead,
     applyReadSelf,

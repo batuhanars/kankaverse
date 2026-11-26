@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { dmApi, type MessageRequestDto } from '@/api/dm';
 import { useDmStore } from '@/stores/dm';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { extractErrorMessage } from '@/api/errors';
+import { useRequestPreviews } from '@/components/home/useRequestPreviews';
 import { dmRouteParams } from '@/utils/dmRoute';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -21,6 +22,8 @@ type LoadState = 'loading' | 'error' | 'ready';
 // YOK — `dmApi.rejectRequest`in `block` parametresi M1a'dan beri duruyordu, hep `false` geçiliyordu.
 export default function DmRequestsScreen() {
   const router = useRouter();
+  // C75: bildirim/push `?channel=<id>` ile gelir; o istek listenin başına alınıp vurgulanır.
+  const { channel: focusChannelId } = useLocalSearchParams<{ channel?: string }>();
   const [state, setState] = useState<LoadState>('loading');
   const [items, setItems] = useState<MessageRequestDto[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
@@ -34,6 +37,8 @@ export default function DmRequestsScreen() {
     dmApi
       .listRequests()
       .then((list) => {
+        // C75 §3.3: E2EE motoru istek kanalını ancak store'da görürse çözer; liste state'ten ÖNCE yazılır (yarış yok).
+        useDmStore.setState({ requests: list, requestCount: list.length });
         setItems(list);
         setState('ready');
       })
@@ -46,6 +51,12 @@ export default function DmRequestsScreen() {
   useEffect(() => {
     fetchRequests();
   }, [fetchRequests]);
+
+  const previewOf = useRequestPreviews(items);
+  // Seçili istek (bildirimden gelen) en üstte; geri kalan sıra korunur.
+  const shown = focusChannelId
+    ? [...items].sort((a, b) => Number(b.channelId === focusChannelId) - Number(a.channelId === focusChannelId))
+    : items;
 
   function retry() {
     setState('loading');
@@ -135,13 +146,13 @@ export default function DmRequestsScreen() {
 
       {state === 'ready' && items.length > 0 && (
         <FlatList
-          data={items}
+          data={shown}
           keyExtractor={(item) => item.channelId}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => {
             const busy = actingId === item.channelId;
             return (
-              <View style={styles.card}>
+              <View style={[styles.card, item.channelId === focusChannelId && styles.cardFocused]}>
                 <View style={styles.cardHeader}>
                   {item.requester?.avatarUrl ? (
                     <Image source={{ uri: item.requester.avatarUrl }} style={styles.avatar} />
@@ -156,7 +167,7 @@ export default function DmRequestsScreen() {
                 </View>
                 {item.preview || item.encrypted ? (
                   <Text style={styles.preview} numberOfLines={2}>
-                    {item.encrypted ? t('e2ee.preview') : item.preview}
+                    {previewOf(item)}
                   </Text>
                 ) : null}
                 <View style={styles.actions}>
@@ -254,6 +265,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgSidebar,
     padding: theme.layout.panelGap,
     marginBottom: 12,
+  },
+  cardFocused: {
+    borderWidth: 1,
+    borderColor: theme.colors.accent500,
   },
   cardHeader: {
     flexDirection: 'row',

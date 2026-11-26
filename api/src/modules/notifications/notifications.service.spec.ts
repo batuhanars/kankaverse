@@ -8,6 +8,7 @@ const prismaMock = {
     create: jest.fn(),
     createManyAndReturn: jest.fn(),
     findMany: jest.fn(),
+    findFirst: jest.fn(),
     findUnique: jest.fn(),
     update: jest.fn(),
     updateMany: jest.fn(),
@@ -387,6 +388,83 @@ describe('NotificationsService', () => {
 
       const [, payload] = pushSendToUsersMock.mock.calls[0];
       expect(payload.body).toBe('aktor sana kanka isteği gönderdi.');
+    });
+  });
+
+  // ── C75 — mesaj isteği bildirimi ────────────────────────────────────────────
+  describe('MESSAGE_REQUEST (C75)', () => {
+    const CH = 'ch-dm-1';
+    const msgReqRow = () =>
+      makeRow({
+        type: 'MESSAGE_REQUEST',
+        preview: null,
+        channelId: CH,
+        messageId: null,
+        guildId: null,
+      });
+
+    it('push gövdesi içeriksiz sabit metin + data.type/channelId taşır', async () => {
+      prismaMock.notification.create.mockResolvedValue(msgReqRow());
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: ACTOR_ID,
+        username: 'aktor',
+        avatarUrl: null,
+      });
+
+      await service.create(USER_ID, { type: 'MESSAGE_REQUEST', actorId: ACTOR_ID, channelId: CH });
+      await Promise.resolve();
+
+      const [, payload] = pushSendToUsersMock.mock.calls[0];
+      expect(payload.body).toBe('aktor sana mesaj isteği gönderdi.');
+      expect(payload.data.type).toBe('MESSAGE_REQUEST');
+      expect(payload.data.channelId).toBe(CH);
+      expect(payload.androidChannelId).toBe('messages_v6');
+      expect(payload.v2).toBeUndefined();
+    });
+
+    it('notifyMessageRequest: son 24 saatte kayıt yoksa üretir (preview yok), true döner', async () => {
+      prismaMock.notification.findFirst.mockResolvedValue(null);
+      prismaMock.notification.create.mockResolvedValue(msgReqRow());
+
+      const made = await service.notifyMessageRequest(USER_ID, ACTOR_ID, CH);
+
+      expect(made).toBe(true);
+      const where = prismaMock.notification.findFirst.mock.calls[0][0].where;
+      expect(where).toMatchObject({ userId: USER_ID, actorId: ACTOR_ID, type: 'MESSAGE_REQUEST' });
+      const since: Date = where.createdAt.gte;
+      expect(Date.now() - since.getTime()).toBeGreaterThan(23.9 * 3600 * 1000);
+      expect(Date.now() - since.getTime()).toBeLessThan(24.1 * 3600 * 1000);
+      const data = prismaMock.notification.create.mock.calls[0][0].data;
+      expect(data).toMatchObject({
+        userId: USER_ID,
+        type: 'MESSAGE_REQUEST',
+        actorId: ACTOR_ID,
+        channelId: CH,
+        preview: null,
+      });
+    });
+
+    it('notifyMessageRequest: 24 saat içinde kayıt varsa kayıt da push da YOK, false döner', async () => {
+      prismaMock.notification.findFirst.mockResolvedValue({ id: 'old' });
+
+      const made = await service.notifyMessageRequest(USER_ID, ACTOR_ID, CH);
+
+      expect(made).toBe(false);
+      expect(prismaMock.notification.create).not.toHaveBeenCalled();
+      expect(pushSendToUsersMock).not.toHaveBeenCalled();
+      expect(emitToUserMock).not.toHaveBeenCalled();
+    });
+
+    it('markMessageRequestActioned: o kanalın okunmamış MESSAGE_REQUEST kayıtlarını okundu işaretler (silmez)', async () => {
+      prismaMock.notification.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.markMessageRequestActioned(USER_ID, CH);
+
+      expect(prismaMock.notification.updateMany).toHaveBeenCalledWith({
+        where: { userId: USER_ID, channelId: CH, type: 'MESSAGE_REQUEST', readAt: null },
+        data: { readAt: expect.any(Date) },
+      });
+      expect(prismaMock.notification.deleteMany).not.toHaveBeenCalled();
     });
   });
 
