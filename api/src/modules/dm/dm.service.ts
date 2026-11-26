@@ -22,6 +22,7 @@ import { visibleLastReaction } from '../../common/utils/last-reaction.util';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { PushService } from '../../shared/push/push.service';
 import { E2eeMembershipService } from '../e2ee/e2ee-membership.service';
+import { channelSoftDeleteOps, softDeleteChannelInTx } from '../e2ee/e2ee-channel-cleanup';
 import { VoiceService } from '../voice/voice.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -834,10 +835,8 @@ export class DmService {
     const remaining = await this.prisma.channelMember.count({ where: { channelId: groupId } });
     const channelDeleted = remaining < 2;
     if (channelDeleted) {
-      await this.prisma.channel.update({
-        where: { id: groupId },
-        data: { deletedAt: new Date() },
-      });
+      // C77 §1: kalan son üyenin cihazlarına bekleyen Welcome'lar da silinir (aynı işlem).
+      await this.prisma.$transaction(channelSoftDeleteOps(this.prisma, groupId));
     }
     await this.e2ee?.afterDeparture(groupId, userId, channelDeleted);
     // C62 §2.3.d: kişi devam eden grup aramasından da düşer (best-effort; hata işlemi bozmaz). Kanal silindiyse de.
@@ -900,10 +899,8 @@ export class DmService {
       throw new ForbiddenException({ message: 'Bu işlem için yetkiniz yok.', error: 'FORBIDDEN' });
     }
 
-    await this.prisma.channel.update({
-      where: { id: groupId },
-      data: { deletedAt: new Date() },
-    });
+    // C77 §1: soft-delete + bekleyen E2EE Welcome temizliği aynı işlemde.
+    await this.prisma.$transaction(channelSoftDeleteOps(this.prisma, groupId));
 
     return null;
   }
@@ -1462,10 +1459,8 @@ export class DmService {
     const channel = await this.requirePendingRequestForRecipient(userId, channelId);
     const requesterId = channel.dmRequesterId!;
     await this.prisma.$transaction(async (tx) => {
-      await tx.channel.update({
-        where: { id: channelId },
-        data: { deletedAt: new Date() },
-      });
+      // C77 §1: istek kurulurken alıcıya bırakılan Welcome'lar da silinir (yoksa alıcının kuyruğunu kilitler).
+      await softDeleteChannelInTx(tx, channelId);
       if (block) {
         await tx.userBlock.upsert({
           where: { blockerId_blockedId: { blockerId: userId, blockedId: requesterId } },

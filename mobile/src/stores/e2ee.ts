@@ -8,6 +8,7 @@ import { useDmStore } from '@/stores/dm';
 import { isDepartedGroup } from '@/e2ee/departed';
 import { clearDeviceNotices, loadDeviceNotices } from '@/stores/e2eeNotices';
 import { t } from '@/i18n';
+import { e2eeErrorTag } from '@/e2ee/errorTag';
 
 /**
  * E1 mobil istemcinin tek girişi (web `stores/e2ee.ts` karşılığı). Motor (shared/e2ee-client) arayüzden
@@ -50,7 +51,7 @@ export function initE2ee(userId: string): Promise<void> {
       await engine?.onWelcome();
     } catch (e) {
       // İçerik yok: yalnız hata türü. Rastgelelik yoksa buraya düşer, E2EE başlamaz (§5).
-      console.error('[E2EE] başlatılamadı', e instanceof Error ? e.name : '');
+      console.error('[E2EE] başlatılamadı', e2eeErrorTag(e));
     }
   })();
   return ready;
@@ -108,7 +109,7 @@ export async function openE2eeChannel(channelId: string): Promise<void> {
     const info = await engine.open(channelId);
     set((s) => ({ channels: { ...s.channels, [channelId]: info } }));
   } catch (e) {
-    console.error('[E2EE] kanal açılamadı', e instanceof Error ? e.name : '');
+    console.error('[E2EE] kanal açılamadı', e2eeErrorTag(e));
   }
   void loadDeviceNotices(channelId); // E2 §3.3: yerel depodan "yeni cihaz eklendi" satırları (web açılış davranışı)
 }
@@ -129,7 +130,7 @@ export async function syncE2eeChannel(channelId: string): Promise<void> {
   await ready;
   const engine = get().engine;
   if (!engine || !(await isEncryptableDm(channelId)) || isDeparted(channelId)) return;
-  await engine.onGroupChanged(channelId).catch((e) => console.error('[E2EE] senkron', e instanceof Error ? e.name : ''));
+  await engine.onGroupChanged(channelId).catch((e) => console.error('[E2EE] senkron', e2eeErrorTag(e)));
   await loadDeviceNotices(channelId); // commit "yeni cihaz eklendi" satırı üretmiş olabilir (E2 §3.3)
 }
 

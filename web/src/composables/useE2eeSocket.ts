@@ -1,4 +1,5 @@
 import type { Socket } from 'socket.io-client'
+import { e2eeErrorTag } from '@kankaverse/e2ee-client'
 import { useE2eeStore } from '@/stores/e2ee'
 import { useE2eeNoticesStore } from '@/stores/e2eeNotices'
 import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
@@ -11,7 +12,7 @@ import { useVoiceStore } from '@/stores/voice'
 export function bindE2eeSocket(socket: Socket): void {
   const store = useE2eeStore()
   const voice = useVoiceStore()
-  const log = (e: unknown) => console.error('[e2ee] olay işlenemedi', e)
+  const log = (e: unknown) => console.error('[e2ee] olay işlenemedi', e2eeErrorTag(e))
 
   // Yeni Welcome: gruba katıl; açık/yeni kanalın şifreli bilgisini (ayraç zamanı) tazele.
   socket.on('e2ee:welcome', () => {

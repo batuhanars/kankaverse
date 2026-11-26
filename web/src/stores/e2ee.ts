@@ -6,7 +6,7 @@ import { useDmStore } from '@/stores/dm'
 import { useE2eeBackupStore } from '@/stores/e2eeBackup'
 import { useE2eeNoticesStore } from '@/stores/e2eeNotices'
 import { useE2eeTransferStore } from '@/stores/e2eeTransfer'
-import { CallKeyUnavailableError } from '@kankaverse/e2ee-client'
+import { CallKeyUnavailableError, e2eeErrorTag } from '@kankaverse/e2ee-client'
 import type {
   ChannelInfo,
   E2eeEngine,
@@ -56,7 +56,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
         // E5b: uygulama kapalıyken açılan aktarım isteği (soket olayı kaçtı) açılışta sorulur.
         if (engine.value?.transfer) void useE2eeTransferStore().checkPending()
       } catch (e) {
-        console.error('[e2ee] başlatılamadı', e)
+        console.error('[e2ee] başlatılamadı', e2eeErrorTag(e))
       }
     })()
     return ready
@@ -75,7 +75,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
       await current?.destroy()
       await destroyAllVaults()
     } catch (e) {
-      console.error('[e2ee] yerel depo silinemedi', e)
+      console.error('[e2ee] yerel depo silinemedi', e2eeErrorTag(e))
     }
   }
 
@@ -120,7 +120,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
     try {
       channels.value[channelId] = await engine.value.open(channelId)
     } catch (e) {
-      console.error('[e2ee] kanal açılamadı', e)
+      console.error('[e2ee] kanal açılamadı', e2eeErrorTag(e))
     }
   }
 
@@ -128,7 +128,9 @@ export const useE2eeStore = defineStore('e2ee', () => {
   async function syncChannel(channelId: string): Promise<void> {
     await ready
     if (!engine.value || !isEncryptableDm(channelId)) return
-    await engine.value.onGroupChanged(channelId).catch((e) => console.error('[e2ee] senkron', e))
+    await engine.value
+      .onGroupChanged(channelId)
+      .catch((e) => console.error('[e2ee] senkron', e2eeErrorTag(e)))
     await useE2eeNoticesStore().load(channelId) // commit "yeni cihaz eklendi" satırı üretmiş olabilir (E2 §3.3)
   }
 
@@ -299,7 +301,7 @@ export const useE2eeStore = defineStore('e2ee', () => {
     if (!engine.value || !isEncryptableDm(channelId)) return
     await engine.value
       .forgetMessage(messageId)
-      .catch((e) => console.error('[e2ee] yerel kayıt silinemedi', e))
+      .catch((e) => console.error('[e2ee] yerel kayıt silinemedi', e2eeErrorTag(e)))
   }
 
   /**

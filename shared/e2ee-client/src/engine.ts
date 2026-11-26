@@ -32,6 +32,7 @@ import type { E2eeApi, EngineDeps, Vault, WarningHandler, WithLock } from './por
 import { OFFLINE_API, withViewCache } from './viewCache'
 import { channelRecords, enrichHits, matchRecords, searchable, type LocalSearchHit } from './localSearch'
 import { processWelcomes } from './welcomes'
+import { e2eeErrorTag } from './errors'
 
 export type { WarningHandler }
 
@@ -134,7 +135,7 @@ export class E2eeEngine {
     this.api = api ? withViewCache(api, this.store) : OFFLINE_API
     this.withLock = deps.withLock
     this.onWarn = onWarn
-    this.log = deps.log ?? ((m, e) => console.error(m, e))
+    this.log = deps.log ?? ((m, e) => (e === undefined ? console.error(m) : console.error(m, e)))
     this.yieldToUi = deps.yieldToUi
     this.metric = deps.metric
     this.identity = api
@@ -278,6 +279,7 @@ export class E2eeEngine {
       warn: this.onWarn,
       yieldToUi: this.yieldToUi,
       metric: this.metric,
+      log: (m) => this.log(m),
       getDevice: async () => {
         device ??= await this.store.loadDevice()
         if (!device) throw new DeviceBrokenError('Yerel cihaz yok')
@@ -294,7 +296,10 @@ export class E2eeEngine {
   onWelcome(): Promise<string[]> {
     return this.run(async (ctx) => {
       const joined = await processWelcomes(ctx)
-      for (const id of joined) await syncChannel(ctx, id)
+      // C77 §2: bir kanalın senkron hatası diğer katılınan kanalların senkronunu durdurmaz (sonraki olayda yeniden).
+      for (const id of joined) {
+        await syncChannel(ctx, id).catch((e) => this.log(`[e2ee] Welcome sonrası senkron: ${e2eeErrorTag(e)}`))
+      }
       return joined
     })
   }

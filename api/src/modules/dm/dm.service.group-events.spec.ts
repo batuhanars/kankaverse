@@ -52,6 +52,7 @@ function setup() {
       deleteMany: jest.fn().mockReturnValue('dep-del'),
       findUnique: jest.fn(),
     },
+    e2eeWelcome: { deleteMany: jest.fn() },
     $transaction: jest.fn().mockResolvedValue([]),
   };
   const realtime = { emitToUser: jest.fn(), emitToUsers: jest.fn() };

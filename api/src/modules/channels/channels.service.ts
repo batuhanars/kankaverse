@@ -12,6 +12,7 @@ import { PermissionsService } from '../../shared/permissions/permissions.service
 import { RealtimeService } from '../../shared/realtime/realtime.service';
 import { PushService } from '../../shared/push/push.service';
 import { VoiceService } from '../voice/voice.service';
+import { channelSoftDeleteOps } from '../e2ee/e2ee-channel-cleanup';
 import { CreateChannelDto } from './dto/create-channel.dto';
 import { UpdateChannelDto } from './dto/update-channel.dto';
 import { AddChannelMemberDto } from './dto/add-channel-member.dto';
@@ -635,10 +636,8 @@ export class ChannelsService {
     // item 6: özel kanal herkese görünür → silme de TÜM guild üyelerine (ghost kanal kalmasın)
     const recipients = await this.allGuildMemberIds(channel.guildId!);
 
-    await this.prisma.channel.update({
-      where: { id: channelId },
-      data: { deletedAt: new Date() },
-    });
+    // C77 §1: soft-delete + bekleyen E2EE Welcome temizliği aynı işlemde (ortam kanalında grup yoksa no-op).
+    await this.prisma.$transaction(channelSoftDeleteOps(this.prisma, channelId));
 
     this.realtime.emitToUsers(recipients, 'channel.deleted', {
       guildId: channel.guildId,

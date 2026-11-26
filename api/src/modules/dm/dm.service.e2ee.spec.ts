@@ -43,6 +43,7 @@ function setup() {
       deleteMany: jest.fn().mockReturnValue('departure-delete-op'),
     },
     userBlock: { findMany: jest.fn().mockResolvedValue([]) },
+    e2eeWelcome: { deleteMany: jest.fn().mockReturnValue('channel-welcome-delete-op') },
     $transaction: jest.fn().mockResolvedValue([]),
   };
   const e2ee = {
@@ -153,6 +154,11 @@ describe('DmService.leaveGroupDm / removeGroupMember: E2EE bağlantısı (§2.4)
     await service.leaveGroupDm(TARGET, GROUP);
 
     expect(prisma.channel.update).toHaveBeenCalled();
+    // C77 §1: kanal silinince kalan üyenin cihazlarına bekleyen Welcome'lar da (aynı tx) silinir
+    expect(prisma.e2eeWelcome.deleteMany).toHaveBeenCalledWith({
+      where: { channelId: GROUP, deliveredAt: null },
+    });
+    expect(prisma.$transaction).toHaveBeenLastCalledWith([undefined, 'channel-welcome-delete-op']);
     expect(e2ee.afterDeparture).toHaveBeenCalledWith(GROUP, TARGET, true);
   });
 

@@ -13,6 +13,8 @@ export interface E2eeContext {
   warn(channelId: string, kind: WarningKind | null): void
   yieldToUi?: () => Promise<void>
   metric?: (name: string, ms: number, count: number) => void
+  /** İçeriksiz günlük (motorun `log`'u); yalnız hata etiketi verilir. Yoksa sessiz. */
+  log?: (message: string) => void
 }
 
 /** Şifreli yük henüz gönderilemez (Welcome gelmedi, anahtar yok): kullanıcıya "tekrar dene". */

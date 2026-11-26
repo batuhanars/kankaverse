@@ -189,12 +189,26 @@ export class E2eeGroupsService {
       where: { targetDeviceId: device.id, deliveredAt: null },
       orderBy: { createdAt: 'asc' },
     });
-    return rows.map((w) => ({
-      id: w.id,
-      channelId: w.channelId,
-      epoch: w.epoch,
-      welcome: toB64(w.welcome),
-    }));
+    // C77 §1 savunma: silinmiş (ya da artık olmayan) kanalın Welcome'ı dönmez; istemci onu işlerken 404 alıp
+    // kuyruğu kilitliyordu. Kaynakta temizlik `channelSoftDeleteOps`; bu süzgeç eski/yarışta kalan kayıtlar için.
+    const liveIds = await this.liveChannelIds(rows.map((w) => w.channelId));
+    return rows
+      .filter((w) => liveIds.has(w.channelId))
+      .map((w) => ({
+        id: w.id,
+        channelId: w.channelId,
+        epoch: w.epoch,
+        welcome: toB64(w.welcome),
+      }));
+  }
+
+  private async liveChannelIds(channelIds: string[]): Promise<Set<string>> {
+    if (channelIds.length === 0) return new Set();
+    const live = await this.prisma.channel.findMany({
+      where: { id: { in: [...new Set(channelIds)] }, deletedAt: null },
+      select: { id: true },
+    });
+    return new Set(live.map((c) => c.id));
   }
 
   async ackWelcome(user: RequestUser, welcomeId: string): Promise<null> {

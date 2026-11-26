@@ -51,6 +51,7 @@ const prismaMock = {
     upsert: jest.fn(),
     deleteMany: jest.fn(),
   },
+  e2eeWelcome: { deleteMany: jest.fn() },
   $transaction: jest.fn(),
 };
 
@@ -960,6 +961,10 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     expect(notificationsMock.markMessageRequestActioned).toHaveBeenCalledWith(SENDER, CH);
 
     expect(prismaMock.channel.update).toHaveBeenCalled();
+    // C77 §1: istek kurulurken alıcının cihazlarına bırakılan teslim edilmemiş Welcome'lar aynı tx'te silinir
+    expect(prismaMock.e2eeWelcome.deleteMany).toHaveBeenCalledWith({
+      where: { channelId: CH, deliveredAt: null },
+    });
     expect(prismaMock.userBlock.upsert).not.toHaveBeenCalled();
   });
 

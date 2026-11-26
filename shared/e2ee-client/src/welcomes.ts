@@ -5,6 +5,7 @@ import type { E2eeWelcomeRow } from './ports'
 import { fromB64, toB64 } from './b64'
 import { guardUntrusted } from './commitSync'
 import type { E2eeContext } from './context'
+import { e2eeErrorTag, isChannelGoneError } from './errors'
 import { observeLeaves } from './deviceNotices'
 import { topUpKeyPackages } from './deviceSetup'
 import { devicesOf } from './registry'
@@ -39,21 +40,47 @@ async function joinOne(ctx: E2eeContext, device: Device, row: E2eeWelcomeRow): P
   return true
 }
 
-/** Welcome'ları sırayla işler ve ack'ler. Katılınan kanal kimlikleri döner (ardından senkron çalışır). */
+type Outcome = 'joined' | 'done' | 'retry'
+
+/**
+ * 🔴 R7 — C77 §2: tek Welcome'ın sonucu. Hata bu Welcome'da kalır, çağırana fırlamaz:
+ *  - `done` (ack'lenir, bir daha gelmez): katılındı/bayat; cihazda eşleşen paket yok; kanal yok ya da erişim yok
+ *    (404/403, `isChannelGoneError`: silinmiş istek kanalı vb.).
+ *  - `retry` (ack YOK, sunucuda bekler, sonraki tetiklemede yeniden): ağ/5xx, tanınmayan cihaz (uyarı `guardUntrusted`'da
+ *    verildi, Welcome kanıt olarak kalır) ve sınıflanmamış her hata. Kuşkuda Welcome düşürülmez.
+ */
+async function tryOne(ctx: E2eeContext, device: Device, row: E2eeWelcomeRow): Promise<Outcome> {
+  try {
+    return (await joinOne(ctx, device, row)) ? 'joined' : 'done'
+  } catch (e) {
+    if (e instanceof NoMatchingKeyPackageError) return 'done'
+    const gone = isChannelGoneError(e)
+    ctx.log?.(`[e2ee] Welcome atlandı (${gone ? 'kalıcı' : 'sonra'}): ${e2eeErrorTag(e)}`)
+    return gone ? 'done' : 'retry'
+  }
+}
+
+/**
+ * Welcome'ları sunucu sırasıyla işler ve ack'ler. Katılınan kanal kimlikleri döner (ardından senkron çalışır).
+ * C77 §2: bir Welcome'ın hatası diğerlerini DURDURMAZ (silinmiş tek kanal tüm sohbetleri kilitliyordu). Sıra kuralı:
+ * bir kanalın Welcome'ı `retry` kalırsa o kanalın SONRAKİ Welcome'ları da bu tur işlenmez (kanal içi sıra bozulmaz);
+ * diğer kanallar devam eder. Ack hatası da yalnız o Welcome'ı etkiler (yeniden gelir, bayat sayılıp ack'lenir).
+ */
 export async function processWelcomes(ctx: E2eeContext): Promise<string[]> {
   const { data } = await ctx.api.welcomes()
   if (data.length === 0) return []
   const device = await ctx.getDevice()
   const joined: string[] = []
+  const held = new Set<string>() // bu tur `retry` kalan kanallar
   for (const row of data) {
-    try {
-      if (await joinOne(ctx, device, row)) joined.push(row.channelId)
-    } catch (e) {
-      // Cihazda eşleşen paket yok: bu Welcome hiçbir zaman işlenemez, ack ile kuyruktan düşür.
-      // Tanınmayan cihaz hatasında ACK YOK: uyarı çıktı, mesajlaşma durur, Welcome kanıt olarak kalır.
-      if (!(e instanceof NoMatchingKeyPackageError)) throw e
+    if (held.has(row.channelId)) continue
+    const outcome = await tryOne(ctx, device, row)
+    if (outcome === 'retry') {
+      held.add(row.channelId)
+      continue
     }
-    await ctx.api.ackWelcome(row.id)
+    if (outcome === 'joined') joined.push(row.channelId)
+    await ctx.api.ackWelcome(row.id).catch((e) => ctx.log?.(`[e2ee] Welcome ack: ${e2eeErrorTag(e)}`))
   }
   await topUpKeyPackages(ctx.api, ctx.store, device)
   return joined

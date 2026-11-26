@@ -9,13 +9,14 @@ import {
   onTransferReady,
   onTransferRevealed,
 } from '@/stores/e2eeTransfer';
+import { e2eeErrorTag } from '@/e2ee/errorTag';
 
 /**
  * E1 §2.7 — şifreleme soket olayları. Hepsi motorun sıralı kuyruğundan geçer; olay sırası korunur
  * (Welcome, mesajdan önce işlenir). Motor yoksa (E2EE kapalı) olaylar zaten gelmez, gelirse yok sayılır.
  */
 export function bindE2eeSocket(socket: Socket): void {
-  const log = (e: unknown) => console.error('[E2EE] olay işlenemedi', e instanceof Error ? e.name : '');
+  const log = (e: unknown) => console.error('[E2EE] olay işlenemedi', e2eeErrorTag(e));
 
   // Yeni Welcome: gruba katıl; açık/yeni kanalın şifreli bilgisini (ayraç zamanı) tazele.
   socket.on('e2ee:welcome', () => {

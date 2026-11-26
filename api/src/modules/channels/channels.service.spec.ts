@@ -9,6 +9,9 @@ import { ChannelsService } from './channels.service';
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
 
 const prismaMock = {
+  // C77 §1: soft-delete aynı işlemde bekleyen Welcome'ları da siler
+  e2eeWelcome: { deleteMany: jest.fn() },
+  $transaction: jest.fn(),
   channel: {
     aggregate: jest.fn(),
     create: jest.fn(),
@@ -505,6 +508,10 @@ describe('ChannelsService.remove', () => {
         data: expect.objectContaining({ deletedAt: expect.any(Date) }),
       }),
     );
+    expect(prismaMock.e2eeWelcome.deleteMany).toHaveBeenCalledWith({
+      where: { channelId: CHANNEL_ID, deliveredAt: null },
+    });
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
     expect(result).toBeNull();
   });
 

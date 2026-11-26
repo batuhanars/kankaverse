@@ -4604,3 +4604,14 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] mobile: handshake + AppState aktiflik (§4)
 - [x] Doğrulama komutları (§6)
 - [ ] Sahip cihaz turu (§6, 6 adım)
+
+## Sprint C77 — Silinmiş kanalın Welcome'ı şifrelemeyi kilitlemesin — 2026-11-26
+
+> Sözleşme: `contracts/SPRINT_C77_E2EE_WELCOME_QUEUE_CONTRACT.md`. api + shared + web + mobile. R7: dev commit ETMEZ. Dev checkbox işaretler, item EKLEMEZ.
+
+- [x] Anlık veri düzeltmesi: silinmiş kanallara ait teslim edilmemiş 88 Welcome silindi (sahip, 2026-11-26; hepsi test kanalları)
+- [x] api: soft-delete yollarında Welcome temizliği + liste savunması + spec'ler (§1)
+- [x] istemci: Welcome başına hata yalıtımı, kanal açılışı yalıtımı, teşhis etiketi, motor testleri (§2)
+- [x] Doğrulama komutları (§4)
+- [x] Sahip diff onayı (R7) → commit → deploy (2026-11-26)
+- [ ] Sahip cihaz turu (§4)

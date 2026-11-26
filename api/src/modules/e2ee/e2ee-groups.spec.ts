@@ -18,6 +18,7 @@ function setup(flag = { identity: false }) {
     e2eeIdentity: { findMany: jest.fn().mockResolvedValue([]) },
     e2eeHandshake: { findMany: jest.fn() },
     e2eeWelcome: { findMany: jest.fn(), updateMany: jest.fn() },
+    channel: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn((fn: (t: typeof tx) => unknown) => fn(tx)),
   };
   const channels = {
@@ -301,5 +302,39 @@ describe('E2eeGroupsService okuma uçları', () => {
       targetDeviceId: 'dev-1',
       deliveredAt: null,
     });
+  });
+
+  it('C77 §1: silinmiş kanalın Welcome u listede dönmez; silinmemiş kanalınki etkilenmez', async () => {
+    const { prisma, svc } = setup();
+    const w = (id: string, channelId: string) => ({
+      id,
+      channelId,
+      epoch: 1,
+      welcome: new Uint8Array([7]),
+    });
+    prisma.e2eeWelcome.findMany.mockResolvedValue([
+      w('w1', 'ch-deleted'),
+      w('w2', 'ch-live'),
+      w('w3', 'ch-deleted'),
+    ]);
+    // DB süzgeci deletedAt: null ile yalnız canlı kanalı döndürür
+    prisma.channel.findMany.mockResolvedValue([{ id: 'ch-live' }]);
+
+    const res = await svc.listWelcomes(USER);
+
+    expect(prisma.channel.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['ch-deleted', 'ch-live'] }, deletedAt: null },
+      select: { id: true },
+    });
+    expect(res).toEqual([
+      { id: 'w2', channelId: 'ch-live', epoch: 1, welcome: toB64(new Uint8Array([7])) },
+    ]);
+  });
+
+  it('C77 §1: bekleyen Welcome yoksa kanal sorgusu yapılmaz', async () => {
+    const { prisma, svc } = setup();
+    prisma.e2eeWelcome.findMany.mockResolvedValue([]);
+    await expect(svc.listWelcomes(USER)).resolves.toEqual([]);
+    expect(prisma.channel.findMany).not.toHaveBeenCalled();
   });
 });

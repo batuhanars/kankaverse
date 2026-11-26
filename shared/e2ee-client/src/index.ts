@@ -22,6 +22,9 @@ export {
   TransferSessionError,
   TransferTooLargeError,
   e2eeErrorCode,
+  e2eeErrorTag,
+  httpStatusOf,
+  isChannelGoneError,
 } from './errors'
 export { TransferManager } from './transfer'
 export {

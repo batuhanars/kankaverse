@@ -6,6 +6,7 @@ import KvButton from '@/components/ui/KvButton.vue'
 import { reportsApi, ReportReason } from '@/api/reports'
 import type { ReportTargetType, CreateReportPayload, ReportEvidenceItem } from '@/api/reports'
 import { useE2eeStore } from '@/stores/e2ee'
+import { e2eeErrorTag } from '@kankaverse/e2ee-client'
 import { useMessagesStore } from '@/stores/messages'
 
 const props = defineProps<{
@@ -51,7 +52,7 @@ async function gatherEvidence(): Promise<ReportEvidenceItem[] | undefined> {
     const items = await e2eeStore.collectEvidence(props.channelId, props.targetId, older)
     return items.length ? items : undefined
   } catch (e) {
-    console.error('[e2ee] kanıt toplanamadı', e)
+    console.error('[e2ee] kanıt toplanamadı', e2eeErrorTag(e))
     return undefined
   }
 }

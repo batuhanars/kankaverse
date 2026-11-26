@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { DeviceNotice } from '@kankaverse/e2ee-client'
+import { e2eeErrorTag, type DeviceNotice } from '@kankaverse/e2ee-client'
 import { useE2eeStore } from '@/stores/e2ee'
 
 /**
@@ -16,7 +16,7 @@ export const useE2eeNoticesStore = defineStore('e2eeNotices', () => {
     try {
       byChannel.value[channelId] = await engine.deviceNotices(channelId)
     } catch (e) {
-      console.error('[e2ee] cihaz satırları okunamadı', e)
+      console.error('[e2ee] cihaz satırları okunamadı', e2eeErrorTag(e))
     }
   }
 

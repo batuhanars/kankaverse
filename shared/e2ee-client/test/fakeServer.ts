@@ -19,7 +19,7 @@ interface Dev {
   lastResort?: string
 }
 
-const fail = (status: number, error: string, extra: object = {}) =>
+export const fail = (status: number, error: string, extra: object = {}) =>
   Object.assign(new Error(error), {
     response: { status, data: { error, ...extra } },
   })
@@ -57,6 +57,9 @@ export class FakeServer {
   rejectCommits = false
   /** true ise channelState 403 (C62: gruptan çıkarılmış eski üye). */
   failChannelState = false
+  /** C77: kanal başına channelState hatası (404 silinmiş kanal, 5xx geçici) ve çağrı kaydı. */
+  channelStateErrors = new Map<string, Error>()
+  channelStateCalls: string[] = []
   /** true ise commit satırlarında createdAt yok (eski sunucu). */
   legacyCommits = false
   /** `/e2ee/status.franking` (E4 §2.2): istemcinin v2 gönderip göndermeyeceği. */
@@ -201,6 +204,9 @@ export class FakeServer {
       channelState: (channelId: string) => {
         active()
         if (this.failChannelState) throw fail(403, 'NOT_CHANNEL_MEMBER')
+        this.channelStateCalls.push(channelId)
+        const err = this.channelStateErrors.get(channelId)
+        if (err) throw err
         return ok(this.state(channelId, userId))
       },
       claim: (channelId: string, ids: string[]) => {

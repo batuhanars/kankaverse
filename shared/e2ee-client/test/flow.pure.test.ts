@@ -9,6 +9,7 @@ import { groupSuite } from './groupSuite'
 import { rebindSuite } from './rebindSuite'
 import { frankingSuite } from './frankingSuite'
 import { notificationSuite } from './notificationSuite'
+import { welcomeQueueSuite } from './welcomeQueueSuite'
 
 // Mobil yolu: crypto.subtle'sız saf noble sağlayıcısı aynı akışı geçmeli.
 flowSuite('pure', pureProvider)
@@ -21,3 +22,4 @@ rebindSuite('pure')
 callSuite('pure') // E8; beforeEach ve sunucu flowSuite'ten gelir
 identitySuite('pure') // E7; beforeEach ve sunucu flowSuite'ten gelir
 localSearchSuite('pure') // E7 Parça B
+welcomeQueueSuite('pure') // C77; beforeEach ve sunucu flowSuite'ten gelir
