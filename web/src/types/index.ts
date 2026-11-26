@@ -204,6 +204,7 @@ export interface MessageRequestDto {
   requester: { id: string; username: string; avatarUrl: string | null } | null
   preview: string
   encrypted?: boolean // E1 — yalnız şifreliyse true: önizleme "Şifreli mesaj"
+  unseen?: boolean // C75 Rev.6 — istekler sayfası açılınca görüldü sayılır; rozet yalnız görülmemişi sayar
   createdAt: string
 }
 

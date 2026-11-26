@@ -36,6 +36,7 @@ onMounted(async () => {
     await dmStore.fetchRequests()
   } finally {
     loading.value = false
+    void dmStore.markRequestsSeen() // C75 Rev.6: sayfa açıldı → istekler görüldü
     // C75 §3.2: bildirimden gelindiyse (?channel=) o istek seçili açılır; yoksa ilki
     const wanted = typeof route.query.channel === 'string' ? route.query.channel : null
     if (!selectedChannelId.value && requests.value.length > 0) {
@@ -50,6 +51,14 @@ watch(
   () => route.query.channel,
   (id) => {
     if (typeof id === 'string' && requests.value.some((r) => r.channelId === id)) selectedChannelId.value = id
+  },
+)
+
+// C75 Rev.6: sayfa açıkken yeni istek gelirse (görülmemiş) yine görüldü say; store çift çağrıyı önler.
+watch(
+  () => dmStore.unseenRequestCount,
+  (n) => {
+    if (!loading.value && n > 0) void dmStore.markRequestsSeen()
   },
 )
 

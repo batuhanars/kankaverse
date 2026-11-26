@@ -179,6 +179,14 @@ export class PushService {
         v2Users,
         payload.v2?.kind === 'message' ? payload.v2.conversationId : undefined,
       );
+      // C75 Rev.6 (c): mesaj isteği push'u v2 gövdesi taşımaz (FCM çizer), ama "görüldü/kabul/ret"
+      // diğer cihazdaki bildirimi kaldırabilsin diye aynı işaret (alıcı, kanal) için yazılır.
+      if (payload.data.type === 'MESSAGE_REQUEST' && payload.data.channelId) {
+        await this.markPending(
+          new Set(targets.filter((uid) => this.v2AllowedFor(uid))),
+          payload.data.channelId,
+        );
+      }
 
       for (const batch of chunk(messages, CHUNK_SIZE)) {
         await this.sendBatch(batch);

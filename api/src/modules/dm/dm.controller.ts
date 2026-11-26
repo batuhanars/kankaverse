@@ -77,6 +77,16 @@ export class DmController {
     return this.dmService.getMessageRequests(user.id);
   }
 
+  @Post('requests/seen')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'C75 Rev.6: mesaj istekleri görüldü (seenAt=now, istek bildirimleri okundu, dm.requests_seen olayı); data: null',
+  })
+  markMessageRequestsSeen(@CurrentUser() user: { id: string }) {
+    return this.dmService.markMessageRequestsSeen(user.id);
+  }
+
   @Post('requests/:id/accept')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'C9: mesaj isteğini kabul et → mesajlaşma başlar (güncel DM kanalı)' })

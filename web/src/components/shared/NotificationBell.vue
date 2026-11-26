@@ -30,7 +30,9 @@ const { viewId: aiVideoViewId, openView, closeView } = useAiVideoViewer()
 // İstek `requestCount` ile sayılır; kalıcı MESSAGE_REQUEST bildirimi düşülür ki çift sayılmasın ve
 // 24 sa sınırı yüzünden yeni kayıt üretilmese de bekleyen istek rozette görünsün.
 const requestCount = computed(() => dmStore.requestCount)
-const bellBadge = computed(() => bellBadgeCount(notificationsStore.unreadCount, notificationsStore.unreadRequestNotifCount, requestCount.value))
+// C75 Rev.6: rozet görülmemiş istekleri sayar; listede tekil MESSAGE_REQUEST satırı yok (yalnız kısayol).
+const bellBadge = computed(() => bellBadgeCount(notificationsStore.unreadCount, notificationsStore.unreadRequestNotifCount, dmStore.unseenRequestCount))
+const listItems = computed(() => notificationsStore.items.filter((n) => n.type !== 'MESSAGE_REQUEST'))
 
 function openRequests() {
   showNotifications.value = false
@@ -282,14 +284,14 @@ async function onItemClick(n: NotificationDto) {
       </button>
 
       <!-- Boş durum (bildirim yok VE bekleyen istek yok) -->
-      <div v-if="!notificationsStore.items.length && requestCount === 0" class="py-10 text-center">
+      <div v-if="!listItems.length && requestCount === 0" class="py-10 text-center">
         <p class="text-[13px]" style="color: var(--kv-text-muted);">{{ t('notification.empty') }}</p>
       </div>
 
       <!-- Bildirim listesi -->
       <div v-else class="overflow-y-auto" style="max-height: 360px;" @scroll="onScroll">
         <button
-          v-for="item in notificationsStore.items"
+          v-for="item in listItems"
           :key="item.id"
           type="button"
           class="w-full text-left flex items-start gap-3 px-4 py-3 border-b last:border-0 cursor-pointer transition-colors hover:brightness-110"

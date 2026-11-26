@@ -12,3 +12,9 @@ describe('bellBadgeCount', () => {
     expect(bellBadgeCount(0, 2, 0)).toBe(0)
   })
 })
+
+describe('bellBadgeCount (Rev.6: görülmemiş istek)', () => {
+  it('görülmüş istek rozete katılmaz', () => {
+    expect(bellBadgeCount(1, 1, 0)).toBe(0)
+  })
+})

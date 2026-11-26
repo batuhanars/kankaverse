@@ -167,6 +167,27 @@ async function dismissStaleChannelNotifications(channelId: string, excludeIdenti
 }
 
 /**
+ * C75 Rev.6 (c) — verilen kanal kimliklerine ait, sistemde gösterilen bildirimleri kaldırır (FCM'in çizdiği
+ * mesaj isteği bildirimi gibi). Yalnız YEREL kaldırma: ağ çağrısı yok (MIUI arka planda dondurur), bu yüzden
+ * `kind:'read'` işleyicisinden (headless dahil) güvenle çağrılır. Hata yutulur.
+ */
+export async function dismissPresentedForChannels(channelIds: string[]): Promise<void> {
+  if (channelIds.length === 0) return;
+  try {
+    const wanted = new Set(channelIds);
+    const presented = await Notifications.getPresentedNotificationsAsync();
+    for (const n of presented) {
+      const data = n.request.content.data as Record<string, unknown> | undefined;
+      if (typeof data?.channelId === 'string' && wanted.has(data.channelId)) {
+        await Notifications.dismissNotificationAsync(n.request.identifier);
+      }
+    }
+  } catch {
+    // sessiz — bildirim altyapısı ana akışı ASLA bloke etmez
+  }
+}
+
+/**
  * §2 (M5e) — kullanıcı bir DM'i açtığında o kanala ait gölgede bekleyen mesaj bildirimlerini düşürür.
  * `dm/[id].tsx`'teki odak kancasından (`useFocusEffect`, M5d §1) çağrılır — yeni bir yaşam döngüsü
  * mekanizması KURULMADI, var olan tetikleyici kullanıldı. Yalnız `DM_MESSAGE`/`MENTION` tipini

@@ -21,8 +21,9 @@ export default function TabsLayout() {
   const unreadRequestNotifs = useNotificationsStore(
     (s) => s.items.filter((n) => n.type === 'MESSAGE_REQUEST' && !n.readAt).length,
   );
-  const requestCount = useDmStore((s) => s.requestCount);
-  const bellBadge = Math.max(0, unreadCount - unreadRequestNotifs) + requestCount;
+  // C75 Rev.6: yalnız GÖRÜLMEMİŞ istekler sayılır (istekler ekranı açılınca görüldü olur).
+  const unseenRequestCount = useDmStore((s) => s.unseenRequestCount);
+  const bellBadge = Math.max(0, unreadCount - unreadRequestNotifs) + unseenRequestCount;
   // Sprint M2a §4.3 — Ana Sayfa sekmesi rozeti: toplam ping (Σ ortam bahsetmeleri + okunmamış
   // DM/grup DM adedi). Bildirimler sekmesinin rozeti (`unreadCount`, yukarıda) AYRI bir sayı
   // (mention + kanka isteği + davet, `GET /notifications/unread-count`'tan) — bilinçli olarak

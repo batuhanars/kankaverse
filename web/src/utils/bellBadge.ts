@@ -1,5 +1,6 @@
 /**
- * C75 Rev.4 — zil rozeti: okunmamış bildirimler (MESSAGE_REQUEST hariç) + bekleyen gelen istek sayısı.
+ * C75 Rev.4/Rev.6 — zil rozeti: okunmamış bildirimler (MESSAGE_REQUEST hariç) + GÖRÜLMEMİŞ gelen istek sayısı
+ * (`requestCount` parametresine çağıranlar `dmStore.unseenRequestCount` verir).
  * `unreadCount` sunucudan gelir ve MESSAGE_REQUEST bildirimlerini de içerir; onları düşüp istekleri
  * `requestCount` ile say. Böylece istek her durumda bir kez sayılır (24 sa bildirim sınırı rozeti etkilemez).
  * `unreadRequestNotifs` yalnız yüklü bildirimlerden sayılabildiği için fark negatife düşmesin diye kıstırılır.

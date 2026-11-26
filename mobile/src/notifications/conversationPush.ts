@@ -11,7 +11,7 @@ import {
   showConversationNotification,
   updateNotificationMessageText,
 } from '../../modules/conversation-notification';
-import { MESSAGE_CHANNEL_ID } from './push';
+import { MESSAGE_CHANNEL_ID, dismissPresentedForChannels } from './push';
 import { accentColor, cacheNotificationDefaults } from './notificationDefaults';
 import { notificationText } from './notificationText';
 import { loadHidePreview } from './previewSetting';
@@ -279,7 +279,10 @@ TaskManager.defineTask(TASK_NAME, async ({ data, error }) => {
       return;
     }
     if (p.kind === 'read') {
-      await Promise.all(parseRead(p).conversationIds.map((id) => dismissConversationNotification(id)));
+      const ids = parseRead(p).conversationIds;
+      await Promise.all(ids.map((id) => dismissConversationNotification(id)));
+      // C75 Rev.6 (c): FCM'in çizdiği istek bildirimi (veri-yalnız yolla çizilmez) de kalksın.
+      await dismissPresentedForChannels(ids);
       return;
     }
     if (await handleCall(p)) return;

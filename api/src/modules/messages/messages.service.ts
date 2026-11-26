@@ -26,6 +26,7 @@ import { E2eeMessageService, E2eeSendPlan } from '../e2ee/e2ee-message.service';
 import { toB64 } from '../e2ee/e2ee.util';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeService } from '../../shared/realtime/realtime.service';
+import { PushService } from '../../shared/push/push.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UpdateMessageDto } from './dto/update-message.dto';
 import { Attachment, Message, MessageReaction, Prisma, ScanStatus, User } from '@prisma/client';
@@ -287,6 +288,8 @@ export class MessagesService {
     private notifications?: NotificationsService,
     // C75 §2.7: örtük kabulde alıcının diğer cihazlarına istek temizliği olayı.
     private realtime?: RealtimeService,
+    // C75 Rev.6 (c): örtük kabulde diğer cihazlardaki istek push bildirimi kalksın.
+    private push?: PushService,
   ) {
     this.scanEnabled = config.get<boolean>('attachmentScanEnabled') ?? false;
   }
@@ -757,6 +760,7 @@ export class MessagesService {
           data: { dmRequestStatus: 'ACCEPTED' },
         });
         await this.notifications?.markMessageRequestActioned(userId, channelId);
+        this.push?.notifyRead(userId, [channelId]).catch(() => {});
         this.realtime?.emitToUser(userId, 'dm.request_resolved', {
           channelId,
           outcome: 'accepted',

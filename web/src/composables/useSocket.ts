@@ -409,8 +409,16 @@ export function useSocket() {
       'dm.request_resolved',
       (data: { channelId: string; outcome: 'accepted' | 'rejected' }) => {
         dmStore.applyRequestResolved(data.channelId, data.outcome)
+        closeOsNotificationsForChannel(data.channelId) // C75 Rev.6 (c)
       },
     )
+
+    // C75 Rev.6 — istekler görüldü (bu ya da başka cihazımdan): rozet sıfırlanır, istek OS bildirimleri kapanır
+    socket.on('dm.requests_seen', () => {
+      const channelIds = dmStore.requests.map((r) => r.channelId)
+      dmStore.applyRequestsSeen()
+      for (const id of channelIds) closeOsNotificationsForChannel(id)
+    })
 
     // friend.* event'leri YALNIZ friends store senkronu için kalır (arkadaş listesi).
     // Bell artık bunlardan beslenmiyor → kalıcı `notification` event'i kullanır (Sprint C1).

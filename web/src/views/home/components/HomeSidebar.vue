@@ -21,7 +21,7 @@ const showStartChat = ref(false)
 const activeDmChannelId = computed(() => (route.name === 'dm' ? (route.params.channelId as string) : null))
 
 // C9 — Mesaj İstekleri (arkadaş-olmayan DM onay süzgeci). Kanka isteğinden AYRIDIR.
-const requestCount = computed(() => dmStore.requestCount)
+const requestCount = computed(() => dmStore.unseenRequestCount) // C75 Rev.6: yalnız görülmemiş
 const requestsActive = computed(() => route.name === 'dm-requests')
 
 // Ana Sayfa (karşılama/arkadaşlar ekranı) — logo dışında net bir dönüş yolu.

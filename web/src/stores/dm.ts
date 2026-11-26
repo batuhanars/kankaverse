@@ -17,6 +17,8 @@ export const useDmStore = defineStore('dm', () => {
   // C9 — Mesaj İstekleri (bana gelen bekleyen istekler)
   const requests = ref<MessageRequestDto[]>([])
   const requestCount = computed(() => requests.value.length)
+  // C75 Rev.6: rozet/kenar sayacı yalnız görülmemiş istekleri sayar (başlık sayısı toplam kalır).
+  const unseenRequestCount = computed(() => requests.value.filter((r) => r.unseen === true).length)
 
   // Oturum kullanıcısı değişince (çıkış = undefined, ya da başka hesap) kullanıcıya özel durum
   // sıfırlanır; yoksa önceki hesabın yerel giden-PENDING kanalı yeni hesabın listesine sızar.
@@ -32,6 +34,26 @@ export const useDmStore = defineStore('dm', () => {
   async function fetchRequests() {
     const res = await dmApi.getRequests()
     requests.value = res.data
+  }
+
+  /** C75 Rev.6 — WS `dm.requests_seen` (başka cihaz ya da bu cihaz): hepsi görüldü. Idempotent. */
+  function applyRequestsSeen() {
+    for (const r of requests.value) r.unseen = false
+  }
+
+  let markingSeen = false
+  /** Görülmemiş istek varsa sunucuya "görüldü" bildirir; uçuştayken çift çağrı yapmaz. */
+  async function markRequestsSeen() {
+    if (markingSeen || unseenRequestCount.value === 0) return
+    markingSeen = true
+    try {
+      await dmApi.markRequestsSeen()
+      applyRequestsSeen()
+    } catch {
+      /* sessiz: sonraki değişimde yeniden denenir */
+    } finally {
+      markingSeen = false
+    }
   }
 
   /** İsteği kabul et → ACCEPTED DM kanalı; listeden düş, kanal listesine ekle. */
@@ -450,6 +472,9 @@ export const useDmStore = defineStore('dm', () => {
     activeDmChannelId,
     requests,
     requestCount,
+    unseenRequestCount,
+    applyRequestsSeen,
+    markRequestsSeen,
     applyRequestResolved,
     fetchRequests,
     acceptRequest,

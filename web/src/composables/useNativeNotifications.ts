@@ -128,7 +128,7 @@ export function useNativeNotifications() {
       bellBadgeCount(
         notificationsStore.unreadCount,
         notificationsStore.unreadRequestNotifCount,
-        dmStore.requestCount,
+        dmStore.unseenRequestCount,
       ) + dmStore.channels.filter((c) => c.unread).length,
   )
   watch(

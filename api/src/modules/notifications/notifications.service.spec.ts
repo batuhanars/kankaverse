@@ -455,6 +455,17 @@ describe('NotificationsService', () => {
       expect(emitToUserMock).not.toHaveBeenCalled();
     });
 
+    it('markAllMessageRequestsRead: kullanıcının tüm okunmamış MESSAGE_REQUEST kayıtlarını okundu işaretler (C75 Rev.6)', async () => {
+      prismaMock.notification.updateMany.mockResolvedValue({ count: 2 });
+
+      await service.markAllMessageRequestsRead(USER_ID);
+
+      expect(prismaMock.notification.updateMany).toHaveBeenCalledWith({
+        where: { userId: USER_ID, type: 'MESSAGE_REQUEST', readAt: null },
+        data: { readAt: expect.any(Date) },
+      });
+    });
+
     it('markMessageRequestActioned: o kanalın okunmamış MESSAGE_REQUEST kayıtlarını okundu işaretler (silmez)', async () => {
       prismaMock.notification.updateMany.mockResolvedValue({ count: 1 });
 

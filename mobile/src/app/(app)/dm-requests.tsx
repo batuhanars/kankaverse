@@ -42,9 +42,14 @@ export default function DmRequestsScreen() {
       .listRequests()
       .then((list) => {
         // C75 §3.3: E2EE motoru istek kanalını ancak store'da görürse çözer; liste state'ten ÖNCE yazılır (yarış yok).
-        useDmStore.setState({ requests: list, requestCount: list.length });
+        useDmStore.setState({
+          requests: list,
+          requestCount: list.length,
+          unseenRequestCount: list.filter((r) => r.unseen === true).length,
+        });
         setItems(list);
         setState('ready');
+        void useDmStore.getState().markRequestsSeen(); // C75 Rev.6: ekran açıldı → görüldü
       })
       .catch((e) => {
         setErrorMessage(extractErrorMessage(e));
@@ -55,6 +60,12 @@ export default function DmRequestsScreen() {
   useEffect(() => {
     fetchRequests();
   }, [fetchRequests]);
+
+  // C75 Rev.6: ekran açıkken yeni (görülmemiş) istek gelirse yine görüldü say; store çift çağrıyı önler.
+  const unseenRequestCount = useDmStore((s) => s.unseenRequestCount);
+  useEffect(() => {
+    if (state === 'ready' && unseenRequestCount > 0) void useDmStore.getState().markRequestsSeen();
+  }, [state, unseenRequestCount]);
 
   const previewOf = useRequestPreviews(items);
   // Seçili istek (bildirimden gelen) en üstte; geri kalan sıra korunur.

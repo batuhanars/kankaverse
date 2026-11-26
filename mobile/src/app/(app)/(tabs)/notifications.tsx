@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -113,7 +113,9 @@ function NotificationPermissionBanner() {
 // karşılığı M1d-A'da yazılan Ortama Katıl ekranıdır, kod hazır geçilir. **Yeni ekran açılmadı.**
 export default function NotificationsScreen() {
   const router = useRouter();
-  const items = useNotificationsStore((s) => s.items);
+  const allItems = useNotificationsStore((s) => s.items);
+  // C75 Rev.6: listede tekil MESSAGE_REQUEST satırı yok; yalnız aşağıdaki "Mesaj istekleri (n)" kısayolu.
+  const items = useMemo(() => allItems.filter((n) => n.type !== 'MESSAGE_REQUEST'), [allItems]);
   const loading = useNotificationsStore((s) => s.loading);
   const loadingMore = useNotificationsStore((s) => s.loadingMore);
   const nextCursor = useNotificationsStore((s) => s.nextCursor);

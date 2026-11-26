@@ -87,6 +87,8 @@ export interface MessageRequestDto {
   preview: string;
   /** E1 — yalnız şifreliyse true: önizleme "Şifreli mesaj" gösterilir. */
   encrypted?: boolean;
+  /** C75 Rev.6 — istekler ekranı açılınca görüldü sayılır; rozet yalnız görülmemişi sayar. */
+  unseen?: boolean;
   createdAt: string;
 }
 
@@ -110,6 +112,10 @@ export const dmApi = {
   },
   async listRequests(): Promise<MessageRequestDto[]> {
     const res = await http.get<MessageRequestDto[]>('/dm/requests');
+    return res.data;
+  },
+  async markRequestsSeen(): Promise<null> {
+    const res = await http.post<null>('/dm/requests/seen');
     return res.data;
   },
   async acceptRequest(channelId: string): Promise<DmChannelDto> {

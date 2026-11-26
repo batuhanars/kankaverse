@@ -404,6 +404,28 @@ describe('PushService C50 v2', () => {
     expect(redisMock.setMarker).toHaveBeenCalledWith('push:pending:u1:ch-1', 7 * 24 * 60 * 60);
   });
 
+  it("MESSAGE_REQUEST push'u: v2 gövdesi olmasa da (alıcı, kanal) işareti yazılır (C75 Rev.6)", async () => {
+    prismaMock.pushToken.findMany.mockResolvedValue([
+      { token: 'ExponentPushToken[a]', userId: 'u1', format: 2 },
+    ]);
+    await make({ v2: true }).sendToUsers(['u1'], {
+      body: 'x sana mesaj isteği gönderdi.',
+      data: { type: 'MESSAGE_REQUEST', channelId: 'ch-9' },
+    });
+    expect(redisMock.setMarker).toHaveBeenCalledWith('push:pending:u1:ch-9', 7 * 24 * 60 * 60);
+  });
+
+  it("MESSAGE_REQUEST push'u v2 kapalıyken işaret yazmaz (C75 Rev.6)", async () => {
+    prismaMock.pushToken.findMany.mockResolvedValue([
+      { token: 'ExponentPushToken[a]', userId: 'u1', format: 1 },
+    ]);
+    await make({ v2: false }).sendToUsers(['u1'], {
+      body: 'x',
+      data: { type: 'MESSAGE_REQUEST', channelId: 'ch-9' },
+    });
+    expect(redisMock.setMarker).not.toHaveBeenCalled();
+  });
+
   it('v2 mesajında ttlSeconds varsa ttl taşınır', async () => {
     prismaMock.pushToken.findMany.mockResolvedValue([
       { token: 'ExponentPushToken[a]', userId: 'u1', format: 2 },
@@ -641,7 +663,9 @@ describe('PushService C53 arama', () => {
 
     it('v2 token yoksa fetch yok; hata fırlatmaz', async () => {
       prismaMock.pushToken.findMany.mockResolvedValue([]);
-      await expect(make({ v2: true }).sendCallEnd('u1', 'dm-1', 'canceled')).resolves.toBeUndefined();
+      await expect(
+        make({ v2: true }).sendCallEnd('u1', 'dm-1', 'canceled'),
+      ).resolves.toBeUndefined();
       expect(global.fetch).not.toHaveBeenCalled();
     });
   });

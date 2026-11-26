@@ -109,6 +109,8 @@ model User {
   username               String                @unique
   email                  String                @unique
   passwordHash           String
+  // C75 Rev.6: mesaj istekleri sayfasının son görüldüğü an (null = hiç görülmedi).
+  messageRequestsSeenAt  DateTime?
   birthDate              DateTime
   isMinor                Boolean
   isModerator            Boolean               @default(false)

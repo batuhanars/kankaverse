@@ -44,7 +44,7 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
   // state'te tutulurken canlı güncelleme tutunacak bir yer bulamıyordu.
   const channels = useDmStore((s) => s.channels);
   const encryptedPreviews = useEncryptedPreviews(channels);
-  const requestCount = useDmStore((s) => s.requestCount);
+  const unseenRequestCount = useDmStore((s) => s.unseenRequestCount); // C75 Rev.6: görülmemiş
   // Gelen (incoming) istek sayısı — giden istekler kullanıcıdan eylem beklemiyor, sayılmaz.
   const friendRequestCount = useFriendsStore(
     (s) => s.requests.filter((r) => r.direction === 'incoming').length,
@@ -142,9 +142,9 @@ export function DmSidebar({ onOpenDm, onDmMenu, onOpenRequests, onOpenSearch, on
         </Pressable>
       )}
 
-      {requestCount > 0 && (
+      {unseenRequestCount > 0 && (
         <Pressable onPress={onOpenRequests} style={styles.requestRow}>
-          <Text style={styles.requestText}>{t('notification.messageRequests', { n: requestCount })}</Text>
+          <Text style={styles.requestText}>{t('notification.messageRequests', { n: unseenRequestCount })}</Text>
         </Pressable>
       )}
 

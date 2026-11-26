@@ -68,6 +68,30 @@ Sahip bulgusu: masaüstünde reddedilen istek mobilde (ve tersi) istek ekranınd
   (web `fetchChannels`, mobil `fetchAll`). İşlemi yapan cihazda zaten yerel olarak düşmüştür: işleyici idempotent.
 - Bildirim/push YOK. İstek sahibine giden olaylar değişmez (§2.6).
 
+### Rev.6 (2026-11-26): "görüldü", tek satır liste, cihazlar arası bildirim kaldırma
+Sahip kararları (2026-11-26):
+**(a) Listede tek satır.** Zil listesinde (web + mobil) tekil `MESSAGE_REQUEST` bildirim satırı GÖSTERİLMEZ; yalnız
+"Mesaj istekleri (n)" kısayol satırı. Push/OS bildiriminin kendisi değişmez.
+**(b) Görüldü.** İstekler sayfası açılınca istekler "görüldü" sayılır; zil rozeti ve kenar çubuğu "Mesaj İstekleri" sayacı
+yalnız GÖRÜLMEMİŞ istekleri sayar. Sayfa başlığındaki sayı ve kısayol satırı toplam bekleyeni göstermeye devam eder.
+- api: `User.messageRequestsSeenAt DateTime?` (migration). `POST /dm/requests/seen` (gövdesiz): `now` yazar; o kullanıcının
+  okunmamış `MESSAGE_REQUEST` bildirimlerini okundu işaretler; kullanıcının kendi soketlerine `dm.requests_seen` `{ seenAt }`;
+  bekleyen istek kanalları için §(c) okundu push'u.
+- `GET /dm/requests` her öğeye `unseen: boolean` ekler: ilk mesajın zamanı `messageRequestsSeenAt`'ten sonraysa (ya da seenAt
+  null ise) true. Öğenin `createdAt`'i değişmez.
+- İstemci: sayfa açılınca (ve sayfa açıkken yeni istek gelince) `seen` çağrılır. `dm.requests_seen` gelince tüm öğeler
+  `unseen=false`. Rozet = okunmamış bildirimler (MESSAGE_REQUEST hariç) + görülmemiş istek sayısı; kenar sayacı = görülmemiş.
+**(c) Diğer cihazdan kaldırma.** İstek görülünce, kabul ya da ret edilince diğer cihazlardaki istek bildirimi kalkar.
+- api: `MESSAGE_REQUEST` push'u gerçekten gönderildiğinde (bastırılmadıysa) mevcut v2 okundu işareti o (alıcı, kanal) için
+  yazılır; `seen`, `acceptMessageRequest`, `rejectMessageRequest` ve örtük kabulde `push.notifyRead(alıcı, [kanal(lar)])`.
+  Mevcut `kind:'read'` push'u kullanılır, yeni push türü yok.
+- mobil: `read` push'u işlenirken mevcut konuşma bildirimi kaldırmaya EK olarak, sistemde gösterilen ve `data.channelId`'si
+  listede olan bildirimler (FCM'in çizdiği istek bildirimi) de kaldırılır. Uygulama açıkken `dm.requests_seen` /
+  `dm.request_resolved` gelince de aynı kaldırma.
+- web/masaüstü: `dm.requests_seen` ve `dm.request_resolved` gelince ilgili kanal(lar)ın OS bildirimi kapanır
+  (`closeOsNotificationsForChannel`; istek toast'u kanal kimliğiyle izlenir).
+- Sınır: MIUI uygulamayı tamamen dondurduysa telefondaki bildirim bir sonraki açılışa kalabilir (DM'lerle aynı).
+
 ### Rev.5 (2026-11-26): uygulama açıkken istek bildirimi yok
 Sahip kuralı: herhangi bir istemcide uygulama açıkken mesaj isteği sistem bildirimi üretmez. Masaüstü görünürken
 (OS toast yalnız `document.hidden` iken) ve masaüstü aktifken telefona push gitmez (C76) zaten sağlanıyordu; telefon

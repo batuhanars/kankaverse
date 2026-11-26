@@ -4623,3 +4623,9 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Üye satırı giriş noktaları ProfileSheet açar; ortam rolleri; yetkiliye "Üyeyi yönet" (§1)
 - [x] Doğrulama (§3: typecheck, eslint)
 - [ ] Sahip cihaz turu (§3, 5 adım)
+
+### C75 Rev.6 — görüldü, tek satır liste, cihazlar arası bildirim kaldırma (2026-11-26)
+- [x] api: `messageRequestsSeenAt` + migration, `POST /dm/requests/seen`, `unseen`, okundu işareti + notifyRead (Rev.6 b, c)
+- [x] web: listede tekil istek satırı yok, seen çağrısı, rozet/sayaç görülmemiş, OS bildirimi kapanır (Rev.6 a, b, c)
+- [x] mobile: aynısı + read push'unda FCM istek bildirimi kaldırma (Rev.6 a, b, c)
+- [x] Doğrulama + sahip diff onayı → deploy → APK (2026-11-26)

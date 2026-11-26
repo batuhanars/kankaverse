@@ -255,6 +255,14 @@ export class NotificationsService {
     });
   }
 
+  /** C75 Rev.6 — "görüldü": kullanıcının tüm okunmamış `MESSAGE_REQUEST` kayıtlarını okundu işaretler. */
+  async markAllMessageRequestsRead(userId: string): Promise<void> {
+    await this.prisma.notification.updateMany({
+      where: { userId, type: 'MESSAGE_REQUEST', readAt: null },
+      data: { readAt: new Date() },
+    });
+  }
+
   /**
    * C75 §2.3 — İstek sahibinin ilk mesajında alıcıya kalıcı bildirim + push (içeriksiz, K2).
    *

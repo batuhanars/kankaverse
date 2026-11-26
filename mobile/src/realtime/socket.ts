@@ -18,7 +18,7 @@ import { useVoicePresenceStore } from '@/stores/voicePresence';
 import { usePresenceStore, type PresenceStatus } from '@/stores/presence';
 import { useActivityStore } from '@/stores/activity';
 import { presentIncomingCall, dismissIncomingCall } from '@/notifications/incomingCall';
-import { clearChannelNotifications } from '@/notifications/push';
+import { clearChannelNotifications, dismissPresentedForChannels } from '@/notifications/push';
 import { t } from '@/i18n';
 import type { MessageDto } from '@/api/messages';
 import type { DmLastReactionDto, GroupDmEventDto } from '@/api/dm';
@@ -391,6 +391,14 @@ function ensureSocket(): Socket {
   // C75 §2.7 — gelen isteği başka cihazımda kabul/ret ettim: istek ekranından düşer.
   socket.on('dm.request_resolved', (data: { channelId: string; outcome: 'accepted' | 'rejected' }) => {
     useDmStore.getState().applyRequestResolved(data.channelId, data.outcome);
+    void dismissPresentedForChannels([data.channelId]); // C75 Rev.6 (c): yalnız yerel kaldırma
+  });
+
+  // C75 Rev.6 — istekler görüldü (bu ya da başka cihazımdan): rozet sıfırlanır, istek bildirimleri kalkar.
+  socket.on('dm.requests_seen', () => {
+    const ids = useDmStore.getState().requests.map((r) => r.channelId);
+    useDmStore.getState().applyRequestsSeen();
+    void dismissPresentedForChannels(ids);
   });
 
   // Sprint M2a §6 — ortam kanallarında rail/kanal listesi rozetlerinin canlı kaynağı. Bugüne kadar

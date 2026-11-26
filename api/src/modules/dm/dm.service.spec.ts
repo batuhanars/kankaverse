@@ -12,6 +12,7 @@ const prismaMock = {
   user: {
     findUnique: jest.fn(),
     findMany: jest.fn(),
+    update: jest.fn(),
   },
   channel: {
     findUnique: jest.fn(),
@@ -64,7 +65,10 @@ const realtimeMock = {
 };
 
 // C75: istek sonuçlanınca mesaj isteği bildirimi okundu işaretlenir
-const notificationsMock = { markMessageRequestActioned: jest.fn() };
+const notificationsMock = {
+  markMessageRequestActioned: jest.fn(),
+  markAllMessageRequestsRead: jest.fn(),
+};
 
 function makeService() {
   return new DmService(
@@ -1009,6 +1013,96 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     expect(res[1]).not.toHaveProperty('encrypted');
   });
 
+  it('getMessageRequests: unseen, ilk mesaj seenAt sonrasıysa ya da seenAt null ise true (C75 Rev.6)', async () => {
+    resetMocks();
+    const service = makeService();
+    const msg = (iso: string) => [{ content: 'x', encrypted: false, createdAt: new Date(iso) }];
+    const base = {
+      createdAt: new Date('2026-11-26T08:00:00.000Z'),
+      dmRequester: { id: TARGET, username: 'isteyen', avatarUrl: null },
+    };
+    prismaMock.channel.findMany.mockResolvedValue([
+      { id: 'c-old', ...base, messages: msg('2026-11-26T09:00:00.000Z') },
+      { id: 'c-new', ...base, messages: msg('2026-11-26T11:00:00.000Z') },
+    ]);
+
+    prismaMock.user.findUnique.mockResolvedValue({
+      messageRequestsSeenAt: new Date('2026-11-26T10:00:00.000Z'),
+    });
+    const seen = await service.getMessageRequests(SENDER);
+    expect(seen.map((r) => r.unseen)).toEqual([false, true]);
+
+    prismaMock.user.findUnique.mockResolvedValue({ messageRequestsSeenAt: null });
+    const never = await service.getMessageRequests(SENDER);
+    expect(never.map((r) => r.unseen)).toEqual([true, true]);
+  });
+
+  it('markMessageRequestsSeen: seenAt yazılır, bildirimler okunur, olay + notifyRead (C75 Rev.6)', async () => {
+    resetMocks();
+    const push = { notifyRead: jest.fn().mockResolvedValue(undefined) };
+    const service = new DmService(
+      prismaMock as any,
+      dmPermissionMock as any,
+      realtimeMock as any,
+      push as any,
+      undefined,
+      undefined,
+      notificationsMock as any,
+    );
+    prismaMock.user.update.mockResolvedValue({});
+    prismaMock.channel.findMany.mockResolvedValue([{ id: 'c1' }, { id: 'c2' }]);
+
+    const res = await service.markMessageRequestsSeen(SENDER);
+
+    expect(res).toBeNull();
+    const upd = prismaMock.user.update.mock.calls[0][0];
+    expect(upd.where).toEqual({ id: SENDER });
+    expect(upd.data.messageRequestsSeenAt).toBeInstanceOf(Date);
+    expect(notificationsMock.markAllMessageRequestsRead).toHaveBeenCalledWith(SENDER);
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(SENDER, 'dm.requests_seen', {
+      seenAt: upd.data.messageRequestsSeenAt.toISOString(),
+    });
+    expect(push.notifyRead).toHaveBeenCalledWith(SENDER, ['c1', 'c2']);
+  });
+
+  it('kabul ve ret: alıcının diğer cihazları için notifyRead (C75 Rev.6)', async () => {
+    resetMocks();
+    const push = { notifyRead: jest.fn().mockResolvedValue(undefined) };
+    const service = new DmService(
+      prismaMock as any,
+      dmPermissionMock as any,
+      realtimeMock as any,
+      push as any,
+      undefined,
+      undefined,
+      notificationsMock as any,
+    );
+    prismaMock.channel.findUnique.mockResolvedValue({
+      id: CH,
+      type: 'DM',
+      dmRequestStatus: 'PENDING',
+      dmRequesterId: TARGET,
+    });
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm', lastReadAt: null });
+    prismaMock.channel.update.mockResolvedValue({ id: CH });
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: TARGET,
+      username: 'isteyen',
+      avatarUrl: null,
+    });
+    prismaMock.message.findFirst.mockResolvedValue(null);
+    prismaMock.userBlock.findUnique.mockResolvedValue(null);
+    await service.acceptMessageRequest(SENDER, CH);
+    expect(push.notifyRead).toHaveBeenCalledWith(SENDER, [CH]);
+
+    push.notifyRead.mockClear();
+    prismaMock.$transaction.mockImplementation(
+      async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock),
+    );
+    await service.rejectMessageRequest(SENDER, CH, false);
+    expect(push.notifyRead).toHaveBeenCalledWith(SENDER, [CH]);
+  });
+
   it('getDmChannels: ek-yalnız son mesaj içeriği eklerden üretilir (grup DM)', async () => {
     resetMocks();
     const service = makeService();
@@ -1216,6 +1310,7 @@ describe('DmService — C9 Mesaj İstekleri', () => {
         requester: { id: TARGET, username: 'isteyen', avatarUrl: null },
         preview: 'selam olur mu',
         createdAt: now.toISOString(),
+        unseen: true,
       },
     ]);
     // Yalnız bana gelen (dmRequesterId != me) + PENDING sorgulanmalı

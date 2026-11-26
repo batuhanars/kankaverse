@@ -102,6 +102,8 @@ const e2eeMock = { planSend: jest.fn(), planEdit: jest.fn() };
 const notificationsActionedMock = { markMessageRequestActioned: jest.fn() };
 
 const realtimeResolvedMock = { emitToUser: jest.fn() };
+// C75 Rev.6: örtük kabulde diğer cihazlardaki istek push'u kalkar
+const pushReadMock = { notifyRead: jest.fn() };
 
 function makeService() {
   return new MessagesService(
@@ -114,6 +116,7 @@ function makeService() {
     e2eeMock as any,
     notificationsActionedMock as any,
     realtimeResolvedMock as any,
+    pushReadMock as any,
   );
 }
 
@@ -121,6 +124,7 @@ function resetMocks() {
   jest.resetAllMocks();
   e2eeMock.planSend.mockResolvedValue({ encrypted: false });
   e2eeMock.planEdit.mockResolvedValue({ encrypted: false });
+  pushReadMock.notifyRead.mockResolvedValue(undefined);
   prismaMock.guildMemberRole.findMany.mockResolvedValue([]);
   prismaMock.$transaction.mockImplementation((fn: (tx: unknown) => unknown) => fn(prismaMock));
   permissionsMock.hasGuildPermission.mockResolvedValue(true);
@@ -3548,11 +3552,12 @@ describe('MessagesService.create — C9 mesaj isteği kapısı', () => {
       PENDING_CH,
     );
     // C75 §2.7: alıcının diğer cihazlarına istek temizliği olayı
-    expect(realtimeResolvedMock.emitToUser).toHaveBeenCalledWith(
-      RECIPIENT,
-      'dm.request_resolved',
-      { channelId: PENDING_CH, outcome: 'accepted' },
-    );
+    expect(realtimeResolvedMock.emitToUser).toHaveBeenCalledWith(RECIPIENT, 'dm.request_resolved', {
+      channelId: PENDING_CH,
+      outcome: 'accepted',
+    });
+    // C75 Rev.6 (c): diğer cihazlardaki istek push bildirimi kalkar
+    expect(pushReadMock.notifyRead).toHaveBeenCalledWith(RECIPIENT, [PENDING_CH]);
   });
 
   it('istek sahibi ilk mesaj → bildirimi okundu işaretleme çağrılmaz (örtük kabul değil)', async () => {

@@ -34,6 +34,8 @@ interface DmActivity {
 interface DmState {
   channels: DmChannelDto[];
   requestCount: number;
+  /** C75 Rev.6: görülmemiş (unseen===true) istek sayısı; rozet/kenar sayacı bunu okur. */
+  unseenRequestCount: number;
   /** C75 §3.3: bana gelen bekleyen mesaj istekleri; E2EE motoru istek kanalının ilk mesajını da çözebilsin diye saklanır. */
   requests: MessageRequestDto[];
   /** C75 §3.1: benim gönderdiğim, kabul bekleyen istek kanalları (normal listede görünmez, DM ekranı bunu okur). */
@@ -50,6 +52,10 @@ interface DmState {
   refreshRequests: () => Promise<void>;
   /** C75 §2.6: `dm.request_accepted` — giden isteğim kabul edildi, kutunun kilidi kalkar. */
   applyRequestAccepted: (channelId: string) => void;
+  /** C75 Rev.6: `dm.requests_seen` (ya da kendi çağrım): tüm istekler görüldü. Idempotent. */
+  applyRequestsSeen: () => void;
+  /** C75 Rev.6: görülmemiş istek varsa sunucuya bildirir; uçuştayken çift çağrı yapmaz. */
+  markRequestsSeen: () => Promise<void>;
   /** C75 §2.7: başka cihazda çözülen gelen isteği düşür; `accepted` ise DM listesini tazele. Idempotent. */
   applyRequestResolved: (channelId: string, outcome: 'accepted' | 'rejected') => void;
   /**
@@ -142,9 +148,18 @@ function syncOutgoing(ids: string[], channel: DmChannelDto): string[] {
   return outgoingPending([channel]).length > 0 ? [...rest, channel.id] : rest;
 }
 
+/** C75 Rev.6: görülmemiş istek sayısı (`unseen === true`). */
+function countUnseen(list: MessageRequestDto[]): number {
+  return list.filter((r) => r.unseen === true).length;
+}
+
+/** `markRequestsSeen` çift çağrı koruması (modül düzeyi: store tek). */
+let markingSeen = false;
+
 export const useDmStore = create<DmState>((set, get) => ({
   channels: [],
   requestCount: 0,
+  unseenRequestCount: 0,
   requests: [],
   outgoingPendingIds: [],
   state: 'loading',
@@ -168,6 +183,7 @@ export const useDmStore = create<DmState>((set, get) => ({
           c.id === s.activeDmChannelId ? ({ ...c, unread: false, lastReaction: null } as DmChannelDto) : c,
         ),
         requestCount: requests.length,
+        unseenRequestCount: countUnseen(requests),
         requests,
         outgoingPendingIds: mergeOutgoing(s.outgoingPendingIds, list),
         state: 'ready' as LoadState,
@@ -181,7 +197,7 @@ export const useDmStore = create<DmState>((set, get) => ({
   async refreshRequests() {
     try {
       const requests = await dmApi.listRequests();
-      set({ requestCount: requests.length, requests });
+      set({ requestCount: requests.length, unseenRequestCount: countUnseen(requests), requests });
     } catch {
       // sessizce yut — rozet güncellenmeden kalır, liste yine çalışır
     }
@@ -198,9 +214,32 @@ export const useDmStore = create<DmState>((set, get) => ({
   applyRequestResolved(channelId, outcome) {
     set((s) => {
       const requests = s.requests.filter((r) => r.channelId !== channelId);
-      return requests.length === s.requests.length ? s : { requests, requestCount: requests.length };
+      return requests.length === s.requests.length
+        ? s
+        : { requests, requestCount: requests.length, unseenRequestCount: countUnseen(requests) };
     });
     if (outcome === 'accepted') void get().fetchAll();
+  },
+
+  applyRequestsSeen() {
+    set((s) =>
+      s.unseenRequestCount === 0
+        ? s
+        : { requests: s.requests.map((r) => ({ ...r, unseen: false })), unseenRequestCount: 0 },
+    );
+  },
+
+  async markRequestsSeen() {
+    if (markingSeen || get().unseenRequestCount === 0) return;
+    markingSeen = true;
+    try {
+      await dmApi.markRequestsSeen();
+      get().applyRequestsSeen();
+    } catch {
+      // sessiz: sonraki değişimde yeniden denenir
+    } finally {
+      markingSeen = false;
+    }
   },
 
   async rejectRequest(channelId, block) {
@@ -510,6 +549,7 @@ export const useDmStore = create<DmState>((set, get) => ({
       set({
         channels: [],
         requestCount: 0,
+        unseenRequestCount: 0,
         requests: [],
         outgoingPendingIds: [],
         state: 'loading',

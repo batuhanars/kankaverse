@@ -1363,6 +1363,11 @@ export class DmService {
 
   /** GET /dm/requests — bana gelen (ben başlatmadığım) PENDING mesaj istekleri. */
   async getMessageRequests(userId: string) {
+    const me = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { messageRequestsSeenAt: true },
+    });
+    const seenAt = me?.messageRequestsSeenAt ?? null;
     const channels = await this.prisma.channel.findMany({
       where: {
         type: 'DM',
@@ -1403,7 +1408,44 @@ export class DmService {
       // E1: yalnız şifreliyse alan var (lastMessage kalıbı); istemci "🔒 Şifreli mesaj" gösterir.
       ...(c.messages[0]?.encrypted ? { encrypted: true as const } : {}),
       createdAt: c.createdAt.toISOString(),
+      // C75 Rev.6: ilk mesaj "görüldü" anından sonraysa (ya da hiç görülmediyse) görülmemiş.
+      unseen: !seenAt || (c.messages[0] ? c.messages[0].createdAt > seenAt : false),
     }));
+  }
+
+  /**
+   * POST /dm/requests/seen — C75 Rev.6: istekler sayfası görüldü. seenAt=now; okunmamış istek
+   * bildirimleri okundu; kendi soketlerine `dm.requests_seen`; bekleyen istek kanalları için
+   * diğer cihazlardaki push bildirimi kalksın diye okundu push'u.
+   */
+  async markMessageRequestsSeen(userId: string) {
+    const seenAt = new Date();
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { messageRequestsSeenAt: seenAt },
+    });
+    await this.notifications?.markAllMessageRequestsRead(userId);
+    this.realtime.emitToUser(userId, 'dm.requests_seen', { seenAt: seenAt.toISOString() });
+    const pending = await this.prisma.channel.findMany({
+      where: {
+        type: 'DM',
+        deletedAt: null,
+        dmRequestStatus: 'PENDING',
+        dmRequesterId: { not: userId },
+        members: { some: { userId } },
+        messages: { some: { deletedAt: null } },
+      },
+      select: { id: true },
+    });
+    if (pending.length > 0) {
+      this.push
+        ?.notifyRead(
+          userId,
+          pending.map((c) => c.id),
+        )
+        .catch(() => {});
+    }
+    return null;
   }
 
   /** Bekleyen isteği doğrula + alıcı-kapısı (yalnız alıcı işlem yapabilir, istek sahibi değil). */
@@ -1438,6 +1480,8 @@ export class DmService {
       data: { dmRequestStatus: 'ACCEPTED' },
     });
     await this.notifications?.markMessageRequestActioned(userId, channelId);
+    // C75 Rev.6 (c): diğer cihazlardaki istek push bildirimi kalksın.
+    this.push?.notifyRead(userId, [channelId]).catch(() => {});
     const other = await this.prisma.user.findUnique({
       where: { id: channel.dmRequesterId! },
       select: { id: true, username: true, avatarUrl: true, avatarAnimatedUrl: true },
@@ -1470,6 +1514,7 @@ export class DmService {
       }
     });
     await this.notifications?.markMessageRequestActioned(userId, channelId);
+    this.push?.notifyRead(userId, [channelId]).catch(() => {});
     // C75 §2.7: alıcının diğer cihazlarında istek ekrandan düşsün (engelle dahil).
     this.realtime.emitToUser(userId, 'dm.request_resolved', { channelId, outcome: 'rejected' });
     return null;
