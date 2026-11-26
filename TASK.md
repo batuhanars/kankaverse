@@ -4629,3 +4629,10 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] web: listede tekil istek satırı yok, seen çağrısı, rozet/sayaç görülmemiş, OS bildirimi kapanır (Rev.6 a, b, c)
 - [x] mobile: aynısı + read push'unda FCM istek bildirimi kaldırma (Rev.6 a, b, c)
 - [x] Doğrulama + sahip diff onayı → deploy → APK (2026-11-26)
+
+### C75 Rev.7 — istek başına görüldü, liste görünümü, topluca reddet, mobil canlı liste + rail rozeti (2026-11-26)
+- [x] api: `ChannelMember.requestSeenAt` + migration, `POST /dm/requests/:channelId/seen`, `unseen` kuralı, `reject-batch` (Rev.7 a) (yerel DB'ye uygulandı, `migrate status` temiz)
+- [x] web: otomatik seçim/toplu seen yok, seçince seen, satır işaretleri, "{n} yeni", Tümünü reddet (Rev.7 b)
+- [x] mobile: canlı liste (store), sıkı satır + detay ekranı, detayda seen, Tümünü reddet (Rev.7 c)
+- [x] mobile: rail rozeti kökü (bulgu: arka planda soket kapatılıyor, yeniden bağlanınca DM listesi tazelenmiyordu, `unread` bayat; rozet ayrıca ikondan önce çiziliyordu) + DM / istek / kanka toplamı (Rev.7 c)
+- [x] Doğrulama + sahip diff onayı (R7) → deploy → APK (yerel cihaz turu geçti 2026-11-26; tur bulgusu: başlık rozeti yalnız görülmemişi sayar, hepsi görülünce kaybolur)

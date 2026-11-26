@@ -36,24 +36,38 @@ export const useDmStore = defineStore('dm', () => {
     requests.value = res.data
   }
 
-  /** C75 Rev.6 — WS `dm.requests_seen` (başka cihaz ya da bu cihaz): hepsi görüldü. Idempotent. */
+  /** C75 Rev.6 — WS `dm.requests_seen` (eski istemcinin toplu "görüldü"sü): hepsi görüldü. Idempotent. */
   function applyRequestsSeen() {
     for (const r of requests.value) r.unseen = false
   }
 
-  let markingSeen = false
-  /** Görülmemiş istek varsa sunucuya "görüldü" bildirir; uçuştayken çift çağrı yapmaz. */
-  async function markRequestsSeen() {
-    if (markingSeen || unseenRequestCount.value === 0) return
-    markingSeen = true
+  /** C75 Rev.7 — WS `dm.request_seen` (bu ya da başka cihazım): o istek görüldü. Idempotent. */
+  function applyRequestSeen(channelId: string) {
+    const r = requests.value.find((x) => x.channelId === channelId)
+    if (r) r.unseen = false
+  }
+
+  /**
+   * C75 Rev.7 — istek detayı açıldı. Görülmemişse yerelde hemen düşer (rozet beklemez), sunucuya
+   * bildirilir; diğer cihazlar `dm.request_seen` ile yakalar. Hata sessiz: bir sonraki açılışta yeniden denenir.
+   */
+  async function markRequestSeen(channelId: string) {
+    const r = requests.value.find((x) => x.channelId === channelId)
+    if (!r || r.unseen !== true) return
+    r.unseen = false
     try {
-      await dmApi.markRequestsSeen()
-      applyRequestsSeen()
+      await dmApi.markRequestSeen(channelId)
     } catch {
-      /* sessiz: sonraki değişimde yeniden denenir */
-    } finally {
-      markingSeen = false
+      /* sessiz */
     }
+  }
+
+  /** C75 Rev.7 — Tümünü reddet: yalnız verilen (ekranda görülen) kimlikler; reddedilenler listeden düşer. */
+  async function rejectRequestsBatch(channelIds: string[]): Promise<number> {
+    const res = await dmApi.rejectRequestsBatch(channelIds)
+    const done = new Set(res.data.rejected)
+    requests.value = requests.value.filter((r) => !done.has(r.channelId))
+    return done.size
   }
 
   /** İsteği kabul et → ACCEPTED DM kanalı; listeden düş, kanal listesine ekle. */
@@ -474,7 +488,9 @@ export const useDmStore = defineStore('dm', () => {
     requestCount,
     unseenRequestCount,
     applyRequestsSeen,
-    markRequestsSeen,
+    applyRequestSeen,
+    markRequestSeen,
+    rejectRequestsBatch,
     applyRequestResolved,
     fetchRequests,
     acceptRequest,

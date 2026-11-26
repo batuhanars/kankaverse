@@ -22,6 +22,7 @@ const prismaMock = {
   },
   channelMember: {
     update: jest.fn(),
+    updateMany: jest.fn(),
     findMany: jest.fn(),
     findUnique: jest.fn(),
     findFirst: jest.fn(),
@@ -981,6 +982,7 @@ describe('DmService — C9 Mesaj İstekleri', () => {
         id: CH,
         createdAt: now,
         dmRequester: { id: TARGET, username: 'isteyen', avatarUrl: null },
+        members: [],
         messages: [{ content: '', createdAt: now, attachments: [{ contentType: 'audio/mp4' }] }],
       },
     ]);
@@ -997,6 +999,7 @@ describe('DmService — C9 Mesaj İstekleri', () => {
     const base = {
       createdAt: now,
       dmRequester: { id: TARGET, username: 'isteyen', avatarUrl: null },
+      members: [],
     };
     prismaMock.channel.findMany.mockResolvedValue([
       { id: 'c-enc', ...base, messages: [{ content: '', encrypted: true, createdAt: now }] },
@@ -1022,8 +1025,8 @@ describe('DmService — C9 Mesaj İstekleri', () => {
       dmRequester: { id: TARGET, username: 'isteyen', avatarUrl: null },
     };
     prismaMock.channel.findMany.mockResolvedValue([
-      { id: 'c-old', ...base, messages: msg('2026-11-26T09:00:00.000Z') },
-      { id: 'c-new', ...base, messages: msg('2026-11-26T11:00:00.000Z') },
+      { id: 'c-old', ...base, members: [], messages: msg('2026-11-26T09:00:00.000Z') },
+      { id: 'c-new', ...base, members: [], messages: msg('2026-11-26T11:00:00.000Z') },
     ]);
 
     prismaMock.user.findUnique.mockResolvedValue({
@@ -1063,6 +1066,106 @@ describe('DmService — C9 Mesaj İstekleri', () => {
       seenAt: upd.data.messageRequestsSeenAt.toISOString(),
     });
     expect(push.notifyRead).toHaveBeenCalledWith(SENDER, ['c1', 'c2']);
+  });
+
+  it('getMessageRequests: istek başına requestSeenAt varsa unseen false, toplu damgadan bağımsız (C75 Rev.7)', async () => {
+    resetMocks();
+    const service = makeService();
+    const base = {
+      createdAt: new Date('2026-11-26T08:00:00.000Z'),
+      dmRequester: { id: TARGET, username: 'isteyen', avatarUrl: null },
+      messages: [
+        { content: 'x', encrypted: false, createdAt: new Date('2026-11-26T11:00:00.000Z') },
+      ],
+    };
+    prismaMock.channel.findMany.mockResolvedValue([
+      {
+        id: 'c-opened',
+        ...base,
+        members: [{ requestSeenAt: new Date('2026-11-26T12:00:00.000Z') }],
+      },
+      { id: 'c-closed', ...base, members: [{ requestSeenAt: null }] },
+    ]);
+    prismaMock.user.findUnique.mockResolvedValue({ messageRequestsSeenAt: null });
+
+    const res = await service.getMessageRequests(SENDER);
+
+    expect(res.map((r) => r.unseen)).toEqual([false, true]);
+    // Sorgu yalnız kendi üyelik satırımı okur (karşı tarafın damgası hiç çekilmez).
+    expect(prismaMock.channel.findMany.mock.calls[0][0].include.members).toEqual({
+      where: { userId: SENDER },
+      select: { requestSeenAt: true },
+    });
+  });
+
+  it('markMessageRequestSeen: yalnız kendi satırı, dm:seen YOK, olay + bildirim + notifyRead (C75 Rev.7, R7)', async () => {
+    resetMocks();
+    const push = { notifyRead: jest.fn().mockResolvedValue(undefined) };
+    const service = new DmService(
+      prismaMock as any,
+      dmPermissionMock as any,
+      realtimeMock as any,
+      push as any,
+      undefined,
+      undefined,
+      notificationsMock as any,
+    );
+    prismaMock.channel.findUnique.mockResolvedValue({
+      id: CH,
+      type: 'DM',
+      dmRequestStatus: 'PENDING',
+      dmRequesterId: TARGET,
+    });
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm' });
+    prismaMock.channelMember.updateMany.mockResolvedValue({ count: 1 });
+
+    expect(await service.markMessageRequestSeen(SENDER, CH)).toBeNull();
+
+    const upd = prismaMock.channelMember.updateMany.mock.calls[0][0];
+    expect(upd.where).toEqual({ channelId: CH, userId: SENDER, requestSeenAt: null });
+    expect(upd.data.requestSeenAt).toBeInstanceOf(Date);
+    expect(prismaMock.channelMember.update).not.toHaveBeenCalled(); // lastReadAt'e dokunulmaz
+    expect(notificationsMock.markMessageRequestActioned).toHaveBeenCalledWith(SENDER, CH);
+    expect(realtimeMock.emitToUser).toHaveBeenCalledWith(SENDER, 'dm.request_seen', {
+      channelId: CH,
+    });
+    // İstek sahibine hiçbir olay gitmez (okundu bilgisi sızmaz).
+    expect(realtimeMock.emitToUser.mock.calls.every((c: unknown[]) => c[0] === SENDER)).toBe(true);
+    expect(push.notifyRead).toHaveBeenCalledWith(SENDER, [CH]);
+  });
+
+  it('markMessageRequestSeen: istek sahibi kendi isteğini görüldü yapamaz (C75 Rev.7)', async () => {
+    resetMocks();
+    const service = makeService();
+    prismaMock.channel.findUnique.mockResolvedValue({
+      id: CH,
+      type: 'DM',
+      dmRequestStatus: 'PENDING',
+      dmRequesterId: SENDER,
+    });
+    await expect(service.markMessageRequestSeen(SENDER, CH)).rejects.toThrow(ForbiddenException);
+    expect(prismaMock.channelMember.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejectMessageRequestsBatch: yalnız geçerli kendi istekleri reddedilir, geçersiz atlanır, engel yok (C75 Rev.7)', async () => {
+    resetMocks();
+    const service = makeService();
+    prismaMock.$transaction.mockImplementation(
+      async (fn: (tx: typeof prismaMock) => Promise<unknown>) => fn(prismaMock),
+    );
+    prismaMock.channel.findUnique.mockImplementation(({ where }: { where: { id: string } }) =>
+      Promise.resolve(
+        where.id === 'yok'
+          ? null
+          : { id: where.id, type: 'DM', dmRequestStatus: 'PENDING', dmRequesterId: TARGET },
+      ),
+    );
+    prismaMock.channelMember.findUnique.mockResolvedValue({ id: 'cm' });
+
+    const res = await service.rejectMessageRequestsBatch(SENDER, ['a', 'yok', 'b', 'a']);
+
+    expect(res).toEqual({ rejected: ['a', 'b'] });
+    expect(prismaMock.userBlock.upsert).not.toHaveBeenCalled();
   });
 
   it('kabul ve ret: alıcının diğer cihazları için notifyRead (C75 Rev.6)', async () => {
@@ -1298,6 +1401,7 @@ describe('DmService — C9 Mesaj İstekleri', () => {
         id: CH,
         createdAt: now,
         dmRequester: { id: TARGET, username: 'isteyen', avatarUrl: null },
+        members: [],
         messages: [{ content: 'selam olur mu', createdAt: now }],
       },
     ]);

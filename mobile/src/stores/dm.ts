@@ -52,10 +52,14 @@ interface DmState {
   refreshRequests: () => Promise<void>;
   /** C75 §2.6: `dm.request_accepted` — giden isteğim kabul edildi, kutunun kilidi kalkar. */
   applyRequestAccepted: (channelId: string) => void;
-  /** C75 Rev.6: `dm.requests_seen` (ya da kendi çağrım): tüm istekler görüldü. Idempotent. */
+  /** C75 Rev.6: `dm.requests_seen` (eski istemcinin toplu çağrısı): tüm istekler görüldü. Idempotent. */
   applyRequestsSeen: () => void;
-  /** C75 Rev.6: görülmemiş istek varsa sunucuya bildirir; uçuştayken çift çağrı yapmaz. */
-  markRequestsSeen: () => Promise<void>;
+  /** C75 Rev.7: `dm.request_seen`: tek istek görüldü (bu ya da başka cihazım). Idempotent. */
+  applyRequestSeen: (channelId: string) => void;
+  /** C75 Rev.7: istek detayı açıldı → yalnız o istek görüldü (yerelde anında, sunucuya bildirilir). */
+  markRequestSeen: (channelId: string) => Promise<void>;
+  /** C75 Rev.7: Tümünü reddet; yalnız verilen kimlikler. Dönüş: reddedilen sayısı. Hata yutulmaz. */
+  rejectRequestsBatch: (channelIds: string[]) => Promise<number>;
   /** C75 §2.7: başka cihazda çözülen gelen isteği düşür; `accepted` ise DM listesini tazele. Idempotent. */
   applyRequestResolved: (channelId: string, outcome: 'accepted' | 'rejected') => void;
   /**
@@ -153,9 +157,6 @@ function countUnseen(list: MessageRequestDto[]): number {
   return list.filter((r) => r.unseen === true).length;
 }
 
-/** `markRequestsSeen` çift çağrı koruması (modül düzeyi: store tek). */
-let markingSeen = false;
-
 export const useDmStore = create<DmState>((set, get) => ({
   channels: [],
   requestCount: 0,
@@ -229,17 +230,33 @@ export const useDmStore = create<DmState>((set, get) => ({
     );
   },
 
-  async markRequestsSeen() {
-    if (markingSeen || get().unseenRequestCount === 0) return;
-    markingSeen = true;
+  applyRequestSeen(channelId) {
+    set((s) => {
+      if (!s.requests.some((r) => r.channelId === channelId && r.unseen === true)) return s;
+      const requests = s.requests.map((r) => (r.channelId === channelId ? { ...r, unseen: false } : r));
+      return { requests, unseenRequestCount: countUnseen(requests) };
+    });
+  },
+
+  async markRequestSeen(channelId) {
+    if (!get().requests.some((r) => r.channelId === channelId && r.unseen === true)) return;
+    // Önce yerel: rozet sunucu turunu beklemez. Tekrar çağrı yukarıdaki koşulda durur (çift istek yok).
+    get().applyRequestSeen(channelId);
     try {
-      await dmApi.markRequestsSeen();
-      get().applyRequestsSeen();
+      await dmApi.markRequestSeen(channelId);
     } catch {
-      // sessiz: sonraki değişimde yeniden denenir
-    } finally {
-      markingSeen = false;
+      // sessiz: bir sonraki açılışta sunucu hâlâ unseen döner, yeniden denenir
     }
+  },
+
+  async rejectRequestsBatch(channelIds) {
+    const { rejected } = await dmApi.rejectRequestsBatch(channelIds);
+    const done = new Set(rejected);
+    set((s) => {
+      const requests = s.requests.filter((r) => !done.has(r.channelId));
+      return { requests, requestCount: requests.length, unseenRequestCount: countUnseen(requests) };
+    });
+    return done.size;
   },
 
   async rejectRequest(channelId, block) {

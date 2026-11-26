@@ -20,6 +20,7 @@ import { CreateGroupDmDto } from './dto/create-group-dm.dto';
 import { AddGroupMemberDto } from './dto/add-group-member.dto';
 import { RenameGroupDmDto } from './dto/rename-group-dm.dto';
 import { RejectRequestDto } from './dto/reject-request.dto';
+import { RejectRequestsBatchDto } from './dto/reject-requests-batch.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -85,6 +86,29 @@ export class DmController {
   })
   markMessageRequestsSeen(@CurrentUser() user: { id: string }) {
     return this.dmService.markMessageRequestsSeen(user.id);
+  }
+
+  @Post('requests/reject-batch')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'C75 Rev.7: Tümünü reddet. Yalnız gönderilen kimlikler (engelleme yok); geçersizler atlanır. data: { rejected }',
+  })
+  rejectMessageRequestsBatch(
+    @CurrentUser() user: { id: string },
+    @Body() dto: RejectRequestsBatchDto,
+  ) {
+    return this.dmService.rejectMessageRequestsBatch(user.id, dto.channelIds);
+  }
+
+  @Post('requests/:id/seen')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'C75 Rev.7: tek istek görüldü (alıcıya özel; istek sahibine okundu bilgisi GİTMEZ). dm.request_seen olayı; data: null',
+  })
+  markMessageRequestSeen(@CurrentUser() user: { id: string }, @Param('id') channelId: string) {
+    return this.dmService.markMessageRequestSeen(user.id, channelId);
   }
 
   @Post('requests/:id/accept')

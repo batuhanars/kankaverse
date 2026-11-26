@@ -1509,7 +1509,13 @@
     "composeHint": "Kankan değil. İlk mesajın bir mesaj isteği olarak gider; kabul edilene kadar yalnız bir mesaj gönderebilirsin.",
     "pendingStatus": "İstek gönderildi · kabul bekleniyor",
     "lockedComposer": "Mesaj isteğin kabul edilince yazışmaya devam edebilirsin.",
-    "pendingError": "Mesaj isteğin kabul edilene kadar tek mesaj gönderebilirsin."
+    "pendingError": "Mesaj isteğin kabul edilene kadar tek mesaj gönderebilirsin.",
+    "selectHint": "Okumak için listeden bir istek seç.",
+    "unseenLabel": "Yeni istek",
+    "rejectAll": "Tümünü reddet",
+    "rejectAllConfirmTitle": "Tüm istekler reddedilsin mi?",
+    "rejectAllConfirmMessage": "{n} mesaj isteği reddedilecek. Gönderenler bilgilendirilmez.",
+    "rejectedAll": "{n} istek reddedildi."
   },
   "sidebar": {
     "searchPlaceholder": "Sohbet bul ya da başlat",

@@ -150,6 +150,7 @@ export default function AppLayout() {
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="dm-requests" />
+      <Stack.Screen name="dm-request/[channelId]" />
       <Stack.Screen name="share" />
       {/* M4a-1 sözleşme §4 — arama ekranı "tam ekran modal". Kendi başlığını çizer (headerShown
           false); Android donanım geri tuşu varsayılan pop davranışıyla küçültme ile AYNI sonucu

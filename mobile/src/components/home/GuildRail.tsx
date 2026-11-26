@@ -5,6 +5,8 @@ import type { GuildSummaryDto } from '@/api/guilds';
 import { hexPoints } from '../hexShape';
 import { GuildRailItem } from './GuildRailItem';
 import { useDmUnreadCount } from '@/stores/unread';
+import { useDmStore } from '@/stores/dm';
+import { useFriendsStore } from '@/stores/friends';
 import { badgeLabel } from '@/utils/badgeLabel';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
@@ -51,7 +53,16 @@ export function GuildRail({
   // Sprint M2b §10 R3-1 — sahip kararı: rail'in DM girişi bir ortam değil, oradan gelen HER mesaj
   // bahsetme muamelesi görür. Eski beyaz "en az bir okunmamış var mı" pip'i KALDIRILDI, yerine
   // `useTotalPing`in kullandığı AYNI sayı (`useDmUnreadCount`) kırmızı rozette gösterilir.
+  //
+  // C75 Rev.7 (sahip kararı): baloncuk "Ana Sayfa'da seni bekleyen bir şey var" der. Okunmamış DM'e
+  // ek olarak görülmemiş mesaj istekleri ve bekleyen gelen kanka istekleri de sayılır; yoksa push
+  // düşüp nereden geldiği belli olmuyordu.
   const dmUnreadCount = useDmUnreadCount();
+  const unseenRequestCount = useDmStore((s) => s.unseenRequestCount);
+  const friendRequestCount = useFriendsStore(
+    (s) => s.requests.filter((r) => r.direction === 'incoming').length,
+  );
+  const homeBadgeCount = dmUnreadCount + unseenRequestCount + friendRequestCount;
   return (
     // Sabit genişlik SARAN View'da tutulur, ScrollView'a değil — ScrollView'ın kendi `style`ına
     // verilen `width`, flex-row ebeveyn içinde çapraz eksende (yatay) güvenilir uygulanmıyor
@@ -68,15 +79,10 @@ export function GuildRail({
           accessibilityRole="button"
           accessibilityLabel={t('mobile.home.dmEntry')}
         >
-          {/* Sprint M2b §10 R3-1 — kırmızı bahsetme rozeti (GuildRailItem'ın `mentionBadge`iyle
+          {/* (Rozet aşağıda, ikondan sonra çiziliyor.) Sprint M2b §10 R3-1 — kırmızı bahsetme rozeti (GuildRailItem'ın `mentionBadge`iyle
               AYNI görsel dil): DM bir ortam değil, oradan gelen her okunmamış mesaj bahsetme
               muamelesi görür. Sıfırsa hiç çizilmez; susturulmuş/`NONE` DM'ler zaten sayılmıyor
               (`useDmUnreadCount`). */}
-          {dmUnreadCount > 0 && (
-            <View style={styles.dmBadge}>
-              <Text style={styles.dmBadgeText}>{badgeLabel(dmUnreadCount)}</Text>
-            </View>
-          )}
           {/* 🔴 İkon ADI iki durumda da AYNI; yalnız RENK değişiyor (sahip bulgusu 2026-08-01:
               ortam seçiliyken kutu tamamen boş kalıyordu — sönük değil, hiç çizilmiyordu).
               Ad `chatbubble` ↔ `chatbubble-outline` arasında takas ediliyordu ve iki durum
@@ -89,6 +95,13 @@ export function GuildRail({
             size={22}
             color={selection.type === 'dm' ? theme.colors.accent500 : theme.colors.textSecondary}
           />
+          {/* C75 Rev.7: rozet ikondan SONRA çizilir (GuildRailItem ile aynı sıra): Android'de sonraki
+              kardeş üstte kalır, rozet ikonun altında kalmasın. */}
+          {homeBadgeCount > 0 && (
+            <View style={styles.dmBadge}>
+              <Text style={styles.dmBadgeText}>{badgeLabel(homeBadgeCount)}</Text>
+            </View>
+          )}
         </Pressable>
 
         {state === 'loading' && <ActivityIndicator color={theme.colors.textMuted} style={styles.railSpinner} />}

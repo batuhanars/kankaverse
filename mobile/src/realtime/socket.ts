@@ -57,6 +57,13 @@ let activeChannelId: string | null = null;
 let onReconnectRefetch: (() => void) | null = null;
 // auth_error sonrası art arda tazele-dene sayacı (sonsuz döngü koruması)
 let authRetryCount = 0;
+/**
+ * C75 Rev.7 — bu oturumda en az bir kez bağlandık mı. Uygulama arka plana düşünce soket bilerek
+ * kapatılıyor (`disconnectSocket`); arada gelen DM/istek/kanka olayları kaçıyor. İlk bağlantıda
+ * ekranlar zaten çekiyor; YENİDEN bağlanınca liste rozetleri bayat kalmasın diye tazelenir
+ * (sahip bulgusu: push düşüyor ama rail baloncuğunda rozet hiç çıkmıyordu).
+ */
+let connectedOnce = false;
 
 // [[D45]] M4b §13.1 — ses presence aboneliği artık ÇOKLU kanal + REFERANS SAYILI. Eski hâli
 // (`activeVoiceChannelId: string | null`) M4a'da doğruydu: ekranda tek bir DM vardı. M4b'nin DM
@@ -149,6 +156,11 @@ function ensureSocket(): Socket {
     // C76: (yeniden) bağlanınca mevcut aktiflik değeri tekrar gönderilir.
     emitClientActivity();
     bindAppStateActivity();
+    if (connectedOnce) {
+      void useDmStore.getState().fetchAll();
+      void useFriendsStore.getState().fetchAll();
+    }
+    connectedOnce = true;
     if (activeChannelId) {
       joinRoom(activeChannelId);
       // contract §4.3 — "sadece yeni gelenleri dinle" yetmez; arada kaçan mesajlar yeniden çekilir.
@@ -399,6 +411,12 @@ function ensureSocket(): Socket {
     const ids = useDmStore.getState().requests.map((r) => r.channelId);
     useDmStore.getState().applyRequestsSeen();
     void dismissPresentedForChannels(ids);
+  });
+
+  // C75 Rev.7 — tek istek görüldü (bu ya da başka cihazımda detayı açıldı): yalnız o istek ve bildirimi.
+  socket.on('dm.request_seen', (data: { channelId: string }) => {
+    useDmStore.getState().applyRequestSeen(data.channelId);
+    void dismissPresentedForChannels([data.channelId]);
   });
 
   // Sprint M2a §6 — ortam kanallarında rail/kanal listesi rozetlerinin canlı kaynağı. Bugüne kadar
@@ -757,6 +775,7 @@ export function resetSocket(): void {
   activeChannelId = null;
   onReconnectRefetch = null;
   authRetryCount = 0;
+  connectedOnce = false;
   // [[D45]] — yeni oturumda eski sayaçlarla başlamasın (logout sırasında ekranlar zaten unmount
   // olur ve kendi unsubscribe'larını çağırır, ama bu kesin bir güvence değil — örn. React ağacı
   // temizlenmeden logout tetiklenirse sayaç sıfırlanmadan kalabilirdi).

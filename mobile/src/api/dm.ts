@@ -114,8 +114,14 @@ export const dmApi = {
     const res = await http.get<MessageRequestDto[]>('/dm/requests');
     return res.data;
   },
-  async markRequestsSeen(): Promise<null> {
-    const res = await http.post<null>('/dm/requests/seen');
+  /** C75 Rev.7: tek istek görüldü (alıcıya özel; istek sahibine okundu bilgisi gitmez). */
+  async markRequestSeen(channelId: string): Promise<null> {
+    const res = await http.post<null>(`/dm/requests/${channelId}/seen`);
+    return res.data;
+  },
+  /** C75 Rev.7: Tümünü reddet. Yalnız gönderilen kimlikler; engelleme yok. */
+  async rejectRequestsBatch(channelIds: string[]): Promise<{ rejected: string[] }> {
+    const res = await http.post<{ rejected: string[] }>('/dm/requests/reject-batch', { channelIds });
     return res.data;
   },
   async acceptRequest(channelId: string): Promise<DmChannelDto> {

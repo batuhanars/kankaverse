@@ -10,7 +10,11 @@ export const dmApi = {
 
   // C9 — Mesaj İstekleri (arkadaş-olmayan DM onay süzgeci)
   getRequests: () => http.get<MessageRequestDto[]>('/dm/requests'),
-  markRequestsSeen: () => http.post<null>('/dm/requests/seen'),
+  /** C75 Rev.7: tek istek görüldü (alıcıya özel; istek sahibine okundu bilgisi gitmez). */
+  markRequestSeen: (channelId: string) => http.post<null>(`/dm/requests/${channelId}/seen`),
+  /** C75 Rev.7: Tümünü reddet. Yalnız gönderilen kimlikler; engelleme yok. */
+  rejectRequestsBatch: (channelIds: string[]) =>
+    http.post<{ rejected: string[] }>('/dm/requests/reject-batch', { channelIds }),
   acceptRequest: (channelId: string) => http.post<DmChannelDto>(`/dm/requests/${channelId}/accept`),
   rejectRequest: (channelId: string, block: boolean) =>
     http.post<null>(`/dm/requests/${channelId}/reject`, { block }),

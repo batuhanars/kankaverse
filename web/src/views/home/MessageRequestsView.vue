@@ -25,9 +25,12 @@ const loading = ref(true)
 const selectedChannelId = ref<string | null>(null)
 const acting = ref(false)
 const showBlockConfirm = ref(false)
+/** C75 Rev.7: "Tümünü reddet" onayı açıkken ekranda görülen kimlikler (null = diyalog kapalı). */
+const rejectAllIds = ref<string[] | null>(null)
 
 const requests = computed(() => dmStore.requests)
 const selected = computed(() => requests.value.find((r) => r.channelId === selectedChannelId.value) ?? null)
+const unseenCount = computed(() => dmStore.unseenRequestCount)
 // C75 §3.3: şifreli ilk mesaj burada çözülür; çözülemezse genel "Şifreli mesaj" metni kalır.
 const { textOf } = useRequestPreviews(() => requests.value, () => t('e2ee.preview'))
 
@@ -36,14 +39,16 @@ onMounted(async () => {
     await dmStore.fetchRequests()
   } finally {
     loading.value = false
-    void dmStore.markRequestsSeen() // C75 Rev.6: sayfa açıldı → istekler görüldü
-    // C75 §3.2: bildirimden gelindiyse (?channel=) o istek seçili açılır; yoksa ilki
+    // C75 Rev.7: sayfa açılması "görüldü" sayılmaz ve ilk istek otomatik seçilmez (seçmek = görmek).
+    // Bildirimden gelindiyse (?channel=) kullanıcı zaten o isteğe tıklamıştır: o seçilir.
     const wanted = typeof route.query.channel === 'string' ? route.query.channel : null
-    if (!selectedChannelId.value && requests.value.length > 0) {
-      selectedChannelId.value =
-        requests.value.find((r) => r.channelId === wanted)?.channelId ?? requests.value[0].channelId
-    }
+    if (wanted && requests.value.some((r) => r.channelId === wanted)) selectedChannelId.value = wanted
   }
+})
+
+// C75 Rev.7: bir istek seçilince (tıklama ya da ?channel=) yalnız o istek görüldü olur.
+watch(selectedChannelId, (id) => {
+  if (id) void dmStore.markRequestSeen(id)
 })
 
 // Sayfadayken zilden başka bir isteğe tıklanırsa (aynı rota, yeni sorgu) seçim o isteğe geçer.
@@ -54,18 +59,11 @@ watch(
   },
 )
 
-// C75 Rev.6: sayfa açıkken yeni istek gelirse (görülmemiş) yine görüldü say; store çift çağrıyı önler.
-watch(
-  () => dmStore.unseenRequestCount,
-  (n) => {
-    if (!loading.value && n > 0) void dmStore.markRequestsSeen()
-  },
-)
-
-// C75 §2.7: seçili istek başka cihazda çözülüp listeden düştüyse seçim sıradaki isteğe (yoksa boş) geçer.
+// C75 §2.7: seçili istek başka cihazda çözülüp listeden düştüyse seçim boşalır. Sıradakine otomatik
+// geçilmez (Rev.7): o istek kullanıcı açmadan görülmüş sayılırdı.
 watch(requests, (list) => {
   if (loading.value || !selectedChannelId.value) return
-  if (!list.some((r) => r.channelId === selectedChannelId.value)) selectedChannelId.value = list[0]?.channelId ?? null
+  if (!list.some((r) => r.channelId === selectedChannelId.value)) selectedChannelId.value = null
 })
 
 function formatTime(iso: string): string {
@@ -80,7 +78,7 @@ async function accept() {
   try {
     const channel = await dmStore.acceptRequest(ch.channelId)
     toast.success(t('messageRequests.accepted'))
-    router.push({ name: 'dm', params: { channelId: channel.id } })
+    void router.push({ name: 'dm', params: { channelId: channel.id } })
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     toast.error(err.response?.data?.message ?? t('common.error'))
@@ -97,8 +95,29 @@ async function reject(block: boolean) {
   try {
     await dmStore.rejectRequest(ch.channelId, block)
     toast.success(block ? t('messageRequests.blocked') : t('messageRequests.rejected'))
-    // Sonraki isteğe geç (varsa)
-    selectedChannelId.value = requests.value[0]?.channelId ?? null
+    selectedChannelId.value = null // sıradakine otomatik geçilmez (Rev.7: seçmek = görmek)
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { message?: string } } }
+    toast.error(err.response?.data?.message ?? t('common.error'))
+  } finally {
+    acting.value = false
+  }
+}
+
+/** C75 Rev.7: onay penceresi açıldığı andaki liste dondurulur; arada gelen istek bu ret'e girmez. */
+function openRejectAll() {
+  rejectAllIds.value = requests.value.map((r) => r.channelId)
+}
+
+async function rejectAll() {
+  const ids = rejectAllIds.value
+  if (!ids || acting.value) return
+  acting.value = true
+  rejectAllIds.value = null
+  try {
+    const n = await dmStore.rejectRequestsBatch(ids)
+    selectedChannelId.value = null
+    toast.success(t('messageRequests.rejectedAll', { n }))
   } catch (e: unknown) {
     const err = e as { response?: { data?: { message?: string } } }
     toast.error(err.response?.data?.message ?? t('common.error'))
@@ -120,11 +139,20 @@ async function reject(block: boolean) {
     <!-- Başlık -->
     <div class="shrink-0 flex items-center px-6 border-b" style="height: var(--kv-header-height); border-color: var(--kv-border-subtle);">
       <h1 class="text-[16px] font-semibold" style="color: var(--kv-text-primary);">{{ t('messageRequests.title') }}</h1>
+      <!-- Rev.7: rozet yalnız görülmemiş istekleri sayar; hepsi görülünce kaybolur (sahip turu) -->
       <span
-        v-if="requests.length > 0"
+        v-if="unseenCount > 0"
         class="ml-2 min-w-[20px] h-[20px] px-1.5 flex items-center justify-center rounded-full text-[12px] font-bold text-white"
         style="background-color: var(--kv-accent-500);"
-      >{{ requests.length }}</span>
+      >{{ unseenCount }}</span>
+      <KvButton
+        v-if="requests.length >= 2"
+        variant="ghost"
+        size="sm"
+        class="ml-auto"
+        :disabled="acting"
+        @click="openRejectAll"
+      >{{ t('messageRequests.rejectAll') }}</KvButton>
     </div>
 
     <!-- Açıklama şeridi -->
@@ -155,6 +183,7 @@ async function reject(block: boolean) {
           :key="req.channelId"
           class="w-full flex items-center gap-3 px-3 py-2.5 text-left cursor-pointer transition-colors"
           :class="selectedChannelId === req.channelId ? 'bg-[var(--kv-bg-elevated)]' : 'hover:bg-[var(--kv-bg-elevated)]'"
+          :style="selectedChannelId === req.channelId ? 'box-shadow: inset 2px 0 0 var(--kv-accent-500);' : ''"
           @click="selectedChannelId = req.channelId"
         >
           <div
@@ -165,9 +194,24 @@ async function reject(block: boolean) {
             <span v-else>{{ (req.requester?.username ?? '?')[0].toUpperCase() }}</span>
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-[14px] font-medium truncate" style="color: var(--kv-text-primary);">{{ req.requester?.username ?? '—' }}</p>
-            <p class="text-[12px] truncate" style="color: var(--kv-text-muted);">{{ textOf(req) }}</p>
+            <!-- Rev.7: görülmemiş = kalın ad + parlak önizleme + Kor nokta (okunmamış e-posta dili) -->
+            <p
+              class="text-[14px] truncate"
+              :class="req.unseen ? 'font-bold' : 'font-medium'"
+              style="color: var(--kv-text-primary);"
+            >{{ req.requester?.username ?? '—' }}</p>
+            <p
+              class="text-[12px] truncate"
+              :style="{ color: req.unseen ? 'var(--kv-text-secondary)' : 'var(--kv-text-muted)' }"
+            >{{ textOf(req) }}</p>
           </div>
+          <span
+            v-if="req.unseen"
+            class="w-2 h-2 rounded-full shrink-0"
+            style="background-color: var(--kv-accent-500);"
+            role="img"
+            :aria-label="t('messageRequests.unseenLabel')"
+          />
         </button>
       </div>
 
@@ -206,6 +250,9 @@ async function reject(block: boolean) {
         </div>
         <p class="text-[12px] mt-4" style="color: var(--kv-text-muted);">{{ t('messageRequests.privacyNote') }}</p>
       </div>
+      <div v-else class="flex-1 min-w-0 flex items-center justify-center px-6 text-center text-[14px]" style="color: var(--kv-text-muted);">
+        {{ t('messageRequests.selectHint') }}
+      </div>
     </div>
 
       </div><!-- /yüzen kart -->
@@ -220,6 +267,17 @@ async function reject(block: boolean) {
       :loading="acting"
       @confirm="reject(true)"
       @cancel="showBlockConfirm = false"
+    />
+
+    <!-- Rev.7: Tümünü reddet onayı (engelleme yok; kabul toplu yapılmaz) -->
+    <ConfirmDialog
+      v-if="rejectAllIds"
+      :title="t('messageRequests.rejectAllConfirmTitle')"
+      :message="t('messageRequests.rejectAllConfirmMessage', { n: rejectAllIds.length })"
+      :confirm-label="t('messageRequests.rejectAll')"
+      :loading="acting"
+      @confirm="rejectAll"
+      @cancel="rejectAllIds = null"
     />
   </div>
 </template>

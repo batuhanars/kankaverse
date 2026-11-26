@@ -1,55 +1,49 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { dmApi, type MessageRequestDto } from '@/api/dm';
+import { dmApi } from '@/api/dm';
 import { useDmStore } from '@/stores/dm';
+import { showToast } from '@/stores/toast';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { RequestAvatar } from '@/components/dm/RequestAvatar';
 import { extractErrorMessage } from '@/api/errors';
 import { useRequestPreviews } from '@/components/home/useRequestPreviews';
-import { dmRouteParams } from '@/utils/dmRoute';
+import { formatAgo } from '@/utils/formatAgo';
 import { t } from '@/i18n';
 import { theme } from '@/theme';
 
 type LoadState = 'loading' | 'error' | 'ready';
 
-// Sprint M1a contract §5 ekran 4 + §0 — DM istekleri: liste + kabul/ret. Backend uçları hazır
-// (contract girişi: mobilde görünmezse kullanıcı isteği hiç göremez — "dilsizlik" T&S açısından
-// kabul edilemez).
-//
-// Sprint M3b R6 (sahip onaylı) — üçüncü aksiyon **Reddet ve Engelle** geldi. M1a'da "web'de var ama
-// DoD yalnız kabul/ret istiyor" diye atlanmıştı; oysa engellemenin gerçekten gerektiği an tam burası:
-// yabancı biri mesaj isteğiyle taciz ediyorsa kullanıcı reddedip geçmek zorunda kalmamalı. Yeni uç
-// YOK — `dmApi.rejectRequest`in `block` parametresi M1a'dan beri duruyordu, hep `false` geçiliyordu.
+// Sprint M1a §5 ekran 4 — DM istekleri. C75 Rev.7: kart yığını yerine e-posta kutusu gibi sıkı liste;
+// içerik ve Kabul / Reddet / Engelle düğmeleri detay ekranında (`dm-request/[channelId]`). Neden:
+// kartlar ekranı 2-3 istekte dolduruyordu ve "görüldü" artık isteğin detayı açılınca düşüyor
+// (sayfa açılınca değil), liste görmek bir isteği okumuş saymak değil.
 export default function DmRequestsScreen() {
   const router = useRouter();
-  // C75: bildirim/push `?channel=<id>` ile gelir; o istek listenin başına alınıp vurgulanır.
+  // C75: bildirim/push `?channel=<id>` ile gelir; o isteğin detayı bir kez açılır.
   const { channel: focusChannelId } = useLocalSearchParams<{ channel?: string }>();
   const [state, setState] = useState<LoadState>('loading');
-  const [fetched, setItems] = useState<MessageRequestDto[]>([]);
-  // C75 §2.7: başka cihazda çözülen istek store'dan düşer (`applyRequestResolved`); ekran yerel listeyi
-  // store'daki güncel kimliklerle süzer, böylece istek ekrandan da kalkar.
-  const liveRequests = useDmStore((s) => s.requests);
-  const items = fetched.filter((r) => liveRequests.some((l) => l.channelId === r.channelId));
   const [errorMessage, setErrorMessage] = useState('');
-  const [notice, setNotice] = useState('');
-  const [actingId, setActingId] = useState<string | null>(null);
-  /** Engelleme onayı bekleyen istek — `null` ise diyalog kapalı. Kullanıcı adı mesajda geçiyor. */
-  const [blockTarget, setBlockTarget] = useState<MessageRequestDto | null>(null);
+  // C75 Rev.7: liste doğrudan store'dan okunur. Eskiden ekran ilk çekimi yerel bir kopyada tutup
+  // store ile yalnız SÜZÜYORDU: silinen istek kalkıyor, yeni gelen ise hiç eklenmiyordu (sahip bulgusu).
+  // Store `dm.request` soket olayıyla tazelendiği için yeni istek artık anında düşer.
+  const items = useDmStore((s) => s.requests);
+  /** "Tümünü reddet" onayı açıkken dondurulan kimlikler (null = kapalı). */
+  const [rejectAllIds, setRejectAllIds] = useState<string[] | null>(null);
+  const [rejectingAll, setRejectingAll] = useState(false);
+  const focusOpened = useRef(false);
 
-  // react-hooks/set-state-in-effect — bkz. home.tsx fetchGuilds yorumu.
+  // react-hooks/set-state-in-effect: bkz. home.tsx fetchGuilds yorumu.
   const fetchRequests = useCallback(() => {
     dmApi
       .listRequests()
       .then((list) => {
-        // C75 §3.3: E2EE motoru istek kanalını ancak store'da görürse çözer; liste state'ten ÖNCE yazılır (yarış yok).
         useDmStore.setState({
           requests: list,
           requestCount: list.length,
           unseenRequestCount: list.filter((r) => r.unseen === true).length,
         });
-        setItems(list);
         setState('ready');
-        void useDmStore.getState().markRequestsSeen(); // C75 Rev.6: ekran açıldı → görüldü
       })
       .catch((e) => {
         setErrorMessage(extractErrorMessage(e));
@@ -61,76 +55,59 @@ export default function DmRequestsScreen() {
     fetchRequests();
   }, [fetchRequests]);
 
-  // C75 Rev.6: ekran açıkken yeni (görülmemiş) istek gelirse yine görüldü say; store çift çağrıyı önler.
-  const unseenRequestCount = useDmStore((s) => s.unseenRequestCount);
+  const openDetail = useCallback(
+    (channelId: string) => router.push({ pathname: '/dm-request/[channelId]', params: { channelId } }),
+    [router],
+  );
+
+  // Bildirimden gelindiyse kullanıcı o isteğe zaten dokunmuştur: detayı bir kez aç (geri → bu liste).
   useEffect(() => {
-    if (state === 'ready' && unseenRequestCount > 0) void useDmStore.getState().markRequestsSeen();
-  }, [state, unseenRequestCount]);
+    if (state !== 'ready' || !focusChannelId || focusOpened.current) return;
+    focusOpened.current = true;
+    if (items.some((r) => r.channelId === focusChannelId)) openDetail(focusChannelId);
+  }, [state, focusChannelId, items, openDetail]);
 
   const previewOf = useRequestPreviews(items);
-  // Seçili istek (bildirimden gelen) en üstte; geri kalan sıra korunur.
-  const shown = focusChannelId
-    ? [...items].sort((a, b) => Number(b.channelId === focusChannelId) - Number(a.channelId === focusChannelId))
-    : items;
 
   function retry() {
     setState('loading');
     fetchRequests();
   }
 
-  /**
-   * İsteği kabul et → sohbete git. 🔴 `reject` ile **aynı kalıp**: mutasyon `useDmStore` üzerinden
-   * gidiyor, doğrudan `dmApi` değil. Store `requestCount` rozetini ve kanal listesini tazeliyor —
-   * kabul edilen kanal `PENDING`ten çıktığı için artık DM listesinde de anında görünüyor.
-   *
-   * Yönlendirme, store'un **döndürdüğü kanalla** yapılıyor: `dmRouteParams` (projedeki tek route
-   * kurucusu) `canMessage`/`selfBlocked` gibi T&S bayraklarını sunucunun verdiği değerlerle taşıyor.
-   * Eskiden bu ekran onları elle `'true'`/`'false'` diye gömüyordu — istemcinin kendi kararını
-   * vermesi demekti; artık gömülü varsayım yok.
-   */
-  async function accept(item: MessageRequestDto) {
-    setActingId(item.channelId);
-    setErrorMessage('');
-    setNotice('');
+  /** Onay anındaki kimlikler gönderilir; arada gelen (görülmemiş) istek bu ret'e girmez. */
+  async function rejectAll() {
+    if (!rejectAllIds) return;
+    setRejectingAll(true);
     try {
-      const channel = await useDmStore.getState().acceptRequest(item.channelId);
-      setItems((prev) => prev.filter((r) => r.channelId !== item.channelId));
-      router.push(dmRouteParams(channel));
+      const n = await useDmStore.getState().rejectRequestsBatch(rejectAllIds);
+      showToast(t('messageRequests.rejectedAll', { n }));
     } catch (e) {
-      setErrorMessage(extractErrorMessage(e));
+      showToast(extractErrorMessage(e));
     } finally {
-      setActingId(null);
-    }
-  }
-
-  /**
-   * Reddet (ve isteğe bağlı engelle). 🔴 Mutasyon artık `useDmStore` üzerinden gidiyor, doğrudan
-   * `dmApi` değil (M1d-0 dersi): sunucu isteği düşürünce store'un `requestCount` rozeti ve engelleme
-   * sonrası DM bayrakları (`canMessage`/`selfBlocked`) tazelenmeli — o yan etkinin sahibi store.
-   * Yerel liste yine de anında süzülüyor, kullanıcı sunucu turunu beklemesin.
-   *
-   * 🔴 T&S: ret **jenerik** — karşı taraf bilgilendirilmez (`privacyNote` ekranda duruyor) ve
-   * engelleyip engellemediğin ona sızmaz; iki yol da sunucuda aynı sessiz sonucu üretir.
-   */
-  async function reject(item: MessageRequestDto, block: boolean) {
-    setActingId(item.channelId);
-    setErrorMessage('');
-    setNotice('');
-    try {
-      await useDmStore.getState().rejectRequest(item.channelId, block);
-      setItems((prev) => prev.filter((r) => r.channelId !== item.channelId));
-      setBlockTarget(null);
-      setNotice(block ? t('messageRequests.blocked') : t('messageRequests.rejected'));
-    } catch (e) {
-      setErrorMessage(extractErrorMessage(e));
-    } finally {
-      setActingId(null);
+      setRejectingAll(false);
+      setRejectAllIds(null);
     }
   }
 
   return (
     <View style={styles.flex}>
-      <Stack.Screen options={{ title: t('messageRequests.title') }} />
+      <Stack.Screen
+        options={{
+          title: t('messageRequests.title'),
+          headerRight:
+            state === 'ready' && items.length >= 2
+              ? () => (
+                  <Pressable
+                    onPress={() => setRejectAllIds(items.map((r) => r.channelId))}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.headerAction}>{t('messageRequests.rejectAll')}</Text>
+                  </Pressable>
+                )
+              : undefined,
+        }}
+      />
 
       {state === 'loading' && (
         <View style={styles.center}>
@@ -147,11 +124,6 @@ export default function DmRequestsScreen() {
         </View>
       )}
 
-      {/* Aksiyon geri bildirimi. Liste ekranı bir toast yüzeyine sahip değil (mobilde toast store
-          yok); başarı ve hata aynı yerde, ayrı renkte gösteriliyor. */}
-      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-      {state === 'ready' && errorMessage ? <Text style={styles.actionError}>{errorMessage}</Text> : null}
-
       {state === 'ready' && items.length === 0 && (
         <View style={styles.center}>
           <Text style={styles.emptyTitle}>{t('messageRequests.emptyTitle')}</Text>
@@ -161,68 +133,45 @@ export default function DmRequestsScreen() {
 
       {state === 'ready' && items.length > 0 && (
         <FlatList
-          data={shown}
+          data={items}
           keyExtractor={(item) => item.channelId}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => {
-            const busy = actingId === item.channelId;
+            const unseen = item.unseen === true;
             return (
-              <View style={[styles.card, item.channelId === focusChannelId && styles.cardFocused]}>
-                <View style={styles.cardHeader}>
-                  {item.requester?.avatarUrl ? (
-                    <Image source={{ uri: item.requester.avatarUrl }} style={styles.avatar} />
-                  ) : (
-                    <View style={[styles.avatar, styles.avatarFallback]}>
-                      <Text style={styles.avatarFallbackText}>
-                        {(item.requester?.username ?? '?').charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                  <Text style={styles.username}>{item.requester?.username ?? t('notification.someone')}</Text>
-                </View>
-                {item.preview || item.encrypted ? (
-                  <Text style={styles.preview} numberOfLines={2}>
+              <Pressable
+                onPress={() => openDetail(item.channelId)}
+                style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                accessibilityRole="button"
+              >
+                <RequestAvatar requester={item.requester} size={40} />
+                <View style={styles.rowBody}>
+                  <View style={styles.rowTop}>
+                    {/* Görülmemiş: kalın ad + parlak önizleme + Kor nokta (web ile aynı işaret dili). */}
+                    <Text style={[styles.username, unseen && styles.usernameUnseen]} numberOfLines={1}>
+                      {item.requester?.username ?? t('notification.someone')}
+                    </Text>
+                    <Text style={styles.time}>{formatAgo(item.createdAt)}</Text>
+                  </View>
+                  <Text style={[styles.preview, unseen && styles.previewUnseen]} numberOfLines={1}>
                     {previewOf(item)}
                   </Text>
-                ) : null}
-                <View style={styles.actions}>
-                  <Pressable disabled={busy} onPress={() => accept(item)} style={[styles.acceptButton, busy && styles.disabled]}>
-                    <Text style={styles.acceptText}>{t('messageRequests.accept')}</Text>
-                  </Pressable>
-                  <Pressable disabled={busy} onPress={() => reject(item, false)} style={[styles.rejectButton, busy && styles.disabled]}>
-                    <Text style={styles.rejectText}>{t('messageRequests.reject')}</Text>
-                  </Pressable>
                 </View>
-                {/* 🔴 Görsel ağırlığı Reddet'ten DÜŞÜK (web ile aynı): dolu/kenarlıklı düğme değil,
-                    tehlike renginde düz metin. Yıkıcı ve geri alınması zahmetli bir aksiyona
-                    yanlışlıkla basılmasın. Dokunma hedefi yine de 44dp — silik olması küçük olması
-                    demek değil. */}
-                <Pressable
-                  disabled={busy}
-                  onPress={() => setBlockTarget(item)}
-                  style={[styles.blockButton, busy && styles.disabled]}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('messageRequests.rejectBlock')}
-                >
-                  <Text style={styles.blockText}>{t('messageRequests.rejectBlock')}</Text>
-                </Pressable>
-                <Text style={styles.privacyNote}>{t('messageRequests.privacyNote')}</Text>
-              </View>
+                {unseen && <View style={styles.dot} accessibilityLabel={t('messageRequests.unseenLabel')} />}
+              </Pressable>
             );
           }}
         />
       )}
 
-      {blockTarget && items.some((r) => r.channelId === blockTarget.channelId) && (
+      {rejectAllIds && (
         <ConfirmDialog
-          title={t('messageRequests.blockConfirmTitle')}
-          message={t('messageRequests.blockConfirmMessage', {
-            name: blockTarget.requester?.username ?? t('notification.someone'),
-          })}
-          confirmLabel={t('messageRequests.rejectBlock')}
-          loading={actingId === blockTarget.channelId}
-          onConfirm={() => reject(blockTarget, true)}
-          onCancel={() => setBlockTarget(null)}
+          title={t('messageRequests.rejectAllConfirmTitle')}
+          message={t('messageRequests.rejectAllConfirmMessage', { n: rejectAllIds.length })}
+          confirmLabel={t('messageRequests.rejectAll')}
+          loading={rejectingAll}
+          onConfirm={() => void rejectAll()}
+          onCancel={() => setRejectAllIds(null)}
         />
       )}
     </View>
@@ -272,114 +221,59 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.sm,
     textAlign: 'center',
   },
+  headerAction: {
+    color: theme.colors.danger,
+    fontSize: theme.fontSize.sm,
+    fontWeight: '600',
+  },
   list: {
-    padding: theme.layout.panelGap,
+    paddingVertical: 8,
   },
-  card: {
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.bgSidebar,
-    padding: theme.layout.panelGap,
-    marginBottom: 12,
-  },
-  cardFocused: {
-    borderWidth: 1,
-    borderColor: theme.colors.accent500,
-  },
-  cardHeader: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
+    gap: 12,
+    paddingHorizontal: theme.layout.panelGap,
+    paddingVertical: 10,
+    minHeight: 64,
   },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  rowPressed: {
+    backgroundColor: theme.colors.bgElevated,
   },
-  avatarFallback: {
-    backgroundColor: theme.colors.accentSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
+  rowBody: {
+    flex: 1,
+    minWidth: 0,
   },
-  avatarFallbackText: {
-    color: theme.colors.accent500,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '700',
+  rowTop: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
   },
   username: {
+    flex: 1,
     color: theme.colors.textPrimary,
     fontSize: theme.fontSize.base,
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  preview: {
-    color: theme.colors.textBody,
-    fontSize: theme.fontSize.sm,
-    marginBottom: 12,
+  usernameUnseen: {
+    fontWeight: '700',
   },
-  actions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 8,
-  },
-  acceptButton: {
-    flex: 1,
-    minHeight: theme.layout.controlSm,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accent500,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  acceptText: {
-    color: theme.colors.textPrimary,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '600',
-  },
-  rejectButton: {
-    flex: 1,
-    minHeight: theme.layout.controlSm,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rejectText: {
-    color: theme.colors.textSecondary,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '600',
-  },
-  // Düz metin düğme — zemini/kenarlığı yok (Reddet'ten silik), ama 44dp dokunma hedefi korunuyor.
-  blockButton: {
-    minHeight: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  blockText: {
-    color: theme.colors.danger,
-    fontSize: theme.fontSize.sm,
-    fontWeight: '600',
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  notice: {
-    color: theme.colors.success,
-    fontSize: theme.fontSize.sm,
-    textAlign: 'center',
-    paddingHorizontal: theme.layout.panelGap,
-    paddingTop: 10,
-  },
-  actionError: {
-    color: theme.colors.danger,
-    fontSize: theme.fontSize.sm,
-    textAlign: 'center',
-    paddingHorizontal: theme.layout.panelGap,
-    paddingTop: 10,
-  },
-  privacyNote: {
+  time: {
     color: theme.colors.textMuted,
     fontSize: theme.fontSize.xs,
-    textAlign: 'center',
+  },
+  preview: {
+    marginTop: 2,
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSize.sm,
+  },
+  previewUnseen: {
+    color: theme.colors.textSecondary,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.accent500,
   },
 });

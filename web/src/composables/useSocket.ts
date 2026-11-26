@@ -420,6 +420,12 @@ export function useSocket() {
       for (const id of channelIds) closeOsNotificationsForChannel(id)
     })
 
+    // C75 Rev.7 — tek istek görüldü (bu ya da başka cihazımda detayı açıldı): yalnız o istek ve onun OS bildirimi
+    socket.on('dm.request_seen', (data: { channelId: string }) => {
+      dmStore.applyRequestSeen(data.channelId)
+      closeOsNotificationsForChannel(data.channelId)
+    })
+
     // friend.* event'leri YALNIZ friends store senkronu için kalır (arkadaş listesi).
     // Bell artık bunlardan beslenmiyor → kalıcı `notification` event'i kullanır (Sprint C1).
     socket.on('friend.request', (request: FriendRequestDto) => {

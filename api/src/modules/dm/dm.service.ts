@@ -1380,6 +1380,8 @@ export class DmService {
       },
       include: {
         dmRequester: { select: { id: true, username: true, avatarUrl: true } },
+        // C75 Rev.7: yalnız KENDİ üyelik satırım (istek başına görüldü). Karşı tarafın satırı okunmaz.
+        members: { where: { userId }, select: { requestSeenAt: true } },
         messages: {
           where: { deletedAt: null },
           orderBy: { createdAt: 'asc' },
@@ -1408,8 +1410,11 @@ export class DmService {
       // E1: yalnız şifreliyse alan var (lastMessage kalıbı); istemci "🔒 Şifreli mesaj" gösterir.
       ...(c.messages[0]?.encrypted ? { encrypted: true as const } : {}),
       createdAt: c.createdAt.toISOString(),
-      // C75 Rev.6: ilk mesaj "görüldü" anından sonraysa (ya da hiç görülmediyse) görülmemiş.
-      unseen: !seenAt || (c.messages[0] ? c.messages[0].createdAt > seenAt : false),
+      // C75 Rev.7: istek tek tek açıldıysa görüldü. Açılmadıysa Rev.6'nın toplu damgası (eski istemcilerin
+      // yazdığı) hâlâ geçerli: ilk mesaj o damgadan sonraysa (ya da damga yoksa) görülmemiş.
+      unseen:
+        !c.members[0]?.requestSeenAt &&
+        (!seenAt || (c.messages[0] ? c.messages[0].createdAt > seenAt : false)),
     }));
   }
 
@@ -1518,5 +1523,46 @@ export class DmService {
     // C75 §2.7: alıcının diğer cihazlarında istek ekrandan düşsün (engelle dahil).
     this.realtime.emitToUser(userId, 'dm.request_resolved', { channelId, outcome: 'rejected' });
     return null;
+  }
+
+  /**
+   * POST /dm/requests/:channelId/seen — C75 Rev.7: alıcı tek bir isteğin detayını açtı.
+   *
+   * 🔴 R7: `markRead` (lastReadAt) KULLANILMAZ. O yol C12 `dm:seen` yayınını tetikler; istek sahibi
+   * "mesajımı açtı" bilgisini alırdı. Yabancının bunu öğrenmesi istek süzgecinin engellediği şey.
+   * Burada yazılan `requestSeenAt` yalnız alıcının kendi istemcilerine döner.
+   *
+   * İdempotent: zaten görülmüşse damga değişmez (updateMany + null koşulu), olay/okundu yine gider
+   * (diğer cihaz geride kalmışsa yakalasın).
+   */
+  async markMessageRequestSeen(userId: string, channelId: string) {
+    await this.requirePendingRequestForRecipient(userId, channelId);
+    await this.prisma.channelMember.updateMany({
+      where: { channelId, userId, requestSeenAt: null },
+      data: { requestSeenAt: new Date() },
+    });
+    await this.notifications?.markMessageRequestActioned(userId, channelId);
+    this.realtime.emitToUser(userId, 'dm.request_seen', { channelId });
+    this.push?.notifyRead(userId, [channelId]).catch(() => {});
+    return null;
+  }
+
+  /**
+   * POST /dm/requests/reject-batch — C75 Rev.7 "Tümünü reddet". Her kimlik tekil ret yolundan geçer
+   * (aynı jenerik ret, aynı olay/bildirim kapatma; engelleme YOK). Bulunamayan ya da kullanıcının
+   * olmayan istek sessizce atlanır: toplu işlemde bir öğe yüzünden hepsi düşmesin, varlık da sızmasın.
+   */
+  async rejectMessageRequestsBatch(userId: string, channelIds: string[]) {
+    const rejected: string[] = [];
+    for (const channelId of new Set(channelIds)) {
+      try {
+        await this.rejectMessageRequest(userId, channelId, false);
+        rejected.push(channelId);
+      } catch (e) {
+        if (e instanceof NotFoundException || e instanceof ForbiddenException) continue;
+        throw e;
+      }
+    }
+    return { rejected };
   }
 }

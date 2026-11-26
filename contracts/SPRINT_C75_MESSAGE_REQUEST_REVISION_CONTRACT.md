@@ -92,6 +92,59 @@ yalnız GÖRÜLMEMİŞ istekleri sayar. Sayfa başlığındaki sayı ve kısayol
   (`closeOsNotificationsForChannel`; istek toast'u kanal kimliğiyle izlenir).
 - Sınır: MIUI uygulamayı tamamen dondurduysa telefondaki bildirim bir sonraki açılışa kalabilir (DM'lerle aynı).
 
+### Rev.7 (2026-11-26): istek başına "görüldü", liste görünümü, topluca reddet, mobil canlı liste + rail rozeti
+Sahip bulguları: (1) mobil istek ekranı açıkken yeni istek ekrana düşmüyor; (2) masaüstü istek sayfası açık durduğu sürece
+gelen her istek anında "görüldü" sayılıyor, diğer cihazlarda rozet hiç yanmıyor; (3) mobil rail'deki sohbet baloncuğunda
+rozet hiç çıkmıyor. Sahip kararları: görüldü **sayfa açılınca değil, isteğin detayı açılınca** ve **istek başına** düşer;
+"Tümünü reddet" gelir; **"Tümünü kabul et" YOK** (T&S: kabul ulaşımı açar, kişi kişi bilinçli verilir).
+
+**(a) api: istek başına görüldü**
+- `ChannelMember.requestSeenAt DateTime?` (migration). Alıcının o PENDING kanaldaki üyelik satırına yazılır.
+- 🔴 **`lastReadAt`/`markRead` KULLANILMAZ:** o yol C12 `dm:seen` yayınını tetikler ve istek sahibi "görüldü" bilgisini
+  alırdı. İsteğin açılıp açılmadığı karşı tarafa hiçbir yoldan sızmaz (R7). `requestSeenAt` yalnız alıcının kendi
+  istemcilerine döner.
+- `POST /dm/requests/:channelId/seen` (gövdesiz, data: null). Koşul: kabul/ret ile aynı alıcı kapısı
+  (`requirePendingRequestForRecipient`: PENDING değilse 404, istek sahibi ya da üye değilse 403). İdempotent (zaten yazılıysa dokunmaz, olay yine gider). Yan etkiler: o kanalın okunmamış
+  `MESSAGE_REQUEST` bildirimleri okundu (`markMessageRequestActioned`), kendi soketlerine `dm.request_seen` `{ channelId }`,
+  `push.notifyRead(ben, [channelId])`.
+- `GET /dm/requests` `unseen` kuralı: `requestSeenAt` null **ve** (`messageRequestsSeenAt` null ya da ilk mesaj ondan sonra).
+- Eski `POST /dm/requests/seen` ve `dm.requests_seen` **kalır** (yayındaki eski mobil sürüm çağırıyor); yeni istemciler
+  çağırmaz. Kaldırma ayrı turda.
+- `POST /dm/requests/reject-batch` `{ channelIds: string[] }` (1..100, cuid). Yalnız **gönderilen kimlikler** reddedilir
+  (onay anı ile işlem arasında gelen, kullanıcının görmediği istek etkilenmez). Her kimlik `rejectMessageRequest(…, block=false)`
+  yolundan geçer (aynı jenerik ret, aynı `dm.request_resolved`, aynı bildirim/push kapatma); geçersiz/başkasının kimliği
+  sessizce atlanır. data: `{ rejected: string[] }`. Engelle toplu YAPILMAZ.
+
+**(b) web: `MessageRequestsView`**
+- Sayfa açılışında `seen` çağrılmaz, ilk istek otomatik seçilmez. Sağda boş durum `messageRequests.selectHint`.
+  `?channel=` ile gelindiyse o istek seçilir.
+- Bir istek seçilince (tıklama ya da `?channel=`) o istek görülmemişse `POST /dm/requests/:id/seen`. Store: `markRequestSeen(id)`
+  + `applyRequestSeen(id)` (`dm.request_seen` işleyicisi, idempotent). Sayfa açıkken gelen istek görülmemiş kalır.
+- Satır görünümü: **seçili** = Kor sol kenarlık + yükseltilmiş zemin (DM listesiyle aynı dil); **görülmemiş** = kalın ad,
+  birincil renkte önizleme, sağda Kor nokta; görülmüş = normal.
+- Başlık: Kor rozet yalnız görülmemiş istek sayısını gösterir, hepsi görülünce kaybolur (sahip turu: gri kalan toplam sayı yanıltıcıydı).
+- "Tümünü reddet" düğmesi başlıkta (istek ≥ 2 iken; tek istekte satırın kendi Reddet düğmesi yeter). `ConfirmDialog`: `messageRequests.rejectAllConfirmTitle/Message` ("{n}").
+  Gönderilen kimlikler = onay anında listede görünenler. Sonuç toast `messageRequests.rejectedAll`.
+
+**(c) mobile**
+- **Canlı liste:** `dm-requests` listesi doğrudan store'daki `requests`ten okunur (yerel kopya kalkar); yeni istek anında düşer.
+- Liste satırı sıkı: avatar, ad, tek satır önizleme, zaman, görülmemişse Kor nokta (web ile aynı işaret dili).
+  Satıra dokununca yeni ekran `dm-request/[channelId]`: avatar + ad + zaman, mesajın tamamı, Kabul / Reddet /
+  Reddet ve Engelle, gizlilik notu. Detay açılınca `markRequestSeen`. İstek başka cihazda çözülürse detay geri döner.
+- Açılışta ve sayfa açıkken toplu `seen` çağrısı kalkar; `dm.request_seen` dinlenir.
+- Bildirim/push `?channel=` ile gelirse doğrudan detay ekranı açılır.
+- "Tümünü reddet": liste başlığında (istek ≥ 2), `ConfirmDialog`, aynı kurallar.
+- **Rail rozeti:** sohbet baloncuğu rozeti = okunmamış DM + görülmemiş istek + bekleyen gelen kanka isteği. Bugün kod var
+  (`GuildRail.tsx`, yalnız DM) ama sahip hiç görmüyor: dev önce kökü bulur (rozet çizimi mi, `unread`ın canlı güncellenmesi mi),
+  bulgu TASK satırına yazılır.
+
+**(d) i18n** tr.json: `messageRequests.selectHint`, `newCount`, `rejectAll`, `rejectAllConfirmTitle`, `rejectAllConfirmMessage`,
+`rejectedAll`. Uzun çizgi yok.
+
+**(e) Doğrulama** api spec: per-item seen (yetki, idempotent, `dm:seen` YAYILMAZ), `unseen` kuralı, reject-batch (yalnız
+gönderilen + kendi istekleri). Cihaz turu: 3 istek → rozet 3 → her detayda bir azalır, diğer cihazda da; istek sayfası
+açıkken gelen istek rozetini korur; mobil ekran açıkken istek anında düşer; tümünü reddet; rail rozeti DM / istek / kanka.
+
 ### Rev.5 (2026-11-26): uygulama açıkken istek bildirimi yok
 Sahip kuralı: herhangi bir istemcide uygulama açıkken mesaj isteği sistem bildirimi üretmez. Masaüstü görünürken
 (OS toast yalnız `document.hidden` iken) ve masaüstü aktifken telefona push gitmez (C76) zaten sağlanıyordu; telefon
