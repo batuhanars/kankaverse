@@ -13,6 +13,7 @@ import {
 } from '@/utils/reactionNotification'
 import { i18n } from '@/i18n'
 import { playNotificationTone } from '@/utils/notificationTone'
+import { osNotificationsSuppressed, trackOsNotification } from '@/utils/activeDevice'
 import type { NotificationDto } from '@/types'
 
 /**
@@ -137,10 +138,14 @@ export function useNativeNotifications() {
     if (!document.hidden) return
     const d = e.detail
     const body = _reactionBody(d.actor.username, d.emoji, reactionPreviewText(d.preview, d.emoji))
-    _showToast(body, () => {
-      void router.push({ name: 'dm', params: { channelId: d.channelId } })
-      requestJump(d.channelId, d.messageId)
-    })
+    _showToast(
+      body,
+      () => {
+        void router.push({ name: 'dm', params: { channelId: d.channelId } })
+        requestJump(d.channelId, d.messageId)
+      },
+      d.channelId,
+    )
   }) as EventListener
   window.addEventListener(REACTION_NOTIFY_EVENT, onReactionNotify)
   onUnmounted(() => window.removeEventListener(REACTION_NOTIFY_EVENT, onReactionNotify))
@@ -150,8 +155,10 @@ export function useNativeNotifications() {
     return preview ? `${text} ${preview}` : text
   }
 
-  function _showToast(body: string, onClick: () => void) {
+  function _showToast(body: string, onClick: () => void, channelId?: string) {
+    if (osNotificationsSuppressed()) return // C76 K2: telefon ön planda → OS bildirimi + ses yok
     const notif = new Notification(t('notification.nativeTitle'), { body, silent: true })
+    trackOsNotification(channelId, notif) // C76 K3
     playNotificationTone() // C74 §4
     notif.onclick = () => {
       window.kankaverse?.focusWindow()
@@ -203,6 +210,7 @@ export function useNativeNotifications() {
     }
     if (isAiVideo && dto.preview) body = `${body}: ${dto.preview}`
 
+    if (osNotificationsSuppressed()) return // C76 K2: telefon ön planda → OS bildirimi + ses yok
     const title = isAiVideo ? t('notification.aiVideoTitle') : t('notification.nativeTitle')
     const notif = new Notification(title, {
       body,
@@ -210,6 +218,7 @@ export function useNativeNotifications() {
       // Electron'da /src/assets/brand/... yolu yerine ana domain'deki favicon kullanılır.
       // Electron kendisi uygulama ikonunu zaten gösterir; icon alanı boş bırakılabilir.
     })
+    trackOsNotification(dto.channelId, notif) // C76 K3
     playNotificationTone()
 
     notif.onclick = () => {

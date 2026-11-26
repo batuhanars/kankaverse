@@ -18,6 +18,7 @@ import { GameIconService } from './games/game-icon.service';
 import { AudioNormalizeService } from './media/audio-normalize.service';
 import { RedisService } from './redis/redis.service';
 import { CallSignalService } from './call-signal/call-signal.service';
+import { ClientActivityService } from './client-activity/client-activity.service';
 
 @Module({
   providers: [
@@ -40,6 +41,7 @@ import { CallSignalService } from './call-signal/call-signal.service';
     AudioNormalizeService,
     RedisService,
     CallSignalService,
+    ClientActivityService,
   ],
   exports: [
     EmailService,
@@ -61,6 +63,7 @@ import { CallSignalService } from './call-signal/call-signal.service';
     AudioNormalizeService,
     RedisService,
     CallSignalService,
+    ClientActivityService,
   ],
 })
 export class SharedModule {}

@@ -8,6 +8,7 @@
 import { MessagesGateway } from './messages.gateway';
 import { E2EE_PUSH_GENERIC_TEXT, E2EE_PUSH_MAX_CIPHERTEXT } from '../../e2ee/e2ee.constants';
 import { CallSignalService } from '../../../shared/call-signal/call-signal.service';
+import { ClientActivityService } from '../../../shared/client-activity/client-activity.service';
 
 // ── Mock fabrikaları ──────────────────────────────────────────────────────────
 
@@ -109,6 +110,7 @@ function makeGateway() {
     gamesMock as any,
     // C53: WS ve HTTP aynı CallSignalService'ten geçer; burada gerçek servis aynı mock'larla çalışır.
     new CallSignalService(prismaMock as any, realtimeMock as any, pushMock as any),
+    new ClientActivityService(realtimeMock as any),
   );
 }
 

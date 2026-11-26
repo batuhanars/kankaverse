@@ -29,6 +29,7 @@ function setup(type: string | null, members: string[] = []) {
     {} as never,
     {} as never,
     {} as never,
+    {} as never,
   );
   const targets: string[] = [];
   const emit = jest.fn();

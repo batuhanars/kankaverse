@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { ClientActivityService } from '../client-activity/client-activity.service';
 import {
   V2_PENDING_TTL_SECONDS,
   V2_READ_MAX_IDS,
@@ -111,6 +112,8 @@ export class PushService {
     private config: ConfigService,
     // C50: opsiyonel; yoksa okundu işareti tutulmaz, v1 yolu etkilenmez.
     @Optional() private redis?: RedisService,
+    // C76: aktif masaüstü/web varken mesaj türü push'lar atlanır; yoksa süzgeç yok.
+    @Optional() private clientActivity?: ClientActivityService,
   ) {}
 
   private get enabled(): boolean {
@@ -132,7 +135,11 @@ export class PushService {
   async sendToUsers(userIds: string[], payload: PushPayload): Promise<void> {
     if (!this.enabled) return;
 
-    const targets = [...new Set(userIds)];
+    // C76 §2.3: tek ortak süzgeç; zil kaydı çağıranda zaten yazıldı, yalnız push atlanır.
+    const unique = [...new Set(userIds)];
+    const targets = this.clientActivity
+      ? this.clientActivity.filterPushRecipients(unique, payload.data.type)
+      : unique;
     if (targets.length === 0) return;
 
     try {

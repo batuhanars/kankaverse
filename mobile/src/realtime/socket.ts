@@ -114,13 +114,30 @@ function joinRoom(channelId: string, attempt = 0) {
   });
 }
 
+// C76 §4 — aktif cihaz kuralı: uygulama ön plandaysa (AppState 'active') bu bağlantı aktif sayılır.
+// Sunucu bunu masaüstü/web bildirimini susturmak (K2) için kullanır. Arka planda soket kapanabildiği
+// için değer yalnız bağlıyken gönderilir; bağlanınca `connect` yolu güncel değeri yeniden yollar.
+function emitClientActivity(): void {
+  if (!socket?.connected) return;
+  socket.emit('client:activity', { active: AppState.currentState === 'active' });
+}
+
+let appStateActivityBound = false;
+function bindAppStateActivity(): void {
+  if (appStateActivityBound) return;
+  appStateActivityBound = true;
+  AppState.addEventListener('change', emitClientActivity);
+}
+
 function ensureSocket(): Socket {
   if (socket) return socket;
 
   socket = io(SOCKET_ORIGIN, {
     autoConnect: false,
     // auth fonksiyon formu — bkz. dosya başı yorumu.
-    auth: (cb: (data: { token: string }) => void) => cb({ token: getAccessToken() ?? '' }),
+    // C76 §2.1: bağlantı türü (aktif cihaz kuralı); sunucu yalnız tanınan değerleri kabul eder.
+    auth: (cb: (data: { token: string; client: 'mobile' }) => void) =>
+      cb({ token: getAccessToken() ?? '', client: 'mobile' }),
     transports: ['websocket'],
     // `path` bilinçli olarak VERİLMEDİ — varsayılan `/socket.io` kalır (Caddy prod'da bu yolu API
     // konteynerine yönlendiriyor). `SOCKET_ORIGIN`'in artık yol içermemesi bunu namespace'le
@@ -129,6 +146,9 @@ function ensureSocket(): Socket {
 
   socket.on('connect', () => {
     authRetryCount = 0;
+    // C76: (yeniden) bağlanınca mevcut aktiflik değeri tekrar gönderilir.
+    emitClientActivity();
+    bindAppStateActivity();
     if (activeChannelId) {
       joinRoom(activeChannelId);
       // contract §4.3 — "sadece yeni gelenleri dinle" yetmez; arada kaçan mesajlar yeniden çekilir.

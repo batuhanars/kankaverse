@@ -30,6 +30,10 @@ import {
   v2Timestamp,
 } from '../../../shared/push/push-v2';
 import { CallSignalService } from '../../../shared/call-signal/call-signal.service';
+import {
+  ClientActivityService,
+  parseClientKind,
+} from '../../../shared/client-activity/client-activity.service';
 import { VoiceService } from '../../voice/voice.service';
 import { GamesService } from '../../../shared/games/games.service';
 import {
@@ -78,6 +82,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private voice: VoiceService,
     private games: GamesService,
     private callSignal: CallSignalService,
+    private clientActivity: ClientActivityService,
   ) {}
 
   afterInit(server: Server) {
@@ -109,6 +114,15 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       socket.data.username = user?.username ?? payload.sub;
 
       socket.join(`user:${payload.sub}`);
+
+      // C76: bağlantı türü + aktiflik kaydı. Eski istemci `client` göndermez → 'unknown' (bastırmaya katılmaz).
+      const client = parseClientKind(socket.handshake.auth?.client);
+      this.clientActivity.register(socket.id, payload.sub, client);
+      if (client === 'web' || client === 'desktop') {
+        socket.emit('client:mobile_foreground', {
+          active: this.clientActivity.isMobileForeground(payload.sub),
+        });
+      }
 
       // Presence bağlantısı: bu bağlantı kaydedilir ve hesabın ETKİN durumu alınır.
       // `socket.id` bağlantı kimliği: durum artık bağlantı başına tutuluyor (bkz. PresenceService
@@ -146,6 +160,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (!userId) return; // auth olmamış socket — hiçbir şey yapma
 
     this.activitySetTimestamps.delete(socket.id);
+    this.clientActivity.unregister(socket.id);
     // C31b: kapanan bağlantının oyunu hesabın etkin oyunuydu mu? Silinmeden ÖNCE bakılır.
     const gameBefore = this.presence.activeGameId(userId);
     const nowOffline = this.presence.disconnect(userId, socket.id);
@@ -162,6 +177,17 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (gameBefore !== this.presence.activeGameId(userId)) {
       await this.presence.broadcastActivity(userId);
     }
+  }
+
+  /** C76 §2.2 — istemci hareketsizlik/ön plan durumunu bildirir. */
+  @SubscribeMessage('client:activity')
+  handleClientActivity(
+    @ConnectedSocket() socket: AuthSocket,
+    @MessageBody() payload: { active?: unknown },
+  ) {
+    if (!socket.data?.userId || typeof payload?.active !== 'boolean') return { ok: false };
+    this.clientActivity.setActive(socket.id, payload.active);
+    return { ok: true };
   }
 
   @SubscribeMessage('channel:join')

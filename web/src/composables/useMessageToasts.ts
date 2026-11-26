@@ -6,6 +6,7 @@ import { useChannelsStore } from '@/stores/channels'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { NotificationLevel } from '@/types'
 import { playNotificationTone } from '@/utils/notificationTone'
+import { osNotificationsSuppressed, trackOsNotification } from '@/utils/activeDevice'
 
 /**
  * Masaüstü (Electron) "yeni mesaj" toast'ları — DM, grup DM ve sunucu kanalları.
@@ -41,7 +42,9 @@ function throttled(channelId: string) {
 function fire(title: string, body: string, onClick: () => void, tag: string) {
   // tag: aynı kanaldan ardışık toast görsel olarak üst üste yığılmaz, tekini günceller.
   // C74 §4: silent → Windows sesi yerine mobilin bildirim sesi.
+  if (osNotificationsSuppressed()) return // C76 K2: telefon ön planda → OS bildirimi + ses yok
   const notif = new Notification(title, { body, tag, silent: true })
+  trackOsNotification(tag, notif) // tag = kanal kimliği (C76 K3)
   playNotificationTone()
   notif.onclick = () => {
     window.kankaverse?.focusWindow()

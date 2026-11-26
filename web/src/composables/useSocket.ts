@@ -37,6 +37,11 @@ import { invalidateReactionUsers } from '@/composables/useReactionUsers'
 import { REACTION_NOTIFY_EVENT, type ReactionNotifyPayload } from '@/utils/reactionNotification'
 import { maybeFireDmToast, maybeFireChannelToast } from '@/composables/useMessageToasts'
 import { playMessageTone } from '@/utils/messageTone'
+import {
+  setMobileForeground,
+  closeOsNotificationsForChannel,
+  closeAllOsNotifications,
+} from '@/utils/activeDevice'
 import type {
   MessageDto,
   FriendRequestDto,
@@ -88,6 +93,14 @@ let lastActivity: ActivityPayload | null = null
 export function sendActivity(payload: ActivityPayload) {
   lastActivity = payload
   socket?.emit('activity:set', payload)
+}
+
+// C76 §3 — bu penceredeki aktiflik (hareketsizlik algısı `useIdlePresence`'te, tek `useIdle` kaynağı).
+// Son değer saklanır: yeniden bağlanınca tekrar gönderilir. Başlangıç true (sunucu da bağlanınca true sayar).
+let lastClientActive = true
+export function sendClientActivity(active: boolean) {
+  lastClientActive = active
+  socket?.emit('client:activity', { active })
 }
 
 /** Yapay zeka video bitti/başarısız: hazırsa "İzle" düğmeli bilgi, başarısızsa hata toast'ı. */
@@ -183,12 +196,19 @@ export function useSocket() {
     socket = io(import.meta.env.VITE_API_URL || '/', {
       // auth fonksiyon formu: her (yeniden) bağlantıda sessionStorage'dan EN GÜNCEL access token okunur.
       // Sabit token verilseydi (denetim #4) 15dk sonra reconnect bayat token'la el sıkışıp auth'ta düşerdi.
-      auth: (cb: (data: { token: string }) => void) => cb({ token: getAccessToken() ?? '' }),
+      // C76 §2.1: bağlantı türü. Electron köprüsü varsa masaüstü, yoksa web.
+      auth: (cb: (data: { token: string; client: 'web' | 'desktop' }) => void) =>
+        cb({
+          token: getAccessToken() ?? '',
+          client: window.kankaverse?.isElectron === true ? 'desktop' : 'web',
+        }),
       transports: ['websocket'],
     })
 
     socket.on('connect', () => {
       connected.value = true
+      // C76: sunucu bağlantı başına aktiflik tutar (bağlanınca true varsayar) → mevcut değeri tekrar gönder.
+      socket?.emit('client:activity', { active: lastClientActive })
       authRetryCount = 0 // başarılı el sıkışma → tazele-dene sayacını sıfırla
       // Reconnect durumunda aktif kanala yeniden join et
       if (activeChannelId) {
@@ -210,6 +230,12 @@ export function useSocket() {
 
     socket.on('disconnect', () => {
       connected.value = false
+      setMobileForeground(false) // C76 K2: bilgi bayatlar; kopunca OS bildirimi serbest
+    })
+
+    // C76 K2: telefon ön planda mı (sunucu hesap düzeyinde yayar; bağlanınca güncel değer bir kez gelir)
+    socket.on('client:mobile_foreground', (data: { active: boolean }) => {
+      setMobileForeground(data?.active === true)
     })
 
     socket.on('connect_error', (err) => {
@@ -312,10 +338,13 @@ export function useSocket() {
       'read:self',
       (data: { channelId?: string; channelIds?: string[]; guildId: string | null }) => {
         if (data.channelIds) {
+          closeAllOsNotifications()
           channelsStore.applyAllReadLocal()
           return
         }
         if (!data.channelId) return
+        // C76 K3: başka cihazda okundu → bu cihazdaki açık OS bildirimi kalkar
+        closeOsNotificationsForChannel(data.channelId)
         if (data.guildId) channelsStore.applyChannelReadLocal(data.channelId, data.guildId)
         else dmStore.applyReadSelf(data.channelId)
       },

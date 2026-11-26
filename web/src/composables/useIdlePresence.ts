@@ -1,7 +1,7 @@
 import { watch } from 'vue'
 import { useIdle } from '@vueuse/core'
 import { usePresenceStore } from '@/stores/presence'
-import { useSocket } from '@/composables/useSocket'
+import { useSocket, sendClientActivity } from '@/composables/useSocket'
 
 /** Hareketsizlik eşiği: bu süre etkileşim olmazsa "Boşta"ya düş. */
 const IDLE_TIMEOUT_MS = 5 * 60_000 // 5 dk
@@ -39,6 +39,10 @@ export function useIdlePresence() {
     // cevabı yalnız sunucu biliyor ve artık kullanıcının kendisine de yolluyor (`presence:update`,
     // `messages.gateway.ts`). Buraya tahmin yazmak, düzeltmek için uğraştığımız yalanın ta kendisi.
   }
+
+  // C76: aynı `idle` kaynağı aktif cihaz kuralına da beslenir (ikinci zamanlayıcı yok). Manuel
+  // DND/Boşta seçimi bunu etkilemez: yalnız gerçek hareketsizlik sayılır.
+  watch(idle, (isIdle) => sendClientActivity(!isIdle))
 
   watch(
     [idle, () => presenceStore.manualStatus],
