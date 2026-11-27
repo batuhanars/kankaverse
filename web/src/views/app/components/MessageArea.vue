@@ -18,6 +18,8 @@ import { useGuildPermissions } from '@/composables/useGuildPermissions'
 import { useAudioQueue } from '@/composables/useExclusivePlayback'
 import { messagesApi } from '@/api/messages'
 import MessageItem from '@/components/shared/MessageItem.vue'
+import MessageSelectionBar from '@/components/shared/MessageSelectionBar.vue'
+import { useMessageSelection, provideMessageSelection } from '@/composables/useMessageSelection'
 import ScrollToBottomButton from '@/components/shared/ScrollToBottomButton.vue'
 import ReplyQuote from '@/components/shared/ReplyQuote.vue'
 import DateDivider from '@/components/shared/DateDivider.vue'
@@ -88,6 +90,24 @@ const channelId = computed(() => channelsStore.activeChannelId)
 const messages = computed(() =>
   channelId.value ? messagesStore.messagesForChannel(channelId.value) : [],
 )
+
+// C82: çoklu mesaj seçimi (MessageRow'lar enjekte eder); seçim çubuğu yazma kutusunun yerine geçer.
+const selection = useMessageSelection(() => channelId.value, () => messages.value)
+provideMessageSelection(selection)
+function canDeleteMessage(m: MessageDto): boolean {
+  return (
+    m.author.id === authStore.user?.id ||
+    canManageMessages.value ||
+    (!!m.webhook && canManageWebhooks.value)
+  )
+}
+function selectionMentionName(userId: string): string | undefined {
+  return guildMembers.value.find((m) => m.userId === userId)?.username
+}
+function selectionRole(roleId: string): { name: string } | undefined {
+  const guildId = guildsStore.activeGuildId
+  return guildId ? rolesStore.rolesFor(guildId).find((r) => r.id === roleId) : undefined
+}
 
 // Gruplama: mesaj grup başı mı?
 // Kural: ilk mesaj VEYA önceki yazarı farklı VEYA öncekinden > 7 dakika geçmişse → grup başı.
@@ -481,15 +501,28 @@ function resetComposerHeight() {
     />
     </div>
 
+    <!-- C82: seçim modu: mesaj kutusunun yerine seçim çubuğu (kutu v-show ile durur, taslak korunur) -->
+    <MessageSelectionBar
+      v-if="selection.active.value"
+      class="shrink-0 px-4 pb-6 pt-2"
+      :selected="selection.selected.value"
+      :read-only="false"
+      :can-delete="canDeleteMessage"
+      :mention-resolver="selectionMentionName"
+      :role-resolver="selectionRole"
+      @close="selection.clear"
+    />
+
     <!-- C57: salt okunur kanalda yazamayan üye -->
     <div
       v-if="channelId && !canWrite"
+      v-show="!selection.active.value"
       class="shrink-0 mx-4 mb-6 mt-2 px-4 py-3 rounded-[var(--kv-radius-md)] border text-[13px] text-center"
       style="border-color: var(--kv-border-subtle); background-color: var(--kv-bg-elevated); color: var(--kv-text-muted);"
     >
       {{ t('channel.readOnlyNotice') }}
     </div>
-    <div v-else-if="channelId" class="shrink-0 px-4 pb-6 pt-2">
+    <div v-else-if="channelId" v-show="!selection.active.value" class="shrink-0 px-4 pb-6 pt-2">
       <!-- Gönderme hatası (örn. MESSAGE_BLOCKED) -->
       <div
         v-if="sendError"

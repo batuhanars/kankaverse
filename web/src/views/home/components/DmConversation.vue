@@ -47,6 +47,8 @@ import GroupEventNotice from '@/components/shared/GroupEventNotice.vue'
 import { useE2eeBackupStore } from '@/stores/e2eeBackup'
 import MessageEditModal from '@/components/shared/MessageEditModal.vue'
 import ForwardMessageModal from '@/components/shared/ForwardMessageModal.vue'
+import MessageSelectionBar from '@/components/shared/MessageSelectionBar.vue'
+import { useMessageSelection, provideMessageSelection } from '@/composables/useMessageSelection'
 import ReactionPill from '@/components/shared/ReactionPill.vue'
 import ReactionsModal from '@/components/shared/ReactionsModal.vue'
 import PinsPopover from '@/components/shared/PinsPopover.vue'
@@ -389,6 +391,10 @@ async function confirmDelete() {
 const messages = computed(() => messagesStore.messagesForChannel(props.channel.id))
 // M6b §8.4: sesli mesaj sırası (biten ses → sıradaki)
 useAudioQueue(() => props.channel.id, messages)
+// C82: çoklu mesaj seçimi (MessageRow'lar enjekte eder); seçim çubuğu yazma kutusunun yerine geçer.
+const selection = useMessageSelection(() => props.channel.id, () => messages.value)
+provideMessageSelection(selection)
+const canDeleteSelected = (m: MessageDto) => isMine(m) || canDeleteOthers(m)
 const hasMore = computed(() => messagesStore.hasMoreByChannel[props.channel.id] ?? false)
 // E5b Parça C: cihaz öncesi mesajlar gizlendiyse (daha eskisi yokken) listenin başında tek satır.
 const hiddenBefore = computed(() => messagesStore.hiddenBeforeDevice[props.channel.id] ?? false)
@@ -1289,8 +1295,19 @@ const dayLabels = computed<(string | null)[]>(() =>
       />
       </div>
 
+      <!-- C82: seçim modu: mesaj kutusunun yerine seçim çubuğu (kutu v-show ile durur, taslak korunur) -->
+      <MessageSelectionBar
+        v-if="selection.active.value"
+        class="px-4 pb-4 pt-2 shrink-0"
+        :selected="selection.selected.value"
+        :read-only="isDeparted"
+        :can-delete="canDeleteSelected"
+        :mention-resolver="dmUserName"
+        @close="selection.clear"
+      />
+
       <!-- Mesaj input / Engel bandı -->
-      <div class="px-4 pb-4 pt-2 shrink-0">
+      <div v-show="!selection.active.value" class="px-4 pb-4 pt-2 shrink-0">
         <!-- Gönderme hatası -->
         <div
           v-if="sendError"
@@ -1485,7 +1502,7 @@ const dayLabels = computed<(string | null)[]>(() =>
 
   <ForwardMessageModal
     v-if="showForward && forwardMsg"
-    :message="forwardMsg"
+    :messages="[forwardMsg]"
     @close="showForward = false"
   />
 

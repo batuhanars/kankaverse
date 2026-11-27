@@ -4667,3 +4667,15 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Doğrulama (typecheck, eslint)
 - [x] Sahip cihaz turu (§6: DM, grup DM, ortam kanalı, salt okunur geçmiş) (2026-11-26 geçti; Rev.2: başlık gizlenmez, şerit baloncuğa bitişik, seçimde titreşim, arama ikonla + boşken tüm emojiler)
 - [x] Rev.1: şerit mesajın üstünde, Düzenle başlıkta / Kopyala menüde, emoji listesinde Varsayılan tepkiler
+
+## Sprint C82 — Web/masaüstü mesaj menüsü (WhatsApp düzeni) + çoklu seçim — 2026-11-27
+
+> Sözleşme: `contracts/SPRINT_C82_WEB_MESSAGE_MENU_SELECTION_CONTRACT.md`. Yalnız web. Dev checkbox işaretler, item EKLEMEZ.
+
+- [x] Tek menü: sağ tık = ⋯, yeni sıra, Seç, Farklı kaydet / Tümünü kaydet (§1)
+- [x] `useMessageSelection` + onay kutuları + satır vurgusu, ortam kanalı ve DM (§2)
+- [x] Seçim çubuğu: Kopyala / Sil / İlet / İndir (§3)
+- [x] Toplu eylemler, `ForwardMessageModal` dizi alır (§4)
+- [x] i18n (§5)
+- [x] Doğrulama: vue-tsc -b, eslint (dokunulan), vite build (§7)
+- [x] Sahip turu (§7, 8 adım) (2026-11-27 geçti; Rev.1 gizle, Rev.2 İndir koşullu, Rev.3 masaüstü klasöre kaydet → C83)

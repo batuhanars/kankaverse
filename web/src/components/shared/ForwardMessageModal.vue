@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
- * ForwardMessageModal: bir mesajı başka bir DM'e, gruba ya da ortam metin kanalına ilet (kanallar sahip isteği
+ * ForwardMessageModal: bir ya da birden çok mesajı (C82) başka bir DM'e, gruba ya da ortam metin kanalına ilet (kanallar sahip isteği
  * 2026-11-24). Listeden hedef seç → mesajın metni + her eki o kanala gönderilir. Şifreli DM'den ortam kanalına
  * iletilen içerik orada düz gider: `useE2eeStore().send` kanal türüne göre yolu kendisi seçer.
  *
  * C30: ekler sunucuda KOPYALANIR (`POST /attachments/:id/forward` → yeni ek kimliği), sonra normal
  * mesaj gönderimiyle (`attachmentIds`) hedefe bağlanır. İstemci dosyayı indirip yeniden yüklemez.
  * Kapılar (kaynak kanal erişimi, tarama, hedef kanal kuralları) sunucuda; ret mesajı toast'ta.
+ * C82: çok mesajda her hedefe mesajlar kronolojik sırayla TEK TEK gönderilir (`messages` listesi sıralı gelir).
  */
 import { ref, computed, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -22,7 +23,7 @@ import type { MessageDto } from '@/types'
 
 const MAX_TARGETS = 5
 
-const props = defineProps<{ message: MessageDto }>()
+const props = defineProps<{ messages: MessageDto[] }>()
 const emit = defineEmits<{ close: [] }>()
 
 const { t } = useI18n()
@@ -34,21 +35,34 @@ const sending = ref(false)
 const selectedIds = ref<Set<string>>(new Set())
 const sentIds = ref<Set<string>>(new Set())
 
-const forwardText = computed(() => props.message.content?.trim() ?? '')
-const attachments = computed(() => props.message.attachments ?? [])
-// Metin de ek de yoksa iletilecek bir şey yok (bugünkü boş durum)
-const hasContent = computed(() => !!forwardText.value || attachments.value.length > 0)
+const isMulti = computed(() => props.messages.length > 1)
+// Önizleme (tek mesaj): metin + ilk ek. Çok mesajda yalnız sayaç gösterilir.
+const first = computed(() => props.messages[0])
+const forwardText = computed(() => first.value?.content?.trim() ?? '')
+const attachments = computed(() => first.value?.attachments ?? [])
+const itemsOf = (m: MessageDto) => ({ text: m.content?.trim() ?? '', atts: m.attachments ?? [] })
+// Metin de ek de yoksa iletilecek bir şey yok (bugünkü boş durum); çokta en az biri doluysa yeter
+const hasContent = computed(() =>
+  props.messages.some((m) => {
+    const { text, atts } = itemsOf(m)
+    return !!text || atts.length > 0
+  }),
+)
 
 // Önizleme: ilk ek (birden fazlaysa "+N dosya" sayacı). Görsel için küçük resim adresi sunucudan,
 // video için mesajdaki kare; diğerleri dosya simgesi + adı.
 const firstAttachment = computed(() => attachments.value[0] ?? null)
 const previewThumb = useAttachmentThumb(() => firstAttachment.value)
 
-/** Hedef başına gönderim: her ek sunucuda kopyalanır, sonra normal (E2EE) mesaj gönderimiyle bağlanır. */
+/** Hedef başına gönderim: mesajlar sırayla; her ek sunucuda kopyalanır, sonra normal (E2EE) mesaj gönderimiyle bağlanır. */
 async function forwardTo(channelId: string) {
-  const copies = await Promise.all(attachments.value.map((a) => attachmentsApi.forward(a.id)))
-  const attachmentIds = copies.map((r) => r.data.attachmentId)
-  await useE2eeStore().send(channelId, forwardText.value, undefined, attachmentIds)
+  for (const m of props.messages) {
+    const { text, atts } = itemsOf(m)
+    if (!text && !atts.length) continue
+    const copies = await Promise.all(atts.map((a) => attachmentsApi.forward(a.id)))
+    const attachmentIds = copies.map((r) => r.data.attachmentId)
+    await useE2eeStore().send(channelId, text, undefined, attachmentIds)
+  }
 }
 
 function onLimit() {
@@ -101,8 +115,9 @@ function finish(okIds: string[]) {
         class="flex flex-col gap-2 px-3 py-2 rounded-[var(--kv-radius-md)] text-[13px]"
         style="background-color: var(--kv-bg-elevated); color: var(--kv-text-secondary);"
       >
-        <p v-if="forwardText" class="line-clamp-2 break-words">{{ forwardText }}</p>
-        <div v-if="firstAttachment" class="flex items-center gap-2 min-w-0">
+        <p v-if="isMulti">{{ t('message.forwardCount', { n: messages.length }) }}</p>
+        <p v-if="!isMulti && forwardText" class="line-clamp-2 break-words">{{ forwardText }}</p>
+        <div v-if="!isMulti && firstAttachment" class="flex items-center gap-2 min-w-0">
           <div
             class="w-10 h-10 shrink-0 rounded-[var(--kv-radius-sm)] overflow-hidden flex items-center justify-center"
             style="background-color: var(--kv-bg-content); color: var(--kv-text-muted);"

@@ -1113,6 +1113,16 @@
       "file": "Dosya"
     }
   },
+  "select": {
+    "start": "Seç",
+    "count": "{n} mesaj seçildi",
+    "close": "Seçimi kapat",
+    "limit": "En fazla {n} mesaj seçebilirsin.",
+    "deleteConfirm": "{n} mesaj silinsin mi? Bu işlem geri alınamaz.",
+    "deletedPartial": "{n} mesajdan {ok} tanesi silindi.",
+    "copied": "Kopyalandı.",
+    "download": "İndir"
+  },
   "message": {
     "scrollToBottom": "En alta in",
     "inputPlaceholder": "#{channel} kanalına mesaj yaz",
@@ -1155,6 +1165,9 @@
     "forwardLimit": "En fazla 5 yer seçebilirsin",
     "forwardEmpty": "(boş mesaj)",
     "forwardMoreFiles": "+{n} dosya",
+    "forwardCount": "{n} mesaj iletilecek",
+    "saveAs": "Farklı kaydet",
+    "saveAll": "Tümünü kaydet",
     "forwardNoChannels": "İletecek bir sohbet ya da kanal yok.",
     "local": {
       "failed": "Gönderilemedi",

@@ -315,7 +315,7 @@ onUnmounted(() => {
   <!-- Mesaj ilet (forward) modalı -->
   <ForwardMessageModal
     v-if="showForward"
-    :message="message"
+    :messages="[message]"
     @close="showForward = false"
   />
 

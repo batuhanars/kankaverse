@@ -29,6 +29,10 @@ import { renderMessageHtml } from '@/utils/markdown'
 import { hoverAvatarSrc } from '@/utils/animatedMedia'
 import { useActiveMenu } from '@/composables/useActiveMenu'
 import { useMessageJump } from '@/composables/useMessageJump'
+import { injectMessageSelection } from '@/composables/useMessageSelection'
+import { useToastStore } from '@/stores/toast'
+import { downloadAttachments, isDownloadable } from '@/utils/downloadAttachment'
+import SelectCheckbox from './SelectCheckbox.vue'
 import type { MessageDto } from '@/types'
 import PinIcon from '@/components/shared/PinIcon.vue'
 
@@ -82,8 +86,11 @@ const { t } = useI18n()
 const overlayKey = computed(() => `msg:${props.message.id}`)
 const { setActive, clearActive, isSuppressed } = useActiveMenu()
 
-// Bu mesajın ⋯ menüsü / emoji picker'ı açık mı? (MessageActionsMenu.menuOpen expose eder)
-const isMenuOpen = computed(() => !!actionsMenuRef.value?.menuOpen)
+// C82: tek menü (sağ tık ve ⋯). isMenuOpen'dan ÖNCE tanımlı olmalı: izleyici kurulurken okunur (TDZ).
+const ctxMenu = ref<{ x: number; y: number; selection: string; attachmentId: string | null } | null>(null)
+
+// Bu mesajın menüsü (sağ tık / ⋯) / emoji picker'ı açık mı? (MessageActionsMenu.menuOpen expose eder)
+const isMenuOpen = computed(() => !!actionsMenuRef.value?.menuOpen || !!ctxMenu.value)
 
 // Menü açıldı/kapandı → paylaşılan aktif-overlay durumunu güncelle.
 watch(isMenuOpen, (open) => {
@@ -122,13 +129,40 @@ const isLocal = computed(() => !!props.message.localStatus)
 // C34: tik yalnız gönderilmiş (yerel/bekleyen olmayan) mesajda; sunucu bilgi vermediyse (`receipt` null) hiç çizilmez.
 const showReceipt = computed(() => !!props.receipt && !isLocal.value)
 
-// Sağ tık menüsü: görünürlük kuralları ⋯ menüsüyle aynı.
+// C82: tek menü. Sağ tık da ⋯ de aynı MessageContextMenu'yu açar; bayraklar burada hesaplanır.
 const canCopy = computed(() => !!props.message.content)
 const canEdit = computed(() => !props.readOnly && props.isMine && !!props.message.content)
 const canDelete = computed(() => !props.readOnly && (props.isMine || !!props.canManageMessages))
-// Şikâyet ⋯ menüsüyle aynı kural: yalnız başkasının mesajı (sahip bulgusu 2026-11-12: sağ tıkta aranıyordu).
-const canReport = computed(() => !props.isMine) // C62 §2.3.c: eski grupta da açık (T&S)
-const ctxMenu = ref<{ x: number; y: number; selection: string } | null>(null)
+// Şikâyet: yalnız başkasının mesajı (C62 §2.3.c: eski grupta da açık, T&S)
+const canReport = computed(() => !props.isMine)
+
+// C82: seçim modu (liste sahibi sağlar; sağlamayan görünümde seçim yok)
+const selection = injectMessageSelection()
+const selecting = computed(() => !!selection?.active.value)
+const isSelected = computed(() => !!selection?.isSelected(props.message.id))
+const toast = useToastStore()
+watch(selecting, (on) => {
+  if (!on) return
+  ctxMenu.value = null
+  actionsMenuRef.value?.closeAll()
+})
+
+/** Farklı kaydet: sağ tık bir ekin üstündeyse o ek, değilse tek ek → o, çok ek → hepsi. */
+const saveMode = computed<'one' | 'all' | null>(() => {
+  const atts = (props.message.attachments ?? []).filter(isDownloadable)
+  if (!atts.length) return null
+  return ctxMenu.value?.attachmentId || atts.length === 1 ? 'one' : 'all'
+})
+
+async function saveAttachments(attachmentId: string | null) {
+  const atts = (props.message.attachments ?? []).filter(isDownloadable)
+  const ids = attachmentId ? [attachmentId] : atts.map((a) => a.id)
+  try {
+    await downloadAttachments(ids)
+  } catch {
+    toast.error(t('toast.saveError'))
+  }
+}
 
 /** Satır içinde seçili metin; menüye tıklayınca seçim kaybolabildiği için açılışta okunur. */
 function selectionIn(row: HTMLElement): string {
@@ -137,18 +171,25 @@ function selectionIn(row: HTMLElement): string {
   return row.contains(sel.anchorNode) && row.contains(sel.focusNode) ? sel.toString() : ''
 }
 
+function openMenu(x: number, y: number, selectedText: string, attachmentId: string | null) {
+  actionsMenuRef.value?.closeAll()
+  ctxMenu.value = { x, y, selection: selectedText, attachmentId }
+}
+
 function onRowContext(e: MouseEvent) {
-  // Düzenleme kutusunda ve eylemi olmayan satırda tarayıcının/masaüstünün kendi menüsü kalır.
-  if (props.isEditing || isLocal.value || (props.canReply === false && !canCopy.value && !canDelete.value && !canReport.value)) return
+  // Düzenleme kutusunda, gönderilmemiş mesajda ve seçim modunda tarayıcının/masaüstünün kendi menüsü kalır.
+  if (props.isEditing || isLocal.value || selecting.value) return
   e.preventDefault()
   // Belgedeki kapatıcılara ulaşmasın: aynı satırda yeniden sağ tık menüyü kapatmak yerine taşır.
   e.stopPropagation()
-  actionsMenuRef.value?.closeAll()
-  ctxMenu.value = {
-    x: e.clientX,
-    y: e.clientY,
-    selection: selectionIn(e.currentTarget as HTMLElement),
-  }
+  const attachmentId = (e.target as Element).closest('[data-attachment-id]')?.getAttribute('data-attachment-id') ?? null
+  openMenu(e.clientX, e.clientY, selectionIn(e.currentTarget as HTMLElement), attachmentId)
+}
+
+/** ⋯ düğmesi: menü açıksa kapatır, değilse düğmenin altında açar. */
+function onMore(x: number, y: number) {
+  if (ctxMenu.value) ctxMenu.value = null
+  else openMenu(x, y, '', null)
 }
 
 /** Seçim varsa seçili kısım, yoksa bahsetmeleri okunur hale getirilmiş mesaj metni kopyalanır. */
@@ -184,14 +225,15 @@ const authorAvatarSrc = computed<string | null>(() => {
 
 function onRowEnter(e: MouseEvent) {
   rowHovered.value = true
-  // Başka bir mesajın menüsü açıkken bu satır hover-vurgusu göstermesin.
-  if (toolbarSuppressed.value) return
+  // Başka bir mesajın menüsü açıkken ya da seçim modundayken (vurguyu seçim belirler) hover-vurgusu yok.
+  if (toolbarSuppressed.value || selecting.value) return
   ;(e.currentTarget as HTMLElement).style.backgroundColor = 'var(--kv-bg-elevated)'
   showFollowTime.value = true
 }
 
 function onRowLeave(e: MouseEvent) {
   rowHovered.value = false
+  if (selecting.value) return
   ;(e.currentTarget as HTMLElement).style.backgroundColor = ''
   showFollowTime.value = false
 }
@@ -237,6 +279,13 @@ const renderedContent = computed<string>(() => {
     (roleId) => props.roleResolver?.(roleId),
   )
 })
+
+// Satır vurgusu: seçiliyse elevated; bahsedilmede sol-aksan çizgisi + accent zemin (seçim zemini ezer)
+const rowStyle = computed(() => {
+  const border = props.isMentioned ? 'border-color: var(--kv-accent-500);' : ''
+  if (isSelected.value) return `${border} background-color: var(--kv-bg-elevated);`
+  return props.isMentioned ? `${border} background-color: var(--kv-accent-subtle);` : ''
+})
 </script>
 
 <template>
@@ -251,28 +300,44 @@ const renderedContent = computed<string>(() => {
   <div
     :data-message-id="message.id"
     class="relative flex gap-3 px-4 rounded group"
-    :class="[isGroupStart ? 'mt-4 py-0.5' : 'py-0.5', isMentioned ? 'border-l-2' : '']"
-    :style="isMentioned ? 'border-color: var(--kv-accent-500); background-color: var(--kv-accent-subtle);' : ''"
+    :class="[isGroupStart ? 'mt-4 py-0.5' : 'py-0.5', isMentioned ? 'border-l-2' : '', selecting ? 'select-none' : '']"
+    :style="rowStyle"
     @mouseenter="onRowEnter"
     @mouseleave="onRowLeave"
     @contextmenu="onRowContext"
   >
+    <!-- C82: seçim modunda satırın tamamı tek tıklama hedefi (görsel büyütme, bağlantı, tepki vb. çalışmaz) -->
+    <div v-if="selecting" class="absolute inset-0 z-20 cursor-pointer" @click.stop="selection?.toggle(message)" />
+    <SelectCheckbox v-if="selecting" :checked="isSelected" :disabled="isLocal" />
+
     <MessageContextMenu
       v-if="ctxMenu"
       :x="ctxMenu.x"
       :y="ctxMenu.y"
       :message-id="message.id"
-      :can-reply="canReply !== false"
+      :can-reply="canReply !== false && !readOnly"
       :can-copy="canCopy"
+      :can-forward="!readOnly"
+      :can-pin="!!canPin && !readOnly"
+      :is-pinned="!!message.pinnedAt"
       :can-edit="canEdit"
+      :can-view-reactions="!!message.reactions?.length && !readOnly"
+      :can-select="!!selection"
+      :save-mode="saveMode"
       :can-delete="canDelete"
       :can-report="canReport"
       @close="ctxMenu = null"
+      @reply="emit('reply', message)"
       @copy="copyText(ctxMenu?.selection)"
+      @forward="emit('forward', message)"
+      @pin="emit('pin', message.id)"
+      @unpin="emit('unpin', message.id)"
       @edit="emit('edit', message)"
+      @view-reactions="emit('viewReactions', message.id)"
+      @select="selection?.start(message)"
+      @save="saveAttachments(ctxMenu?.attachmentId ?? null)"
       @delete="emit('delete', message.id)"
       @report="emit('report', message.id)"
-      @reply="emit('reply', message)"
     />
 
     <!-- Hover araç çubuğu: -top-3 right-4, yalnız düzenleme modunda gizli.
@@ -280,7 +345,7 @@ const renderedContent = computed<string>(() => {
          - BAŞKA mesajın menüsü açıksa (toolbarSuppressed) → hover ile bile gizli kalır.
          - Aksi halde → normal hover davranışı. -->
     <div
-      v-if="!isEditing && !isLocal"
+      v-if="!isEditing && !isLocal && !selecting"
       class="absolute -top-3 right-4 transition-opacity"
       :class="isMenuOpen
         ? 'opacity-100 z-40'
@@ -291,24 +356,13 @@ const renderedContent = computed<string>(() => {
       <MessageActionsMenu
         ref="actionsMenuRef"
         :message-id="message.id"
-        :is-mine="isMine"
-        :has-content="!!message.content"
-        :is-pinned="!!message.pinnedAt"
-        :can-pin="canPin ?? false"
-        :can-manage-messages="canManageMessages ?? false"
         :can-reply="canReply !== false"
         :read-only="readOnly"
-        :has-reactions="!!message.reactions?.length"
+        :more-open="!!ctxMenu"
         @reply="emit('reply', message)"
         @forward="emit('forward', message)"
-        @edit="emit('edit', message)"
-        @copy="copyText()"
-        @delete="emit('delete', message.id)"
-        @report="emit('report', message.id)"
         @add-reaction="(emoji) => emit('addReaction', message.id, emoji)"
-        @view-reactions="emit('viewReactions', message.id)"
-        @pin="emit('pin', message.id)"
-        @unpin="emit('unpin', message.id)"
+        @more="onMore"
       />
     </div>
 
@@ -424,12 +478,9 @@ const renderedContent = computed<string>(() => {
             class="mt-0.5 rounded-[var(--kv-radius-sm)] overflow-hidden"
             style="max-width: 360px; background-color: var(--kv-bg-sidebar);"
           >
-            <AttachmentView
-              v-for="att in message.attachments"
-              :key="att.id"
-              :attachment="att"
-              class="!mt-0"
-            />
+            <div v-for="att in message.attachments" :key="att.id" class="contents" :data-attachment-id="att.id">
+              <AttachmentView :attachment="att" class="!mt-0" />
+            </div>
             <!--
               Sprint V2 Markdown: v-html yalnız DOMPurify sanitize edilmiş HTML alır.
               Ham içerik asla doğrudan v-html'e girmez (renderMessageHtml bunu garantiler).
@@ -481,11 +532,9 @@ const renderedContent = computed<string>(() => {
             {{ e2eeNote }}
           </p>
           <!-- Yalnız ek (açıklamasız) -->
-          <AttachmentView
-            v-for="att in message.attachments"
-            :key="att.id"
-            :attachment="att"
-          />
+          <div v-for="att in message.attachments" :key="att.id" class="contents" :data-attachment-id="att.id">
+            <AttachmentView :attachment="att" />
+          </div>
           <!-- Metinsiz mesajda tik, ekin altındaki son satırın sonunda -->
           <div v-if="showReceipt && receipt && !message.content" class="mt-0.5 text-[16px] leading-none">
             <ReceiptTick :receipt="receipt" />
