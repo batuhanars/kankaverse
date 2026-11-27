@@ -18,8 +18,10 @@ let gameDetector = null
 // installer'ı Başlat Menüsü kısayoluna build.appId'yi (electron-builder.yml) AUMID
 // olarak damgalar; burada aynı kimliği vererek bildirimler kısayolun adını
 // ("Kankaverse") ve ikonunu kullanır. Diğer platformlarda etkisizdir.
+// Paketsiz çalışma (npm start / npx electron) AYRI kimlik kullanır: aynı kimlikle çıplak electron.exe çalışınca
+// Windows, Başlat kısayolunu ve görev çubuğu ikonunu Electron'a eşliyordu (2026-11-27 sahip makinesi).
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.kankaverse.desktop')
+  app.setAppUserModelId(app.isPackaged ? 'com.kankaverse.desktop' : 'com.kankaverse.desktop.dev')
 }
 
 // Uygulama URL'si: geliştirmede KANKAVERSE_URL env değişkeni ile override edilebilir.

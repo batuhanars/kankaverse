@@ -145,3 +145,7 @@ bildirim merkezine düştükten sonra yazılan cevap hem `reply` olayıyla hem `
   i18n `notification.replySend`. Düğmede el imleci yok (Windows çizer, değiştirilemez).
 - Açık: yerel ortamda şifreli DM bildirimi "🔒 Yeni mesaj" gösterdi (pencere önde de arkada da). Yerel cihaz/grup
   durumundan şüpheleniliyor; canlıda 1.4.0 ile şifreli DM bildiriminin gerçek metni gösterdiği turun ilk maddesi.
+- **Kapanış (2026-11-27):** 1.4.0 canlıda, sahip turu geçti. Canlıda şifreli DM bildirimi gerçek metni gösteriyor
+  (yereldeki "Yeni mesaj" yerel cihaz/grup durumundandı). Tur bulgusu: paketsiz Electron canlı AUMID'le çalışıp
+  Başlat'a AUMID'li `Electron.lnk` bırakılınca Windows uygulamayı Electron'a eşledi; kısayol silindi, paketsiz çalışma
+  artık `com.kankaverse.desktop.dev` (bir sonraki masaüstü sürümüne girer).

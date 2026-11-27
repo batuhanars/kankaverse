@@ -4693,4 +4693,4 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] Rev.1: web köprü kullanımı, cevap gönderimi, Okundu (Rev.1 §2)
 - [x] Sürüm 1.4.0 (§6)
 - [x] Doğrulama (§7: paketsiz açılış + konsol, dist, vue-tsc -b, eslint, vite build)
-- [ ] Sahip turu (§7, 6 adım) → yayın (yerel tur 2026-11-27 geçti: klasöre kaydet, gruplu bildirim, cevap + Okundu, oturum kalıcı; Rev.2; kalan: canlıda güncelleme, şifreli DM bildirim metni, R2 toplu indirme, rozet)
+- [x] Sahip turu (§7, 6 adım) → yayın (2026-11-27: yerel tur + canlı 1.4.0 geçti; şifreli DM bildiriminde gerçek metin, cevap + Okundu, cihazlar arası kaldırma, klasöre kaydet, rozet; yerel "Yeni mesaj" yerel ortamdandı)
