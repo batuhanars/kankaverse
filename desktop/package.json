@@ -1,6 +1,6 @@
 {
   "name": "kankaverse-desktop",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "description": "Kankaverse masaüstü istemcisi",
   "main": "src/main.js",
   "scripts": {
@@ -8,7 +8,7 @@
     "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^36.4.0",
+    "electron": "^44.11.6",
     "electron-builder": "^26.0.12"
   },
   "build": {

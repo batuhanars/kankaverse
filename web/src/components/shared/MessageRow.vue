@@ -156,9 +156,9 @@ const saveMode = computed<'one' | 'all' | null>(() => {
 
 async function saveAttachments(attachmentId: string | null) {
   const atts = (props.message.attachments ?? []).filter(isDownloadable)
-  const ids = attachmentId ? [attachmentId] : atts.map((a) => a.id)
+  const picked = attachmentId ? atts.filter((a) => a.id === attachmentId) : atts
   try {
-    await downloadAttachments(ids)
+    await downloadAttachments(picked.map((a) => ({ id: a.id, filename: a.filename })))
   } catch {
     toast.error(t('toast.saveError'))
   }

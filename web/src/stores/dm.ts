@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { dmApi } from '@/api/dm'
 import { useAuthStore } from '@/stores/auth'
+import { clearToastBuffer } from '@/utils/activeDevice'
 import type {
   DmChannelDto,
   DmLastReactionDto,
@@ -145,6 +146,7 @@ export const useDmStore = defineStore('dm', () => {
   }
 
   async function markRead(channelId: string) {
+    clearToastBuffer(channelId) // C83 §4: sohbet okundu → gruplu bildirim tamponu sıfırlanır
     if (isDeparted(channelId)) return
     await dmApi.markRead(channelId)
     const ch = channels.value.find((c) => c.id === channelId)

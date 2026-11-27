@@ -40,8 +40,47 @@ export function trackOsNotification(
   notif.addEventListener('click', forget)
 }
 
+/**
+ * C83 §4: gruplu bildirim tamponu. Sohbet başına son satırlar + toplam sayı. Sohbet okununca
+ * (bu cihazda açılınca ya da başka cihazda okundu) temizlenir; böylece eski satırlar yeni bildirime sızmaz.
+ */
+export interface ToastBuffer {
+  lines: string[]
+  count: number
+  /** Süzgeç içinde gelip henüz çizilmemiş satır var mı. */
+  pending: boolean
+  timer: ReturnType<typeof setTimeout> | null
+}
+const toastBuffers = new Map<string, ToastBuffer>()
+
+export function getToastBuffer(channelId: string): ToastBuffer {
+  let b = toastBuffers.get(channelId)
+  if (!b) toastBuffers.set(channelId, (b = { lines: [], count: 0, pending: false, timer: null }))
+  return b
+}
+
+export function clearToastBuffer(channelId: string): void {
+  const b = toastBuffers.get(channelId)
+  if (!b) return
+  if (b.timer) clearTimeout(b.timer)
+  toastBuffers.delete(channelId)
+}
+
+/** C83 Rev.1: kabuk (köprü) bildirimleri kanal kimliğiyle izlenir: kanal -> köprü tag'i. */
+const shellTagByChannel = new Map<string, string>()
+
+export function trackShellNotification(channelId: string, tag: string): void {
+  shellTagByChannel.set(channelId, tag)
+}
+
 /** K3: bu kanala ait açık OS bildirimlerini kapatır (başka cihazda okundu). Yoksa no-op. */
 export function closeOsNotificationsForChannel(channelId: string): void {
+  clearToastBuffer(channelId)
+  const shellTag = shellTagByChannel.get(channelId)
+  if (shellTag) {
+    shellTagByChannel.delete(channelId)
+    window.kankaverse?.closeMessageNotification?.(shellTag)
+  }
   const set = openByChannel.get(channelId)
   if (!set) return
   openByChannel.delete(channelId)
@@ -55,5 +94,7 @@ export function closeOsNotificationsForChannel(channelId: string): void {
 }
 
 export function closeAllOsNotifications(): void {
-  for (const id of [...openByChannel.keys()]) closeOsNotificationsForChannel(id)
+  for (const id of new Set([...openByChannel.keys(), ...shellTagByChannel.keys()])) {
+    closeOsNotificationsForChannel(id)
+  }
 }

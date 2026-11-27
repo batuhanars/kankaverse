@@ -22,6 +22,7 @@ import { useIdlePresence } from '@/composables/useIdlePresence'
 import { useAppModals } from '@/composables/useAppModals'
 import { useAppShellNav } from '@/composables/useAppShellNav'
 import { useNativeNotifications } from '@/composables/useNativeNotifications'
+import { useMessageNotificationEvents } from '@/composables/useMessageNotificationEvents'
 import { useGameActivity } from '@/composables/useGameActivity'
 import { usePauseMediaWhenHidden } from '@/composables/usePauseMediaWhenHidden'
 import { isMobile, isWide } from '@/composables/useResponsive'
@@ -85,6 +86,9 @@ useIdlePresence()
 // Electron native bildirim katmanı: görünür-değilken yeni bildirim → OS toast.
 // Yalnız window.kankaverse?.isElectron=true iken aktif; tarayıcıda no-op.
 useNativeNotifications()
+
+// C83 Rev.1: kabuk mesaj bildiriminden cevap / Okundu / tıklama olayları (köprü yoksa no-op).
+useMessageNotificationEvents()
 
 // C31b: masaüstü oyun algılama köprüsü ("oynuyor" durumu + yayın önerisi). Köprü yoksa no-op.
 useGameActivity()

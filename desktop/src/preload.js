@@ -50,6 +50,35 @@ contextBridge.exposeInMainWorld('kankaverse', {
   /** C31b: ekran seçici bu adı içeren pencereyi seçili açsın (null temizler). */
   setShareHint: (name) => ipcRenderer.send('share:set-hint', name),
 
+  /**
+   * C83 §3: tek klasör seçtirip tüm dosyaları oraya indirir (dosya adı sorulmaz).
+   * @param {{ url: string, filename: string }[]} files
+   * @param {string} title Klasör seçme penceresi başlığı.
+   * @returns {Promise<{ saved: number, failed: number, canceled: boolean }>}
+   */
+  saveFilesToFolder: (files, title) => ipcRenderer.invoke('desktop:save-files-to-folder', files, title),
+
+  /**
+   * C83 Rev.1: cevap kutulu + "Okundu" düğmeli mesaj bildirimi. tag: `dm:<channelId>` | `ch:<guildId>:<channelId>`
+   * (main deseni doğrular). Aynı tag'li eski bildirim kapanır.
+   * @param {{ tag: string, title: string, body: string, replyPlaceholder: string, readLabel: string }} data
+   */
+  showMessageNotification: (data) => ipcRenderer.send('msgnotif:show', data),
+
+  /** C83 Rev.1: tag'li mesaj bildirimini kapat (sohbet okundu). */
+  closeMessageNotification: (tag) => ipcRenderer.send('msgnotif:close', tag),
+
+  /**
+   * C83 Rev.1: bildirim olayları cb({ type: 'click' | 'reply' | 'read', tag, text? }). Abone olunca bekleyen
+   * olaylar iletilir. Abonelikten çıkış fonksiyonu döner.
+   */
+  onMessageNotificationEvent: (cb) => {
+    const handler = (_event, e) => cb(e)
+    ipcRenderer.on('msgnotif:event', handler)
+    ipcRenderer.send('msgnotif:subscribe')
+    return () => ipcRenderer.removeListener('msgnotif:event', handler)
+  },
+
   /** İndirilen güncellemeyi kurup uygulamayı yeniden başlatır. */
   installUpdate: () => ipcRenderer.send('update:install'),
 

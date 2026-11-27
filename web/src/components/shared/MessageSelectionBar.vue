@@ -53,7 +53,7 @@ const messageText = (m: MessageDto) =>
  * Araya düz metin mesajı karışırsa pasif. Ek altı açıklama metni etkinliği bozmaz.
  */
 const downloadIds = computed(() =>
-  props.selected.flatMap((m) => (m.attachments ?? []).filter(isDownloadable).map((a) => a.id)),
+  props.selected.flatMap((m) => (m.attachments ?? []).filter(isDownloadable).map((a) => ({ id: a.id, filename: a.filename }))),
 )
 const canDownload = computed(
   () => props.selected.length > 0 && props.selected.every((m) => (m.attachments ?? []).some(isDownloadable)),

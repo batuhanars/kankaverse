@@ -4679,3 +4679,18 @@ başka bir sebeple (ör. D62 arama reddetme) zaten geçilecekse aynı turda çö
 - [x] i18n (§5)
 - [x] Doğrulama: vue-tsc -b, eslint (dokunulan), vite build (§7)
 - [x] Sahip turu (§7, 8 adım) (2026-11-27 geçti; Rev.1 gizle, Rev.2 İndir koşullu, Rev.3 masaüstü klasöre kaydet → C83)
+
+## Sprint C83 — Masaüstü kabuğu 1.4.0 — 2026-11-27
+
+> Sözleşme: `contracts/SPRINT_C83_DESKTOP_SHELL_1_4_CONTRACT.md`. desktop + web. Dev checkbox işaretler, item EKLEMEZ. §2 diff sahibe satır satır.
+
+- [x] Electron 44 yükseltmesi + kırıcı değişiklik taraması (§1, D93)
+- [x] Gezinme koruması `isAppUrl` + will-navigate / will-redirect (§2, D80)
+- [x] Klasöre kaydet köprüsü (main + preload) + web kullanımı (§3)
+- [x] Gruplu mesaj bildirimi (§4)
+- [x] Hızlı cevap denemesi raporu (§5, ürüne girmez) (2026-11-27 olumlu → Rev.1)
+- [x] Rev.1: kabuk bildirimi (hasReply + Okundu) + köprü (Rev.1 §1)
+- [x] Rev.1: web köprü kullanımı, cevap gönderimi, Okundu (Rev.1 §2)
+- [x] Sürüm 1.4.0 (§6)
+- [x] Doğrulama (§7: paketsiz açılış + konsol, dist, vue-tsc -b, eslint, vite build)
+- [ ] Sahip turu (§7, 6 adım) → yayın (yerel tur 2026-11-27 geçti: klasöre kaydet, gruplu bildirim, cevap + Okundu, oturum kalıcı; Rev.2; kalan: canlıda güncelleme, şifreli DM bildirim metni, R2 toplu indirme, rozet)

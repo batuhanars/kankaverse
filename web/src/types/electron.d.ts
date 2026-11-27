@@ -39,12 +39,40 @@ interface KankaverseElectronBridge {
   setGameList?: (list: Array<{ id: string; executables: string[] }>) => void
   /** C31b: ekran seçici bu adı içeren pencereyi seçili açsın (null temizler). */
   setShareHint?: (name: string | null) => void
+  /** C83: tek klasör seçtirip dosyaları oraya indirir. 1.4.0 öncesinde yok. */
+  saveFilesToFolder?: (
+    files: Array<{ url: string; filename: string }>,
+    title: string,
+  ) => Promise<{ saved: number; failed: number; canceled: boolean }>
+  /** C83 Rev.1: cevap kutulu + Okundu düğmeli mesaj bildirimi. 1.4.0 öncesinde yok. */
+  showMessageNotification?: (data: MessageNotificationData) => void
+  /** C83 Rev.1: tag'li mesaj bildirimini kapat. */
+  closeMessageNotification?: (tag: string) => void
+  /** C83 Rev.1: bildirim olayları; abonelikten çıkış döner. */
+  onMessageNotificationEvent?: (cb: (e: MessageNotificationEvent) => void) => () => void
   /** C74: gelen arama penceresini göster (ana pencere öndeyse main göstermez). 1.3.0 öncesinde yok. */
   showIncomingCall?: (data: IncomingCallWindowData) => void
   /** C74: gelen arama penceresini kapat. 1.3.0 öncesinde yok. */
   hideIncomingCall?: () => void
   /** C74: arama penceresinde basılan buton; abonelikten çıkış döner. 1.3.0 öncesinde yok. */
   onCallAction?: (cb: (e: { action: 'accept' | 'reject'; channelId: string }) => void) => () => void
+}
+
+/** C83 Rev.1: tag `dm:<channelId>` ya da `ch:<guildId>:<channelId>`. */
+interface MessageNotificationData {
+  tag: string
+  title: string
+  body: string
+  replyPlaceholder: string
+  readLabel: string
+  /** Cevap kutusunun Gönder düğmesi (Electron'un sabit "Reply" metni yerine). */
+  sendLabel?: string
+}
+
+interface MessageNotificationEvent {
+  type: 'click' | 'reply' | 'read'
+  tag: string
+  text?: string
 }
 
 /** C74 §3: arama penceresine giden yük. Metinler web'de çevrilmiş gelir, pencere metin gömmez. */

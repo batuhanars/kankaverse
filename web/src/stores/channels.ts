@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { guildsApi } from '@/api/guilds'
 import { channelsApi, categoriesApi } from '@/api/channels'
 import { useGuildsStore } from '@/stores/guilds'
+import { clearToastBuffer } from '@/utils/activeDevice'
 import type { ChannelDto, CategoryDto } from '@/types'
 
 export const useChannelsStore = defineStore('channels', () => {
@@ -173,6 +174,7 @@ export const useChannelsStore = defineStore('channels', () => {
    * ve C20 `read:self` (başka cihazım okudu, sunucu zaten yazdı). Çözülen guildId'yi döner.
    */
   function applyChannelReadLocal(channelId: string, guildId?: string): string | undefined {
+    clearToastBuffer(channelId) // C83 §4: gruplu bildirim tamponu sıfırlanır
     let resolvedGuildId = guildId
     for (const [loopGuildId, channels] of Object.entries(channelsByGuild.value)) {
       const idx = channels.findIndex((c) => c.id === channelId)

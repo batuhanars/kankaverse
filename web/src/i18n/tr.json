@@ -1121,7 +1121,10 @@
     "deleteConfirm": "{n} mesaj silinsin mi? Bu işlem geri alınamaz.",
     "deletedPartial": "{n} mesajdan {ok} tanesi silindi.",
     "copied": "Kopyalandı.",
-    "download": "İndir"
+    "download": "İndir",
+    "folderTitle": "Klasör seç",
+    "savedCount": "{n} dosya kaydedildi",
+    "savedPartial": "{total} dosyadan {n} tanesi kaydedildi."
   },
   "message": {
     "scrollToBottom": "En alta in",
@@ -1825,6 +1828,11 @@
     "hoursAgo": "{n} sa önce",
     "daysAgo": "{n} gün önce",
     "channelMessage": "{actor}: {text}",
+    "groupedTitle": "{name} ({n} mesaj)",
+    "replyPlaceholder": "Cevap yaz",
+    "markRead": "Okundu olarak işaretle",
+    "replySend": "Gönder",
+    "replyFailed": "Gönderilemedi: {text}",
     "groupFallback": "Grup sohbeti",
     "channelFallback": "kanal",
     "nativeTitle": "Kankaverse",

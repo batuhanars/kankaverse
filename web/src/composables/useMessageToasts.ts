@@ -6,7 +6,13 @@ import { useChannelsStore } from '@/stores/channels'
 import { useNotificationPrefsStore } from '@/stores/notificationPrefs'
 import { NotificationLevel } from '@/types'
 import { playNotificationTone } from '@/utils/notificationTone'
-import { osNotificationsSuppressed, trackOsNotification } from '@/utils/activeDevice'
+import {
+  osNotificationsSuppressed,
+  trackOsNotification,
+  getToastBuffer,
+  clearToastBuffer,
+  trackShellNotification,
+} from '@/utils/activeDevice'
 
 /**
  * Masaüstü (Electron) "yeni mesaj" toast'ları — DM, grup DM ve sunucu kanalları.
@@ -32,22 +38,90 @@ function appFocused() {
   return !document.hidden && document.hasFocus()
 }
 
-function throttled(channelId: string) {
-  const now = Date.now()
-  if (now - (lastToastAt.get(channelId) ?? 0) < THROTTLE_MS) return true
-  lastToastAt.set(channelId, now)
-  return false
+const BUFFER_LINES = 3
+
+/**
+ * C83 §4: süzgeç mesaj DÜŞÜRMEZ. Satır tampona girer; süzgeç dışındaysa hemen, içindeyse süzgeç
+ * bitince tek bildirim çizilir. Bildirim gövdesi son 3 satır, 2+ mesajda başlık "{ad} ({n} mesaj)".
+ */
+function enqueue(
+  channelId: string,
+  shellTag: string,
+  title: string,
+  line: string,
+  onClick: () => void,
+) {
+  if (osNotificationsSuppressed()) return // C76 K2: telefon ön planda → tampona da girmez
+  const buf = getToastBuffer(channelId)
+  buf.lines.push(line)
+  if (buf.lines.length > BUFFER_LINES) buf.lines.shift()
+  buf.count++
+
+  const render = () => {
+    buf.pending = false
+    buf.timer = null
+    lastToastAt.set(channelId, Date.now())
+    const { t } = i18n.global
+    const shownTitle =
+      buf.count > 1 ? t('notification.groupedTitle', { name: title, n: buf.count }) : title
+    fire(shownTitle, buf.lines.join('\n'), onClick, channelId, shellTag)
+  }
+
+  const wait = THROTTLE_MS - (Date.now() - (lastToastAt.get(channelId) ?? 0))
+  if (wait <= 0) {
+    render()
+    return
+  }
+  buf.pending = true
+  if (buf.timer) clearTimeout(buf.timer) // en güncel başlık/tıklama ile çiz
+  buf.timer = setTimeout(render, wait)
 }
 
-function fire(title: string, body: string, onClick: () => void, tag: string) {
+/** C83 Rev.1: başlık, hata sonrası yeniden çizim için tag başına saklanır. */
+const shellTitles = new Map<string, string>()
+
+function drawShellNotification(tag: string, title: string, body: string): boolean {
+  const bridge = window.kankaverse
+  if (!bridge?.showMessageNotification) return false
+  const { t } = i18n.global
+  bridge.showMessageNotification({
+    tag,
+    title,
+    body,
+    replyPlaceholder: t('notification.replyPlaceholder'),
+    readLabel: t('notification.markRead'),
+    sendLabel: t('notification.replySend'),
+  })
+  shellTitles.set(tag, title)
+  return true
+}
+
+/** Cevap gönderilemedi: aynı başlıkla, yazılan metni gövdede tutarak kabuk bildirimini yeniden çizer. */
+export function redrawShellNotificationFailed(tag: string, text: string): void {
+  const { t } = i18n.global
+  drawShellNotification(
+    tag,
+    shellTitles.get(tag) ?? t('notification.nativeTitle'),
+    t('notification.replyFailed', { text }),
+  )
+}
+
+function fire(title: string, body: string, onClick: () => void, tag: string, shellTag: string) {
   // tag: aynı kanaldan ardışık toast görsel olarak üst üste yığılmaz, tekini günceller.
   // C74 §4: silent → Windows sesi yerine mobilin bildirim sesi.
   if (osNotificationsSuppressed()) return // C76 K2: telefon ön planda → OS bildirimi + ses yok
+  // C83 Rev.1: köprü varsa kabuk bildirimi (olaylar useMessageNotificationEvents'te); yoksa bugünkü yol.
+  if (drawShellNotification(shellTag, title, body)) {
+    trackShellNotification(tag, shellTag)
+    playNotificationTone()
+    return
+  }
   const notif = new Notification(title, { body, tag, silent: true })
   trackOsNotification(tag, notif) // tag = kanal kimliği (C76 K3)
   playNotificationTone()
   notif.onclick = () => {
     window.kankaverse?.focusWindow()
+    clearToastBuffer(tag)
     onClick()
   }
 }
@@ -68,13 +142,14 @@ export function maybeFireDmToast(
   if (!isElectron()) return
   const auth = useAuthStore()
   if (payload.senderId === auth.user?.id) return // kendi mesajım
-  if (appFocused() && isActive) return // tam bu sohbete bakıyorum
+  if (appFocused() && isActive) {
+    clearToastBuffer(payload.channelId) // tam bu sohbete bakıyorum: birikmiş satırlar okundu sayılır
+    return
+  }
 
   const prefs = useNotificationPrefsStore()
   if (prefs.isMuted('CHANNEL', payload.channelId)) return
   if (prefs.effectiveLevel('CHANNEL', payload.channelId) === NotificationLevel.NONE) return
-
-  if (throttled(payload.channelId)) return
 
   const { t } = i18n.global
   const dm = useDmStore()
@@ -100,11 +175,12 @@ export function maybeFireDmToast(
     body = content
   }
 
-  fire(
+  enqueue(
+    payload.channelId,
+    `dm:${payload.channelId}`,
     title,
     body,
     () => void router.push({ name: 'dm', params: { channelId: payload.channelId } }),
-    payload.channelId,
   )
 }
 
@@ -126,7 +202,10 @@ export function maybeFireChannelToast(
   if (!payload.author || payload.preview === undefined) return // okuma yetkisi yok → çıplak payload
   const auth = useAuthStore()
   if (payload.authorId === auth.user?.id) return
-  if (appFocused() && isActive) return
+  if (appFocused() && isActive) {
+    clearToastBuffer(payload.channelId)
+    return
+  }
 
   const prefs = useNotificationPrefsStore()
   if (prefs.isMuted('CHANNEL', payload.channelId)) return
@@ -134,8 +213,6 @@ export function maybeFireChannelToast(
   // Sunucu kanalı: yalnız seviye ALL'da düz mesaj toast'ı (MENTIONS/NONE → bahsetme zaten ayrı).
   if (prefs.effectiveLevel('CHANNEL', payload.channelId, payload.guildId) !== NotificationLevel.ALL)
     return
-
-  if (throttled(payload.channelId)) return
 
   const { t } = i18n.global
   const channels = useChannelsStore()
@@ -146,7 +223,9 @@ export function maybeFireChannelToast(
     text: payload.preview,
   })
 
-  fire(
+  enqueue(
+    payload.channelId,
+    `ch:${payload.guildId}:${payload.channelId}`,
     title,
     body,
     () =>
@@ -154,6 +233,5 @@ export function maybeFireChannelToast(
         name: 'channel',
         params: { guildId: payload.guildId, channelId: payload.channelId },
       }),
-    payload.channelId,
   )
 }

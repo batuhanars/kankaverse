@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, session, desktopCapturer } = require('electron')
+const { app, BrowserWindow, Tray, Menu, shell, ipcMain, nativeImage, session, desktopCapturer, dialog, Notification } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { createGameDetector } = require('./game-detector')
@@ -26,6 +26,34 @@ if (process.platform === 'win32') {
 // NOT: kök '/' artık tanıtım sitesi (landing tier). Masaüstü doğrudan app ana ekranını yükler;
 // giriş yapılmamışsa SPA /login'e yönlendirir. Kökü yüklersek landing açılırdı.
 const APP_URL = process.env.KANKAVERSE_URL ?? 'https://kankaverse.com/channels/@me'
+
+// C83 §2: uygulama kökenleri (tek doğruluk). Önek denetimi (`startsWith('https://kankaverse.com')`)
+// `kankaverse.com.evil.tld` açığı taşır; bu yüzden URL ayrıştırılıp origin tam eşleşmesiyle karşılaştırılır.
+// Paketsiz çalışmada (APP_URL localhost) yerel geliştirme kökeni de uygulama sayılır.
+const APP_ORIGINS = new Set(['https://kankaverse.com'])
+function originOf(url) {
+  try {
+    return new URL(url).origin
+  } catch {
+    return null
+  }
+}
+{
+  const o = originOf(APP_URL)
+  if (o && o !== 'null') APP_ORIGINS.add(o)
+}
+function isAppUrl(url) {
+  const u = (() => {
+    try {
+      return new URL(url)
+    } catch {
+      return null
+    }
+  })()
+  if (!u) return false
+  if (APP_ORIGINS.has(u.origin)) return true
+  return !app.isPackaged && u.protocol === 'http:' && u.hostname === 'localhost'
+}
 
 let win = null
 let tray = null
@@ -61,8 +89,10 @@ function applyOpenAtLogin() {
   // Dev'de (paketsiz) login-item kaydı yazma: kayit ciplak electron.exe'ye dusup
   // acilista uygulamasiz Electron karsilama ekrani olarak geri gelir.
   if (!app.isPackaged) return
-  // OS'i ayarla senkronla; openAsHidden (Windows/macOS) açılışta tepsiye düşürür.
-  app.setLoginItemSettings({ openAtLogin: settings.openAtLogin, openAsHidden: settings.startMinimized })
+  // OS'i ayarla senkronla.
+  // Electron 44: `openAsHidden` kaldırıldı. Gizli başlama zaten `startMinimized` ayarını okuyan
+  // ready-to-show'da yapılıyor (her açılışta), o yüzden login item'a ek alan gerekmez.
+  app.setLoginItemSettings({ openAtLogin: settings.openAtLogin })
 }
 
 // Çalışma-zamanı ikon yolu: pakette extraResources (resources/icon.png), dev'de build/icon.png.
@@ -103,6 +133,7 @@ if (!gotLock) {
     createTray()
     setupAutoUpdate()
     setupGameDetection()
+    setupMessageNotificationActivation()
 
     // Ekran paylaşımı (getDisplayMedia) — kullanıcı picker penceresiyle kaynak seçer.
     session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
@@ -241,6 +272,16 @@ function editMenuTemplate(params) {
   return params.selectionText ? [{ role: 'copy', label: 'Kopyala', enabled: flags.canCopy }] : []
 }
 
+// Yalnız http(s) sistem tarayıcısına gider; file:, javascript: vb. şemalar sessizce engellenir.
+function openExternalSafe(url) {
+  try {
+    const { protocol } = new URL(url)
+    if (protocol === 'https:' || protocol === 'http:') void shell.openExternal(url)
+  } catch {
+    // ayrıştırılamayan adres: yok say
+  }
+}
+
 // ── Ana pencere ──────────────────────────────────────────────────────────────
 function createWindow() {
   const iconPath = resolveIconPath()
@@ -268,6 +309,11 @@ function createWindow() {
   callWindow.attachToMainWindow(win)
 
   // İndirme sayfa yüklenmeden bittiyse ya da sayfa yenilendiyse bant kaybolmasın: her yüklemede tekrar bildir.
+  // Yalnız ANA çerçevenin belge değiştiren gezinmesi (yenileme) aboneliği sıfırlar. `did-start-loading` iframe
+  // yüklenince de tetikleniyordu (bağlantı önizlemesi vb.): abonelik "düşmüş" sayılıyor, olaylar kuyrukta kalıyordu.
+  win.webContents.on('did-start-navigation', (details) => {
+    if (details?.isMainFrame && !details.isSameDocument) msgNotifSubscribed = false
+  })
   win.webContents.on('did-finish-load', () => {
     if (currentGame) win.webContents.send('game:activity', currentGame)
     if (downloadedVersion) win.webContents.send('update:ready', { version: downloadedVersion })
@@ -304,13 +350,21 @@ function createWindow() {
   // Harici linkleri (rel="external", target="_blank" vb.) sistem tarayıcısında aç.
   // Uygulama içinde rastgele site açılmasını engeller.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    // Kendi domain'imiz yeni sekmede açılabilir (bazı auth akışları için); dışarısını tarayıcıya at.
-    if (url.startsWith('https://kankaverse.com') || url.startsWith('http://localhost')) {
-      return { action: 'allow' }
-    }
-    shell.openExternal(url)
+    // Kendi kökenimiz yeni pencerede açılabilir (bazı auth akışları için); dışarısını tarayıcıya at.
+    if (isAppUrl(url)) return { action: 'allow' }
+    openExternalSafe(url)
     return { action: 'deny' }
   })
+
+  // C83 §2 (D80): pencere uygulama dışına gezinemez. Bırakılan dosya (file://), tıklanan dış bağlantı ya da
+  // yönlendirme ana pencereyi başka sayfaya götürmez; http(s) ise sistem tarayıcısında açılır.
+  const guardNavigation = (event, url) => {
+    if (isAppUrl(url)) return
+    event.preventDefault()
+    openExternalSafe(url)
+  }
+  win.webContents.on('will-navigate', guardNavigation)
+  win.webContents.on('will-redirect', guardNavigation)
 
   // Pencere X tuşuyla kapatılınca: closeToTray ise tepsiye gizle (WS bağlı kalsın,
   // bildirim gelsin); kapalıysa normal kapanış → window-all-closed → uygulama tamamen kapanır.
@@ -450,6 +504,261 @@ ipcMain.on('game:request-current', () => {
 // Yayın önerisi: ekran seçici bu pencere adını içeren kaynağı seçili açsın.
 ipcMain.on('share:set-hint', (_event, name) => {
   shareHint = typeof name === 'string' && name.length > 0 ? name.slice(0, 100) : null
+})
+
+// ── C83 §3: çoklu indirme, klasöre kaydet ──────────────────────────────────────
+// Web güvenilmez: sınırlar, ana bilgisayar ve dosya adı burada yeniden doğrulanır.
+// İmzalı adres, api'de StorageService.presignGet ile üretilir: S3 uyumlu depoya (path-style) giden adres.
+// Prod'da ana bilgisayar `<hesap>.r2.cloudflarestorage.com` (DEPLOY_VPS.md S3_ENDPOINT); hesap kimliği
+// koda gömülmez, bu yüzden R2 alan son eki kabul edilir. Paketsizde (yerel MinIO) http(s) localhost / özel ağ.
+const MAX_BATCH_FILES = 50
+const DOWNLOAD_HOST_SUFFIXES = ['.r2.cloudflarestorage.com']
+
+function isAllowedDownloadUrl(raw) {
+  let u
+  try {
+    u = new URL(raw)
+  } catch {
+    return false
+  }
+  if (u.protocol === 'https:') {
+    return DOWNLOAD_HOST_SUFFIXES.some((suf) => u.hostname.endsWith(suf))
+  }
+  // Paketsiz geliştirme: yerel MinIO (localhost ya da LAN IP). Paketli üründe asla http.
+  return !app.isPackaged && u.protocol === 'http:'
+}
+
+// Windows'ta geçersiz karakterler `_`; yalnız ad kısmı; boşsa 'dosya'; ayrılmış adlar (CON, NUL...) korunur.
+function safeFilename(name) {
+  let base = path.basename(String(name ?? '').replace(/[\\]/g, '/'))
+  base = base.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/[. ]+$/, '').trim()
+  if (/^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i.test(base)) base = `_${base}`
+  return base || 'dosya'
+}
+
+// Aynı ad varsa `ad (1).uzantı`. Hem diskteki hem bu işte ayrılmış adlar sayılır.
+function uniqueSavePath(dir, filename, reserved) {
+  const ext = path.extname(filename)
+  const stem = filename.slice(0, filename.length - ext.length)
+  let candidate = filename
+  for (let i = 1; fs.existsSync(path.join(dir, candidate)) || reserved.has(candidate.toLowerCase()); i++) {
+    candidate = `${stem} (${i})${ext}`
+  }
+  reserved.add(candidate.toLowerCase())
+  const full = path.join(dir, candidate)
+  // Klasör dışına yazma imkânsız olmalı (basename + geçersiz karakter temizliği zaten garanti eder).
+  if (path.dirname(full) !== path.resolve(dir)) throw new Error('klasör dışı yol')
+  return full
+}
+
+// url -> hedef yol (bu işe ait indirmeler). will-download bu eşlemeye bakar; olmayan indirmelere dokunulmaz.
+const batchTargets = new Map()
+let downloadHookInstalled = false
+function installDownloadHook() {
+  if (downloadHookInstalled) return
+  downloadHookInstalled = true
+  session.defaultSession.on('will-download', (_event, item) => {
+    const target = batchTargets.get(item.getURL())
+    if (!target) return // toplu işe ait değil: varsayılan kayıt penceresi
+    batchTargets.delete(item.getURL())
+    item.setSavePath(target.savePath)
+    item.once('done', (_e, state) => target.onDone(state === 'completed'))
+  })
+}
+
+ipcMain.handle('desktop:save-files-to-folder', async (_event, files, title) => {
+  const fail = { saved: 0, failed: 0, canceled: false }
+  if (!win || win.isDestroyed() || !Array.isArray(files)) return fail
+  if (files.length === 0 || files.length > MAX_BATCH_FILES) return fail
+  const entries = files.map((f) => ({ url: f?.url, filename: f?.filename }))
+  // Reddedilen adres sessiz kalmasın: web "kaydedilemedi" göstersin (izinli ana bilgisayar listesi bayatsa fark edilir).
+  if (entries.some((e) => typeof e.url !== 'string' || !isAllowedDownloadUrl(e.url))) {
+    console.warn('[save-files] izinli olmayan indirme adresi reddedildi')
+    return { saved: 0, failed: files.length, canceled: false }
+  }
+
+  const dialogTitle = typeof title === 'string' && title ? title.slice(0, 100) : undefined
+  const picked = await dialog.showOpenDialog(win, {
+    title: dialogTitle,
+    properties: ['openDirectory', 'createDirectory'],
+  })
+  if (picked.canceled || picked.filePaths.length === 0) return { saved: 0, failed: 0, canceled: true }
+  const dir = path.resolve(picked.filePaths[0])
+
+  installDownloadHook()
+  const reserved = new Set()
+  let saved = 0
+  let failed = 0
+  await Promise.all(
+    entries.map(
+      (e) =>
+        new Promise((resolve) => {
+          // Aynı URL iki kez gelirse eşleme çakışır: ikincisini başarısız say.
+          if (batchTargets.has(e.url)) {
+            failed++
+            resolve()
+            return
+          }
+          let savePath
+          try {
+            savePath = uniqueSavePath(dir, safeFilename(e.filename), reserved)
+          } catch {
+            failed++
+            resolve()
+            return
+          }
+          const timer = setTimeout(() => {
+            if (batchTargets.delete(e.url)) {
+              failed++
+              resolve()
+            }
+          }, 10 * 60 * 1000)
+          batchTargets.set(e.url, {
+            savePath,
+            onDone: (ok) => {
+              clearTimeout(timer)
+              if (ok) saved++
+              else failed++
+              resolve()
+            },
+          })
+          win.webContents.downloadURL(e.url)
+        }),
+    ),
+  )
+  return { saved, failed, canceled: false }
+})
+
+// ── C83 Rev.1: bildirimden hızlı cevap + Okundu ────────────────────────────────
+// Web güvenilmez: tag deseni ve uzunluklar burada yeniden doğrulanır. `tag` Notification `id` seçeneğine verilir
+// (Windows'ta toast Tag'i); Electron bunu etkinleştirme argümanına `tag=<id>` olarak yazar, handleActivation'da oradan okunur.
+const MSG_TAG_RE = /^(dm:[\w-]{1,64}|ch:[\w-]{1,64}:[\w-]{1,64})$/
+const MSG_TAG_MAX = 64 // Windows toast Tag üst sınırı
+const activeMsgNotifs = new Map() // tag -> Notification (yalnız bu süreçte çizilenler)
+let msgNotifSubscribed = false // renderer abone mi (sayfa yüklenmiş + web dinleyiciyi kurmuş)
+const msgNotifQueue = [] // abonelik öncesi gelen olaylar
+const lastMsgEvent = { key: '', at: 0 } // örnek olayı + handleActivation çift teslimini ayıklar
+
+function emitMsgNotifEvent(event) {
+  const key = `${event.type}|${event.tag}|${event.text ?? ''}`
+  const now = Date.now()
+  if (key === lastMsgEvent.key && now - lastMsgEvent.at < 1000) return
+  lastMsgEvent.key = key
+  lastMsgEvent.at = now
+  if (event.type === 'click' || event.type === 'reply' || event.type === 'read') bringToFrontIfClick(event)
+  if (win && !win.isDestroyed() && msgNotifSubscribed) {
+    win.webContents.send('msgnotif:event', event)
+  } else if (msgNotifQueue.length < 20) {
+    msgNotifQueue.push(event)
+  }
+}
+
+// Yalnız tıklama pencereyi öne getirir (cevap/okundu arka planda sessizce işlenir).
+function bringToFrontIfClick(event) {
+  if (event.type === 'click') bringToFront()
+}
+
+// XML'e giren her metin kaçırılır (başlık/gövde kullanıcı içeriği taşır: şablon enjeksiyonu olmasın).
+function xmlEscape(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c])
+}
+
+function buildMessageToastXml({ tag, title, body, placeholder, sendLabel, readLabel }) {
+  const arg = (type) => xmlEscape(`type=${type}&tag=${tag}`)
+  return (
+    `<toast launch="${arg('click')}" activationType="foreground">` +
+    '<visual><binding template="ToastGeneric">' +
+    `<text>${xmlEscape(title)}</text><text>${xmlEscape(body)}</text>` +
+    '</binding></visual>' +
+    '<audio silent="true"/>' +
+    `<actions><input id="reply" type="text" placeHolderContent="${xmlEscape(placeholder)}"/>` +
+    `<action content="${xmlEscape(sendLabel)}" arguments="${arg('reply')}" hint-inputId="reply" activationType="foreground"/>` +
+    `<action content="${xmlEscape(readLabel)}" arguments="${arg('action')}" activationType="foreground"/>` +
+    '</actions></toast>'
+  )
+}
+
+function normalizeActivation(details) {
+  const params = new URLSearchParams(String(details?.arguments ?? ''))
+  const tag = params.get('tag')
+  if (!tag || tag.length > MSG_TAG_MAX || !MSG_TAG_RE.test(tag)) return null
+  // Tür argümandan okunur (kendi şablonumuz da Electron'unki de `type=` yazar); Electron özel şablonda
+  // düğmeyi `click` diye raporlayabilir, o yüzden argüman önce.
+  const type = params.get('type') || details.type
+  if (type === 'reply') {
+    const text = String(details.reply ?? details.userInputs?.reply ?? '').slice(0, 4000)
+    return text.trim() ? { type: 'reply', tag, text } : null
+  }
+  if (type === 'action') return { type: 'read', tag }
+  if (type === 'click') return { type: 'click', tag }
+  return null
+}
+
+// Windows: bildirim merkezinde duran ya da nesnesi bellekte olmayan bildirimin etkinleştirmesi de buradan gelir.
+function setupMessageNotificationActivation() {
+  if (process.platform !== 'win32' || typeof Notification.handleActivation !== 'function') return
+  Notification.handleActivation((details) => {
+    const event = normalizeActivation(details)
+    if (event) emitMsgNotifEvent(event)
+  })
+}
+
+function closeMsgNotif(tag) {
+  const n = activeMsgNotifs.get(tag)
+  if (!n) return
+  activeMsgNotifs.delete(tag)
+  try {
+    n.close()
+  } catch {
+    // zaten kapanmış
+  }
+}
+
+ipcMain.on('msgnotif:subscribe', () => {
+  msgNotifSubscribed = true
+  if (!win || win.isDestroyed()) return
+  for (const ev of msgNotifQueue.splice(0)) win.webContents.send('msgnotif:event', ev)
+})
+
+ipcMain.on('msgnotif:show', (_event, data) => {
+  if (!Notification.isSupported()) return
+  const tag = data?.tag
+  if (typeof tag !== 'string' || tag.length > MSG_TAG_MAX || !MSG_TAG_RE.test(tag)) return
+  const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '')
+  closeMsgNotif(tag)
+  const readLabel = str(data.readLabel, 60) || 'OK'
+  const sendLabel = str(data.sendLabel, 30) || 'OK'
+  const n = new Notification({
+    id: tag,
+    title: str(data.title, 128),
+    body: str(data.body, 1000),
+    silent: true,
+    // Electron'un hazır cevap kutusunda Gönder düğmesi "Reply" sabit; Türkçe için Windows şablonu elle kurulur.
+    // Biçim Electron'unkiyle aynı (`type=…&tag=…`), olaylar handleActivation'da aynı yoldan okunur.
+    toastXml: buildMessageToastXml({
+      tag,
+      title: str(data.title, 128),
+      body: str(data.body, 1000),
+      placeholder: str(data.replyPlaceholder, 60),
+      sendLabel,
+      readLabel,
+    }),
+  })
+  n.on('click', () => emitMsgNotifEvent({ type: 'click', tag }))
+  n.on('reply', (_e, reply) => {
+    const text = String(typeof reply === 'string' ? reply : (reply?.reply ?? '')).slice(0, 4000)
+    if (text.trim()) emitMsgNotifEvent({ type: 'reply', tag, text })
+  })
+  n.on('action', () => emitMsgNotifEvent({ type: 'read', tag }))
+  n.on('close', () => {
+    if (activeMsgNotifs.get(tag) === n) activeMsgNotifs.delete(tag)
+  })
+  activeMsgNotifs.set(tag, n)
+  n.show()
+})
+
+ipcMain.on('msgnotif:close', (_event, tag) => {
+  if (typeof tag === 'string' && MSG_TAG_RE.test(tag)) closeMsgNotif(tag)
 })
 
 // Preload → renderer: pencereyi öne getir (native bildirim tıklaması)
